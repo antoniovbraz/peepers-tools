@@ -3,37 +3,63 @@ import { useCreateListing, PromptCard } from "@/context/CreateListingContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, ArrowLeft, Copy, Check, Upload, ThumbsUp, RefreshCw, MessageSquare, ClipboardList } from "lucide-react";
+import { ArrowRight, ArrowLeft, Copy, Check, Upload, ThumbsUp, RefreshCw, MessageSquare, ClipboardList, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-
-const mockPrompts = [
-  "Product flat lay on clean white marble surface, overhead shot, soft natural lighting, the notebook open showing lined pages alongside colorful gel pens arranged in rainbow order, minimalist styling, professional product photography, 4K",
-  "Lifestyle scene: cozy desk setup with the A5 notebook and gel pens, warm ambient lighting, a cup of coffee in background, bokeh effect, Instagram aesthetic, shallow depth of field, 4K",
-  "Close-up detail shot of gel pen tips showing vibrant ink colors on the notebook page, macro photography, crisp focus, clean white background, professional product photography, 4K",
-  "Gift-ready presentation: notebook and pen set in premium packaging with tissue paper, soft pink and white color palette, elegant product photography, studio lighting, 4K",
-  "Back to school themed flat lay with the notebook, colorful pens, decorative stickers and washi tape, pastel background, fun and youthful aesthetic, overhead shot, 4K",
-  "Hand holding the notebook showing the illustrated hard cover design, natural daylight, outdoor setting with blurred greenery background, lifestyle product photography, 4K",
-  "Infographic-style hero banner: notebook and pens centered with callout graphics highlighting features (80 sheets, A5 size, 6 colors), clean modern design, white background with subtle gradient, 4K",
-];
 
 export default function StepPrompts() {
   const { data, updatePrompts, completeStep, goNext, goBack } = useCreateListing();
-  const [prompts, setPrompts] = useState<PromptCard[]>(() =>
-    data.prompts.map((p, i) => ({
-      ...p,
-      prompt: p.prompt || mockPrompts[i] || `Prompt ${i + 1}`,
-    }))
-  );
+  const [prompts, setPrompts] = useState<PromptCard[]>(data.prompts);
+  const [loading, setLoading] = useState(false);
   const [feedbackId, setFeedbackId] = useState<number | null>(null);
   const [feedbackText, setFeedbackText] = useState("");
   const uploadRefs = useRef<(HTMLInputElement | null)[]>([]);
   const [copiedId, setCopiedId] = useState<number | null>(null);
+  const [generated, setGenerated] = useState(prompts.some(p => p.prompt && !p.prompt.startsWith("Prompt ")));
 
   const approvedCount = prompts.filter(p => p.approved).length;
 
   useEffect(() => {
     updatePrompts(prompts);
   }, [prompts, updatePrompts]);
+
+  const generatePrompts = async () => {
+    setLoading(true);
+    try {
+      const { data: result, error } = await supabase.functions.invoke("generate-prompts", {
+        body: {
+          productName: data.identification.name,
+          category: data.identification.category,
+          characteristics: data.identification.characteristics,
+          extras: data.identification.extras,
+          adTitle: data.ads.mercadoLivre.title,
+        },
+      });
+      if (error) throw error;
+      if (result?.error) throw new Error(result.error);
+
+      const newPrompts = (result.prompts || []).slice(0, 7).map((text: string, i: number) => ({
+        id: i + 1,
+        prompt: text,
+        approved: false,
+        imageUrl: undefined,
+        feedback: undefined,
+      }));
+      setPrompts(newPrompts);
+      setGenerated(true);
+    } catch (err: any) {
+      console.error("Generate prompts error:", err);
+      toast({ title: "Erro ao gerar prompts", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!generated && data.identification.name) {
+      generatePrompts();
+    }
+  }, []);
 
   const copyPrompt = (text: string, id: number) => {
     navigator.clipboard.writeText(text);
@@ -75,6 +101,16 @@ export default function StepPrompts() {
     goNext();
   };
 
+  if (loading) {
+    return (
+      <div className="px-4 py-10 flex flex-col items-center gap-4">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <h2 className="font-display text-lg font-bold">Gerando prompts...</h2>
+        <p className="text-sm text-muted-foreground text-center">A IA está criando 7 prompts de imagem para seu produto</p>
+      </div>
+    );
+  }
+
   return (
     <div className="px-4 py-6 space-y-5">
       <div className="text-center space-y-1">
@@ -82,17 +118,20 @@ export default function StepPrompts() {
         <p className="text-sm text-muted-foreground">Copie, gere a imagem, e faça upload</p>
       </div>
 
-      {/* Progress */}
       <div className="flex items-center justify-between">
         <Badge variant="secondary" className="text-xs gap-1">
           <ThumbsUp className="w-3 h-3" /> {approvedCount}/7 aprovadas
         </Badge>
-        <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={copyAll}>
-          <ClipboardList className="w-3.5 h-3.5" /> Copiar todos
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={generatePrompts}>
+            <RefreshCw className="w-3.5 h-3.5" /> Regenerar
+          </Button>
+          <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={copyAll}>
+            <ClipboardList className="w-3.5 h-3.5" /> Copiar todos
+          </Button>
+        </div>
       </div>
 
-      {/* Prompt Cards */}
       <div className="space-y-4">
         {prompts.map((p, i) => (
           <div
@@ -111,10 +150,8 @@ export default function StepPrompts() {
                 )}
               </div>
 
-              {/* Prompt text */}
               <p className="text-sm text-foreground leading-relaxed">{p.prompt}</p>
 
-              {/* Copy button */}
               <Button
                 variant="outline"
                 size="sm"
@@ -125,7 +162,6 @@ export default function StepPrompts() {
                 {copiedId === p.id ? "Copiado!" : "Copiar prompt"}
               </Button>
 
-              {/* Image upload / preview */}
               {p.imageUrl ? (
                 <div className="space-y-2">
                   <img src={p.imageUrl} alt={`Imagem ${i + 1}`} className="w-full rounded-lg aspect-square object-cover" />
@@ -162,7 +198,6 @@ export default function StepPrompts() {
                 onChange={e => handleImageUpload(p.id, e.target.files)}
               />
 
-              {/* Feedback area */}
               {feedbackId === p.id && (
                 <div className="space-y-2 pt-2 border-t">
                   <Textarea

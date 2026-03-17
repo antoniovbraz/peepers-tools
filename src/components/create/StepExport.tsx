@@ -1,21 +1,51 @@
+import { useState } from "react";
 import { useCreateListing } from "@/context/CreateListingContext";
+import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Download, Check, PartyPopper, Image, FileText } from "lucide-react";
+import { ArrowLeft, Download, Check, PartyPopper, Image, FileText, Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
 export default function StepExport() {
   const { data, completeStep, goBack } = useCreateListing();
+  const { user } = useAuth();
+  const [saving, setSaving] = useState(false);
 
   const approvedImages = data.prompts.filter(p => p.approved && p.imageUrl);
 
   const handleExport = async () => {
-    // For now, just mark as complete. JSZip integration will come with backend.
-    completeStep(4);
-    toast({
-      title: "🎉 Anúncio completo!",
-      description: "O ZIP será gerado quando integrarmos o backend.",
-    });
+    if (!user) return;
+    setSaving(true);
+    try {
+      const { error } = await supabase.from("listings").insert({
+        user_id: user.id,
+        product_name: data.identification.name,
+        category: data.identification.category,
+        characteristics: data.identification.characteristics,
+        extras: data.identification.extras,
+        ad_mercadolivre_title: data.ads.mercadoLivre.title,
+        ad_mercadolivre_description: data.ads.mercadoLivre.description,
+        ad_shopee_title: data.ads.shopee.title,
+        ad_shopee_description: data.ads.shopee.description,
+        prompts: data.prompts.map(p => ({ prompt: p.prompt, approved: p.approved })),
+        photo_urls: data.photoUrls,
+        status: "completed",
+      });
+
+      if (error) throw error;
+
+      completeStep(4);
+      toast({
+        title: "🎉 Anúncio salvo!",
+        description: "Seu anúncio foi salvo com sucesso.",
+      });
+    } catch (err: any) {
+      console.error("Save error:", err);
+      toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -25,12 +55,10 @@ export default function StepExport() {
           <PartyPopper className="w-7 h-7 text-success" />
         </div>
         <h2 className="font-display text-xl font-bold text-foreground">Revisão Final</h2>
-        <p className="text-sm text-muted-foreground">Confira tudo antes de exportar</p>
+        <p className="text-sm text-muted-foreground">Confira tudo antes de salvar</p>
       </div>
 
-      {/* Summary Cards */}
       <div className="space-y-3">
-        {/* Photos */}
         <div className="bg-card rounded-xl border p-4 space-y-2">
           <div className="flex items-center gap-2">
             <Image className="w-4 h-4 text-primary" />
@@ -44,7 +72,6 @@ export default function StepExport() {
           </div>
         </div>
 
-        {/* Product ID */}
         <div className="bg-card rounded-xl border p-4 space-y-1">
           <div className="flex items-center gap-2">
             <Check className="w-4 h-4 text-success" />
@@ -53,7 +80,6 @@ export default function StepExport() {
           <p className="text-sm text-muted-foreground">{data.identification.name || "—"}</p>
         </div>
 
-        {/* Ads */}
         <div className="bg-card rounded-xl border p-4 space-y-2">
           <div className="flex items-center gap-2">
             <FileText className="w-4 h-4 text-primary" />
@@ -65,7 +91,6 @@ export default function StepExport() {
           </div>
         </div>
 
-        {/* Images */}
         <div className="bg-card rounded-xl border p-4 space-y-2">
           <div className="flex items-center gap-2">
             <Image className="w-4 h-4 text-success" />
@@ -80,24 +105,13 @@ export default function StepExport() {
         </div>
       </div>
 
-      {/* ZIP Preview */}
-      <div className="bg-muted rounded-xl p-4 space-y-2">
-        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Conteúdo do ZIP</span>
-        <ul className="text-xs text-muted-foreground space-y-1">
-          <li>📄 mercado-livre.txt (título + descrição)</li>
-          <li>📄 shopee.txt (título + descrição)</li>
-          <li>📁 fotos-produto/ ({data.photoUrls.length} imagens)</li>
-          <li>📁 imagens-geradas/ ({approvedImages.length} imagens)</li>
-          <li>📄 prompts.txt (7 prompts)</li>
-        </ul>
-      </div>
-
       <div className="flex gap-3">
         <Button variant="outline" onClick={goBack} className="h-12 px-4">
           <ArrowLeft className="w-5 h-5" />
         </Button>
-        <Button onClick={handleExport} className="flex-1 h-14 text-base font-bold gap-2 bg-success hover:bg-success/90">
-          <Download className="w-5 h-5" /> Exportar ZIP
+        <Button onClick={handleExport} disabled={saving} className="flex-1 h-14 text-base font-bold gap-2 bg-success hover:bg-success/90">
+          {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+          {saving ? "Salvando..." : "Salvar Anúncio"}
         </Button>
       </div>
     </div>
