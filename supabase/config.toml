@@ -1,1 +1,10 @@
 project_id = "foihtwiunviqopskjcxu"
+
+[functions.identify-product]
+verify_jwt = false
+
+[functions.generate-ads]
+verify_jwt = false
+
+[functions.generate-prompts]
+verify_jwt = false
