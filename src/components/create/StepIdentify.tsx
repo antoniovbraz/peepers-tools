@@ -1,41 +1,75 @@
 import { useState, useEffect } from "react";
 import { useCreateListing } from "@/context/CreateListingContext";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, ArrowLeft, Loader2, Sparkles } from "lucide-react";
+import { ArrowRight, ArrowLeft, Check, Edit3, Loader2, Brain, Plus } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
 
 export default function StepIdentify() {
   const { data, updateIdentification, completeStep, goNext, goBack } = useCreateListing();
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [name, setName] = useState(data.identification.name);
   const [category, setCategory] = useState(data.identification.category);
   const [characteristics, setCharacteristics] = useState<string[]>(data.identification.characteristics);
   const [extras, setExtras] = useState(data.identification.extras);
-  const [showExtras, setShowExtras] = useState(false);
+  const [identified, setIdentified] = useState(!!data.identification.name);
 
-  // Simulate AI identification
-  useEffect(() => {
-    if (data.identification.name) {
-      setLoading(false);
+  const runAI = async () => {
+    if (data.photoUrls.length === 0) {
+      toast({ title: "Envie fotos primeiro", variant: "destructive" });
       return;
     }
-    const timer = setTimeout(() => {
-      const mock = {
-        name: "Kit Caderno Espiral A5 + Canetas Coloridas",
-        category: "Papelaria / Cadernos",
-        characteristics: ["Caderno espiral A5", "Capa dura ilustrada", "80 folhas pautadas", "Kit com 6 canetas gel coloridas", "Embalagem presenteável"],
-      };
-      setName(mock.name);
-      setCategory(mock.category);
-      setCharacteristics(mock.characteristics);
-      setLoading(false);
-    }, 2000);
-    return () => clearTimeout(timer);
-  }, [data.identification.name]);
+    setLoading(true);
+    try {
+      // Convert blob URLs to base64 for AI
+      const base64Urls = await Promise.all(
+        data.photoUrls.slice(0, 4).map(async (url) => {
+          const resp = await fetch(url);
+          const blob = await resp.blob();
+          return new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.readAsDataURL(blob);
+          });
+        })
+      );
 
-  const handleNext = () => {
+      const { data: result, error } = await supabase.functions.invoke("identify-product", {
+        body: { photoUrls: base64Urls },
+      });
+
+      if (error) throw error;
+      if (result?.error) throw new Error(result.error);
+
+      setName(result.name || "");
+      setCategory(result.category || "");
+      setCharacteristics(result.characteristics || []);
+      setIdentified(true);
+      updateIdentification({
+        name: result.name || "",
+        category: result.category || "",
+        characteristics: result.characteristics || [],
+        extras,
+      });
+    } catch (err: any) {
+      console.error("AI identify error:", err);
+      toast({ title: "Erro na IA", description: err.message, variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (!identified && data.photoUrls.length > 0) {
+      runAI();
+    }
+  }, []);
+
+  const handleConfirm = () => {
     updateIdentification({ name, category, characteristics, extras });
     completeStep(1);
     goNext();
@@ -43,14 +77,13 @@ export default function StepIdentify() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center">
-          <Loader2 className="w-8 h-8 text-accent animate-spin" />
+      <div className="px-4 py-10 flex flex-col items-center gap-4">
+        <div className="w-16 h-16 rounded-full bg-highlight/20 flex items-center justify-center animate-pulse">
+          <Brain className="w-8 h-8 text-highlight" />
         </div>
-        <div className="text-center space-y-1">
-          <p className="font-display font-bold text-foreground">Analisando fotos...</p>
-          <p className="text-sm text-muted-foreground">A IA está identificando o produto</p>
-        </div>
+        <h2 className="font-display text-lg font-bold">Analisando produto...</h2>
+        <p className="text-sm text-muted-foreground text-center">A IA está identificando seu produto pelas fotos</p>
+        <Loader2 className="w-6 h-6 animate-spin text-primary" />
       </div>
     );
   }
@@ -58,59 +91,69 @@ export default function StepIdentify() {
   return (
     <div className="px-4 py-6 space-y-5">
       <div className="text-center space-y-1">
-        <div className="inline-flex items-center gap-1.5 text-primary">
-          <Sparkles className="w-4 h-4" />
-          <span className="text-xs font-semibold uppercase tracking-wider">Identificação da IA</span>
-        </div>
-        <h2 className="font-display text-xl font-bold text-foreground">Confira o resultado</h2>
+        <h2 className="font-display text-xl font-bold text-foreground">Produto Identificado</h2>
+        <p className="text-sm text-muted-foreground">Confira e ajuste se necessário</p>
       </div>
 
-      <div className="space-y-4 bg-card rounded-xl p-4 border shadow-sm">
+      <div className="bg-card rounded-xl border p-4 space-y-4">
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Nome do Produto</label>
-          <Input value={name} onChange={e => setName(e.target.value)} className="font-medium" />
+          <label className="text-xs font-semibold text-muted-foreground uppercase">Nome</label>
+          <Input value={name} onChange={e => setName(e.target.value)} disabled={!editing} />
         </div>
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Categoria</label>
-          <Input value={category} onChange={e => setCategory(e.target.value)} />
+          <label className="text-xs font-semibold text-muted-foreground uppercase">Categoria</label>
+          <Input value={category} onChange={e => setCategory(e.target.value)} disabled={!editing} />
         </div>
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Características</label>
+          <label className="text-xs font-semibold text-muted-foreground uppercase">Características</label>
           <div className="flex flex-wrap gap-2">
             {characteristics.map((c, i) => (
-              <Badge key={i} variant="secondary" className="text-xs">{c}</Badge>
+              <Badge key={i} variant="secondary" className="text-xs">
+                {editing ? (
+                  <input
+                    className="bg-transparent border-none outline-none w-auto text-xs"
+                    value={c}
+                    onChange={e => {
+                      const next = [...characteristics];
+                      next[i] = e.target.value;
+                      setCharacteristics(next);
+                    }}
+                  />
+                ) : (
+                  c
+                )}
+              </Badge>
             ))}
+            {editing && (
+              <Button size="sm" variant="ghost" className="h-6 gap-1 text-xs" onClick={() => setCharacteristics([...characteristics, ""])}>
+                <Plus className="w-3 h-3" /> Adicionar
+              </Button>
+            )}
           </div>
         </div>
-      </div>
-
-      {!showExtras ? (
-        <button
-          onClick={() => setShowExtras(true)}
-          className="text-sm text-primary font-medium underline underline-offset-2"
-        >
-          + Adicionar informações extras
-        </button>
-      ) : (
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Especificações extras</label>
+          <label className="text-xs font-semibold text-muted-foreground uppercase">Informações extras</label>
           <Textarea
             value={extras}
             onChange={e => setExtras(e.target.value)}
-            placeholder="Ex: material premium, edição limitada, dimensões..."
-            rows={3}
+            placeholder="Dimensões, material, código do produto..."
+            rows={2}
           />
         </div>
-      )}
+      </div>
 
       <div className="flex gap-3">
-        <Button variant="outline" onClick={goBack} className="h-12 px-4">
-          <ArrowLeft className="w-5 h-5" />
+        <Button variant="outline" className="gap-2" onClick={() => setEditing(!editing)}>
+          <Edit3 className="w-4 h-4" /> {editing ? "Pronto" : "Editar"}
         </Button>
-        <Button onClick={handleNext} className="flex-1 h-12 text-base font-semibold gap-2">
-          Tá correto, próximo <ArrowRight className="w-5 h-5" />
+        <Button variant="outline" className="gap-2" onClick={runAI}>
+          <Brain className="w-4 h-4" /> Re-analisar
         </Button>
       </div>
+
+      <Button onClick={handleConfirm} disabled={!name} className="w-full h-14 text-base font-bold gap-2">
+        <Check className="w-5 h-5" /> Tá correto, próximo <ArrowRight className="w-5 h-5" />
+      </Button>
     </div>
   );
 }
