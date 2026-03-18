@@ -1,9 +1,8 @@
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useCreateListing, PromptCard } from "@/context/CreateListingContext";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, ArrowLeft, Copy, Check, Upload, ThumbsUp, RefreshCw, MessageSquare, ClipboardList, Loader2, Sparkles, X } from "lucide-react";
+import { ArrowRight, ArrowLeft, RefreshCw, ClipboardList, Loader2, ThumbsUp, Sparkles, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import PromptCardItem from "./PromptCardItem";
@@ -14,8 +13,12 @@ export default function StepPrompts() {
   const [loading, setLoading] = useState(false);
   const [generated, setGenerated] = useState(prompts.some(p => p.prompt && p.prompt.length > 20));
 
-  const approvedCount = prompts.filter(p => p.approved).length;
+  // Batch generation state
+  const [batchGenerating, setBatchGenerating] = useState(false);
+  const [batchProgress, setBatchProgress] = useState(0);
+  const cancelRef = useRef(false);
 
+  const approvedCount = prompts.filter(p => p.approved).length;
 
   const generatePrompts = async () => {
     setLoading(true);
@@ -70,6 +73,46 @@ export default function StepPrompts() {
     });
   };
 
+  const generateAllImages = useCallback(async () => {
+    cancelRef.current = false;
+    setBatchGenerating(true);
+    setBatchProgress(0);
+
+    const pending = prompts.filter(p => !p.imageUrl && !p.approved);
+    const referencePhotos = data.photoUrls.slice(0, 3);
+
+    for (let idx = 0; idx < pending.length; idx++) {
+      if (cancelRef.current) break;
+      const p = pending[idx];
+      setBatchProgress(idx + 1);
+
+      try {
+        const { data: result, error } = await supabase.functions.invoke("generate-image", {
+          body: { prompt: p.prompt, referencePhotos, feedback: p.feedback },
+        });
+        if (error) throw error;
+        if (result?.error) throw new Error(result.error);
+        if (result?.imageUrl) {
+          updatePrompt(p.id, { imageUrl: result.imageUrl });
+        }
+      } catch (err: any) {
+        console.error(`Generate image #${p.id} error:`, err);
+        toast({ title: `Erro na imagem #${p.id}`, description: err.message, variant: "destructive" });
+      }
+    }
+
+    setBatchGenerating(false);
+    if (!cancelRef.current) {
+      toast({ title: "Todas as imagens foram geradas!" });
+    }
+  }, [prompts, data.photoUrls]);
+
+  const cancelBatch = () => {
+    cancelRef.current = true;
+    setBatchGenerating(false);
+    toast({ title: "Geração cancelada" });
+  };
+
   const handleNext = () => {
     completeStep(3);
     goNext();
@@ -84,6 +127,8 @@ export default function StepPrompts() {
       </div>
     );
   }
+
+  const pendingCount = prompts.filter(p => !p.imageUrl && !p.approved).length;
 
   return (
     <div className="px-4 py-6 space-y-5">
@@ -106,6 +151,27 @@ export default function StepPrompts() {
         </div>
       </div>
 
+      {/* Generate All button */}
+      {pendingCount > 0 && (
+        <div>
+          {batchGenerating ? (
+            <div className="flex gap-2">
+              <Button disabled className="flex-1 gap-2 h-10">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Gerando {batchProgress}/{pendingCount}...
+              </Button>
+              <Button variant="destructive" size="sm" className="h-10 gap-1" onClick={cancelBatch}>
+                <XCircle className="w-4 h-4" /> Cancelar
+              </Button>
+            </div>
+          ) : (
+            <Button className="w-full gap-2 h-10" variant="outline" onClick={generateAllImages}>
+              <Sparkles className="w-4 h-4" /> Gerar todas as {pendingCount} imagens
+            </Button>
+          )}
+        </div>
+      )}
+
       <div className="space-y-4">
         {prompts.map((p, i) => (
           <PromptCardItem
@@ -113,7 +179,7 @@ export default function StepPrompts() {
             prompt={p}
             index={i}
             onUpdate={updatePrompt}
-            photos={data.photos}
+            photoUrls={data.photoUrls}
           />
         ))}
       </div>

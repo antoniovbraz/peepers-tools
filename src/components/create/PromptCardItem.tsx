@@ -11,19 +11,10 @@ interface PromptCardItemProps {
   prompt: PromptCard;
   index: number;
   onUpdate: (id: number, updates: Partial<PromptCard>) => void;
-  photos: File[];
+  photoUrls: string[];
 }
 
-function fileToBase64(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = reject;
-    reader.readAsDataURL(file);
-  });
-}
-
-export default function PromptCardItem({ prompt: p, index: i, onUpdate, photos }: PromptCardItemProps) {
+export default function PromptCardItem({ prompt: p, index: i, onUpdate, photoUrls }: PromptCardItemProps) {
   const [copiedId, setCopiedId] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -39,9 +30,8 @@ export default function PromptCardItem({ prompt: p, index: i, onUpdate, photos }
   const generateImage = async () => {
     setGenerating(true);
     try {
-      // Convert up to 3 photos to base64
-      const photosToSend = photos.slice(0, 3);
-      const referencePhotos = await Promise.all(photosToSend.map(fileToBase64));
+      // photoUrls are now public Storage URLs — pass directly
+      const referencePhotos = photoUrls.slice(0, 3);
 
       const { data, error } = await supabase.functions.invoke("generate-image", {
         body: { prompt: p.prompt, referencePhotos, feedback: p.feedback },
@@ -61,7 +51,6 @@ export default function PromptCardItem({ prompt: p, index: i, onUpdate, photos }
 
   const handleImageUpload = (files: FileList | null) => {
     if (!files?.[0]) return;
-    // Revoke previous blob URL if any
     if (p.imageUrl?.startsWith("blob:")) {
       URL.revokeObjectURL(p.imageUrl);
     }
@@ -77,7 +66,9 @@ export default function PromptCardItem({ prompt: p, index: i, onUpdate, photos }
     });
     setFeedbackOpen(false);
     setFeedbackText("");
-    toast({ title: "Feedback salvo", description: "Regenere a imagem com o prompt atualizado" });
+    toast({ title: "Feedback salvo, regenerando imagem..." });
+    // Auto-regenerate after feedback
+    setTimeout(() => generateImage(), 100);
   };
 
   return (
@@ -161,7 +152,7 @@ export default function PromptCardItem({ prompt: p, index: i, onUpdate, photos }
               rows={3}
             />
             <Button size="sm" className="w-full gap-1" onClick={submitFeedback}>
-              <RefreshCw className="w-3.5 h-3.5" /> Salvar feedback
+              <RefreshCw className="w-3.5 h-3.5" /> Salvar e regenerar
             </Button>
           </div>
         )}

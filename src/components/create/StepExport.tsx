@@ -31,7 +31,7 @@ export default function StepExport() {
         ad_mercadolivre_description: data.ads.mercadoLivre.description,
         ad_shopee_title: data.ads.shopee.title,
         ad_shopee_description: data.ads.shopee.description,
-        prompts: data.prompts.map(p => ({ prompt: p.prompt, approved: p.approved })),
+        prompts: data.prompts.map(p => ({ prompt: p.prompt, approved: p.approved, imageUrl: p.imageUrl })),
         photo_urls: data.photoUrls,
         status: "completed",
       });
@@ -53,13 +53,11 @@ export default function StepExport() {
     try {
       const zip = new JSZip();
 
-      // Ad texts
       const mlText = `Título: ${data.ads.mercadoLivre.title}\n\nDescrição:\n${data.ads.mercadoLivre.description}`;
       const shopeeText = `Título: ${data.ads.shopee.title}\n\nDescrição:\n${data.ads.shopee.description}`;
       zip.file("anuncio_mercadolivre.txt", mlText);
       zip.file("anuncio_shopee.txt", shopeeText);
 
-      // Product photos
       const photosFolder = zip.folder("fotos_produto");
       for (let i = 0; i < data.photoUrls.length; i++) {
         try {
@@ -70,22 +68,19 @@ export default function StepExport() {
         } catch { /* skip failed photos */ }
       }
 
-      // AI generated images
       const aiFolder = zip.folder("imagens_ia");
       for (let i = 0; i < approvedImages.length; i++) {
         const img = approvedImages[i];
         if (!img.imageUrl) continue;
         try {
           if (img.imageUrl.startsWith("data:")) {
-            try {
-              const parts = img.imageUrl.split(",");
-              const mime = parts[0].match(/:(.*?);/)?.[1] || "image/png";
-              const ext = mime.includes("png") ? "png" : "jpg";
-              const binary = atob(parts[1]);
-              const arr = new Uint8Array(binary.length);
-              for (let j = 0; j < binary.length; j++) arr[j] = binary.charCodeAt(j);
-              aiFolder?.file(`imagem_ia_${i + 1}.${ext}`, arr);
-            } catch { /* skip invalid base64 */ }
+            const parts = img.imageUrl.split(",");
+            const mime = parts[0].match(/:(.*?);/)?.[1] || "image/png";
+            const ext = mime.includes("png") ? "png" : "jpg";
+            const binary = atob(parts[1]);
+            const arr = new Uint8Array(binary.length);
+            for (let j = 0; j < binary.length; j++) arr[j] = binary.charCodeAt(j);
+            aiFolder?.file(`imagem_ia_${i + 1}.${ext}`, arr);
           } else {
             const resp = await fetch(img.imageUrl);
             const blob = await resp.blob();
@@ -95,7 +90,6 @@ export default function StepExport() {
         } catch { /* skip failed images */ }
       }
 
-      // Prompts
       const promptsText = data.prompts.map((p, i) => `#${i + 1}\n${p.prompt}`).join("\n\n---\n\n");
       zip.file("prompts.txt", promptsText);
 

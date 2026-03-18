@@ -23,6 +23,12 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
+interface PromptData {
+  prompt?: string;
+  approved?: boolean;
+  imageUrl?: string;
+}
+
 interface Listing {
   id: string;
   product_name: string;
@@ -99,6 +105,11 @@ export default function History() {
       toast({ title: "Anúncio duplicado!" });
       fetchListings();
     }
+  };
+
+  const getApprovedImages = (prompts: any): PromptData[] => {
+    if (!Array.isArray(prompts)) return [];
+    return prompts.filter((p: any) => p?.approved && p?.imageUrl);
   };
 
   if (loading) {
@@ -217,10 +228,21 @@ export default function History() {
               )}
               {selected.photo_urls && selected.photo_urls.length > 0 && (
                 <div>
-                  <p className="font-semibold text-muted-foreground text-xs uppercase mb-1">Fotos</p>
+                  <p className="font-semibold text-muted-foreground text-xs uppercase mb-1">Fotos do Produto</p>
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     {selected.photo_urls.map((url, i) => (
                       <img key={i} src={url} alt="" className="w-20 h-20 rounded-lg object-cover flex-shrink-0" />
+                    ))}
+                  </div>
+                </div>
+              )}
+              {/* AI Generated Images */}
+              {getApprovedImages(selected.prompts).length > 0 && (
+                <div>
+                  <p className="font-semibold text-muted-foreground text-xs uppercase mb-1">Imagens Geradas por IA</p>
+                  <div className="grid grid-cols-2 gap-2">
+                    {getApprovedImages(selected.prompts).map((p, i) => (
+                      <img key={i} src={p.imageUrl} alt={`IA ${i + 1}`} className="w-full aspect-square rounded-lg object-cover" />
                     ))}
                   </div>
                 </div>
