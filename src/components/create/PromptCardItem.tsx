@@ -23,7 +23,7 @@ function fileToBase64(file: File): Promise<string> {
   });
 }
 
-export default function PromptCardItem({ prompt: p, index: i, onUpdate }: PromptCardItemProps) {
+export default function PromptCardItem({ prompt: p, index: i, onUpdate, photos }: PromptCardItemProps) {
   const [copiedId, setCopiedId] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
