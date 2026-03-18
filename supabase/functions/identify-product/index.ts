@@ -1,34 +1,21 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { getCorsHeaders, authenticate, errorResponse, handleAIError } from "../_shared/helpers.ts";
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const cors = getCorsHeaders(req);
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
 
   try {
-    // Auth guard
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    const supabaseClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!);
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    const auth = await authenticate(req, cors);
+    if (auth instanceof Response) return auth;
 
     const { photoUrls } = await req.json();
     if (!Array.isArray(photoUrls) || photoUrls.length === 0 || photoUrls.length > 4) {
-      return new Response(JSON.stringify({ error: "Envie de 1 a 4 fotos" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return errorResponse("Envie de 1 a 4 fotos", 400, cors);
     }
     for (const url of photoUrls) {
       if (typeof url !== "string" || (!url.startsWith("data:image/") && !url.startsWith("https://"))) {
-        return new Response(JSON.stringify({ error: "Formato de foto inválido" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return errorResponse("Formato de foto inválido", 400, cors);
       }
     }
 
@@ -91,20 +78,8 @@ Responda APENAS em português brasileiro.`,
     });
 
     if (!response.ok) {
-      const status = response.status;
-      if (status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded. Tente novamente em alguns segundos." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos de IA insuficientes." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
       const t = await response.text();
-      console.error("AI error:", status, t);
-      throw new Error(`AI gateway error: ${status}`);
+      return handleAIError(response.status, t, cors);
     }
 
     const data = await response.json();
@@ -115,12 +90,10 @@ Responda APENAS em português brasileiro.`,
     }
 
     return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("identify-product error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return errorResponse(e instanceof Error ? e.message : "Unknown error", 500, cors);
   }
 });

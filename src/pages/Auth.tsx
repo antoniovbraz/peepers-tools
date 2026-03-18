@@ -57,7 +57,7 @@ export default function Auth() {
       redirect_uri: window.location.origin,
     });
     if (error) {
-      toast({ title: "Erro com Google", description: String(error), variant: "destructive" });
+      toast({ title: "Erro com Google", description: "Não foi possível conectar com o Google. Tente novamente.", variant: "destructive" });
     }
   };
 
