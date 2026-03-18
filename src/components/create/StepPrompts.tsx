@@ -16,9 +16,6 @@ export default function StepPrompts() {
 
   const approvedCount = prompts.filter(p => p.approved).length;
 
-  useEffect(() => {
-    updatePrompts(prompts);
-  }, [prompts, updatePrompts]);
 
   const generatePrompts = async () => {
     setLoading(true);
