@@ -49,7 +49,6 @@
     "file-saver": "^2.0.5",
     "framer-motion": "^12.38.0",
     "jszip": "^3.10.1",
-    "lovable-tagger": "^1.1.13",
     "lucide-react": "^0.577.0",
     "next-themes": "^0.3.0",
     "postcss": "^8.5.6",
