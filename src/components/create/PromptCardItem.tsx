@@ -39,8 +39,12 @@ export default function PromptCardItem({ prompt: p, index: i, onUpdate, photos }
   const generateImage = async () => {
     setGenerating(true);
     try {
+      // Convert up to 3 photos to base64
+      const photosToSend = photos.slice(0, 3);
+      const referencePhotos = await Promise.all(photosToSend.map(fileToBase64));
+
       const { data, error } = await supabase.functions.invoke("generate-image", {
-        body: { prompt: p.prompt },
+        body: { prompt: p.prompt, referencePhotos },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);

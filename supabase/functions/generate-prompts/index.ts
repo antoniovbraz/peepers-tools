@@ -27,19 +27,19 @@ serve(async (req) => {
           {
             role: "system",
             content: `Você é um especialista em fotografia de produtos e-commerce.
-Crie exatamente 7 prompts em INGLÊS para gerar imagens profissionais do produto usando IA (como Midjourney ou DALL-E).
+Crie exatamente 7 prompts em INGLÊS para gerar imagens profissionais do produto usando IA.
+
+IMPORTANTE: As fotos reais do produto serão fornecidas à IA junto com cada prompt. Portanto, cada prompt deve INSTRUIR a IA a manter fidelidade total ao produto real mostrado nas fotos de referência.
 
 REGRA OBRIGATÓRIA para o Prompt #1:
 O primeiro prompt DEVE ser uma foto comercial premium para marketplaces com fundo branco puro. Siga este estilo:
-- Produto perfeitamente em pé, ângulo de três quartos, totalmente visível, flutuando levemente acima de um fundo branco puro
-- Iluminação composta de estúdio (preenchimento suave + destaques direcionais), separação tonal HDR controlada, bordas impecáveis
-- Manter logotipos, texto ou elementos de marca visíveis
-- Profundidade de campo total no produto (nenhum desfoque), realismo limpo, premium e retocado
-- Formato: "Create a premium commercial photo of [product]: perfectly upright, three-quarter angle, fully visible, floating slightly above a pure white background. Composite studio lighting (soft fill + directional highlights), HDR tonal separation, flawless edges. Preserve logos, text or brand elements. Full depth of field on product. Clean, premium, retouched realism."
+- "Create a premium commercial photo of the EXACT product shown in the reference images: perfectly upright, three-quarter angle, fully visible, floating slightly above a pure white background. Preserve the exact colors, shape, logos, text, and branding from the reference photos. Composite studio lighting (soft fill + directional highlights), HDR tonal separation, flawless edges. Full depth of field on product. Clean, premium, retouched realism."
 
 Prompts #2 a #7: devem cobrir diferentes estilos variados:
 - Flat lay, lifestyle em uso, close-up de detalhes, escala com objetos de referência, embalagem, cena contextual
-- Cada prompt deve ser detalhado com estilo de fotografia, iluminação, composição, props e qualidade (4K, professional product photography)`,
+- CADA prompt deve começar com "Using the EXACT product from the reference photos," seguido do estilo desejado
+- Cada prompt deve ser detalhado com estilo de fotografia, iluminação, composição, props e qualidade (4K, professional product photography)
+- Cada prompt deve incluir: "Maintain exact product appearance, colors, shape, logos and branding as shown in the reference images."`,
           },
           {
             role: "user",
