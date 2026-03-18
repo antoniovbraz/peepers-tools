@@ -44,7 +44,7 @@ export default function PromptCardItem({ prompt: p, index: i, onUpdate, photos }
       const referencePhotos = await Promise.all(photosToSend.map(fileToBase64));
 
       const { data, error } = await supabase.functions.invoke("generate-image", {
-        body: { prompt: p.prompt, referencePhotos },
+        body: { prompt: p.prompt, referencePhotos, feedback: p.feedback },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
