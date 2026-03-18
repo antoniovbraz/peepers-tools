@@ -28,12 +28,18 @@ serve(async (req) => {
             role: "system",
             content: `Você é um especialista em fotografia de produtos e-commerce.
 Crie exatamente 7 prompts em INGLÊS para gerar imagens profissionais do produto usando IA (como Midjourney ou DALL-E).
-Cada prompt deve ser detalhado, incluindo:
-- Estilo de fotografia (flat lay, lifestyle, close-up, etc)
-- Iluminação
-- Composição e props
-- Qualidade (4K, professional product photography)
-Os 7 prompts devem cobrir diferentes ângulos e estilos para um anúncio completo.`,
+
+REGRA OBRIGATÓRIA para o Prompt #1:
+O primeiro prompt DEVE ser uma foto comercial premium para marketplaces com fundo branco puro. Siga este estilo:
+- Produto perfeitamente em pé, ângulo de três quartos, totalmente visível, flutuando levemente acima de um fundo branco puro
+- Iluminação composta de estúdio (preenchimento suave + destaques direcionais), separação tonal HDR controlada, bordas impecáveis
+- Manter logotipos, texto ou elementos de marca visíveis
+- Profundidade de campo total no produto (nenhum desfoque), realismo limpo, premium e retocado
+- Formato: "Create a premium commercial photo of [product]: perfectly upright, three-quarter angle, fully visible, floating slightly above a pure white background. Composite studio lighting (soft fill + directional highlights), HDR tonal separation, flawless edges. Preserve logos, text or brand elements. Full depth of field on product. Clean, premium, retouched realism."
+
+Prompts #2 a #7: devem cobrir diferentes estilos variados:
+- Flat lay, lifestyle em uso, close-up de detalhes, escala com objetos de referência, embalagem, cena contextual
+- Cada prompt deve ser detalhado com estilo de fotografia, iluminação, composição, props e qualidade (4K, professional product photography)`,
           },
           {
             role: "user",
