@@ -9,7 +9,7 @@ serve(async (req) => {
     const auth = await authenticate(req, cors);
     if (auth instanceof Response) return auth;
 
-    const { prompt, referencePhotos } = await req.json();
+    const { prompt, referencePhotos, feedback } = await req.json();
     if (!prompt || typeof prompt !== "string" || prompt.length > 5000) {
       return errorResponse("Prompt inválido", 400, cors);
     }
@@ -25,7 +25,24 @@ serve(async (req) => {
     if (photos.length > 0) {
       contentParts.push({
         type: "text",
-        text: "Here are reference photos of the ACTUAL product. You MUST generate an image of THIS EXACT product — same shape, colors, logos, branding, packaging, and proportions. Do NOT invent a different product.",
+        text: `Here are reference photos of the ACTUAL product.
+
+FIDELITY RULES (MANDATORY — NEVER VIOLATE):
+- Use the EXACT product from these reference photos
+- Do not change: shape, proportions, dimensions, materials, colors, textures, button placement, ports, layout, logos, branding, text, labels
+- Preserve ALL physical characteristics exactly as shown
+- Do not add, remove, or modify any product feature
+- Match the exact surface finish (matte, glossy, brushed, etc.)
+
+REALISM RULES (MANDATORY):
+- This must look like a REAL photograph, NOT a 3D render or CGI
+- Realistic reflections based on actual material (metal, plastic, glass, fabric, leather)
+- Accurate shadows with natural light falloff
+- Subtle micro imperfections for photorealism (minor surface variations, realistic edge quality)
+- AVOID: plastic/CGI look, over-smoothing, fake edges, unrealistic specular highlights, artificial sheen
+
+Generate the image following the style direction in the prompt below.
+Ensure the product looks IDENTICAL to the reference and NOT reinterpreted.`,
       });
       for (const photoUrl of photos) {
         contentParts.push({
@@ -35,11 +52,18 @@ serve(async (req) => {
       }
     }
 
+    // Build the final prompt text, incorporating feedback if provided
+    let finalPrompt = photos.length > 0
+      ? `Now generate a professional photo of the EXACT product shown in the reference images above. Follow this style direction:\n\n${prompt}`
+      : prompt;
+
+    if (feedback && typeof feedback === "string" && feedback.trim().length > 0) {
+      finalPrompt += `\n\nIMPORTANT CORRECTION FROM PREVIOUS ATTEMPT:\nThe previous image had these problems that MUST be fixed: ${feedback.trim().slice(0, 500)}\nMake sure to address these issues while maintaining full product fidelity.`;
+    }
+
     contentParts.push({
       type: "text",
-      text: photos.length > 0
-        ? `Now generate a new professional photo of the EXACT product shown in the reference images above. Follow this style direction:\n\n${prompt}`
-        : prompt,
+      text: finalPrompt,
     });
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
