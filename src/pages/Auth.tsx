@@ -1,4 +1,5 @@
 import { useState } from "react";
+import logo from "@/assets/logo.png";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { lovable } from "@/integrations/lovable/index";
@@ -64,7 +65,8 @@ export default function Auth() {
   return (
     <div className="px-6 py-10 space-y-6 max-w-sm mx-auto">
       <div className="text-center space-y-2">
-        <h1 className="font-display text-2xl font-bold text-foreground">✏️ Paper Shop</h1>
+        <img src={logo} alt="Peepers Shop" className="h-12 mx-auto" />
+        <h1 className="font-display text-2xl font-bold text-foreground">Peepers Shop</h1>
         <p className="text-sm text-muted-foreground">
           {isLogin ? "Entre na sua conta" : "Crie sua conta"}
         </p>
