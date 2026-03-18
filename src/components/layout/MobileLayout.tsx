@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import logo from "@/assets/logo.png";
+import logoHorizontal from "@/assets/logo-horizontal.png";
 import { useNavigate, useLocation } from "react-router-dom";
 import { PlusCircle, ClipboardList, LogOut } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
@@ -16,11 +16,8 @@ export default function MobileLayout({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex flex-col min-h-[100dvh] bg-background">
-      <header className="flex items-center justify-between px-4 py-3 border-b bg-card">
-        <h1 className="font-display text-lg font-bold tracking-tight text-foreground">
-          <img src={logo} alt="Peepers Shop" className="h-7 mr-2 inline-block" />
-          Peepers Shop
-        </h1>
+       <header className="flex items-center justify-between px-4 py-3 border-b bg-card">
+        <img src={logoHorizontal} alt="Peepers Shop" className="h-8" />
         <button onClick={signOut} className="text-muted-foreground hover:text-foreground transition-colors p-1">
           <LogOut className="w-4 h-4" />
         </button>
