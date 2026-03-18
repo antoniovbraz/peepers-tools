@@ -63,7 +63,11 @@ export default function StepPrompts() {
   };
 
   const updatePrompt = (id: number, updates: Partial<PromptCard>) => {
-    setPrompts(prev => prev.map(p => (p.id === id ? { ...p, ...updates } : p)));
+    setPrompts(prev => {
+      const next = prev.map(p => (p.id === id ? { ...p, ...updates } : p));
+      updatePrompts(next);
+      return next;
+    });
   };
 
   const handleNext = () => {

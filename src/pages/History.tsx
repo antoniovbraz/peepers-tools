@@ -51,6 +51,7 @@ export default function History() {
     const { data, error } = await supabase
       .from("listings")
       .select("*")
+      .eq("user_id", user.id)
       .order("created_at", { ascending: false });
 
     if (error) {

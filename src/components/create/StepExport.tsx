@@ -77,13 +77,15 @@ export default function StepExport() {
         if (!img.imageUrl) continue;
         try {
           if (img.imageUrl.startsWith("data:")) {
-            const parts = img.imageUrl.split(",");
-            const mime = parts[0].match(/:(.*?);/)?.[1] || "image/png";
-            const ext = mime.includes("png") ? "png" : "jpg";
-            const binary = atob(parts[1]);
-            const arr = new Uint8Array(binary.length);
-            for (let j = 0; j < binary.length; j++) arr[j] = binary.charCodeAt(j);
-            aiFolder?.file(`imagem_ia_${i + 1}.${ext}`, arr);
+            try {
+              const parts = img.imageUrl.split(",");
+              const mime = parts[0].match(/:(.*?);/)?.[1] || "image/png";
+              const ext = mime.includes("png") ? "png" : "jpg";
+              const binary = atob(parts[1]);
+              const arr = new Uint8Array(binary.length);
+              for (let j = 0; j < binary.length; j++) arr[j] = binary.charCodeAt(j);
+              aiFolder?.file(`imagem_ia_${i + 1}.${ext}`, arr);
+            } catch { /* skip invalid base64 */ }
           } else {
             const resp = await fetch(img.imageUrl);
             const blob = await resp.blob();
