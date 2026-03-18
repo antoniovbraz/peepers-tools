@@ -1,4 +1,5 @@
 import { CreateListingProvider, useCreateListing } from "@/context/CreateListingContext";
+import { AnimatePresence, motion } from "framer-motion";
 import StepperProgress from "@/components/create/StepperProgress";
 import StepUpload from "@/components/create/StepUpload";
 import StepIdentify from "@/components/create/StepIdentify";
@@ -15,7 +16,17 @@ function CreateListingInner() {
   return (
     <div>
       <StepperProgress />
-      <StepComponent />
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={currentStep}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          transition={{ duration: 0.2, ease: "easeInOut" }}
+        >
+          <StepComponent />
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }
