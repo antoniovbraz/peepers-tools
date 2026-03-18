@@ -1,18 +1,35 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useState } from "react";
 import { useCreateListing } from "@/context/CreateListingContext";
-import { Camera, X, ArrowRight } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+import { Camera, X, ArrowRight, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_FILES = 8;
 
 export default function StepUpload() {
   const { data, updatePhotos, completeStep, goNext } = useCreateListing();
+  const { user } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
+  const [uploading, setUploading] = useState(false);
 
-  const addFiles = useCallback((files: FileList | null) => {
-    if (!files) return;
+  const uploadToStorage = useCallback(async (file: File): Promise<string> => {
+    if (!user) throw new Error("Não autenticado");
+    const ext = file.name.split(".").pop() || "jpg";
+    const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabase.storage.from("product-photos").upload(path, file, {
+      cacheControl: "3600",
+      upsert: false,
+    });
+    if (error) throw error;
+    const { data: urlData } = supabase.storage.from("product-photos").getPublicUrl(path);
+    return urlData.publicUrl;
+  }, [user]);
+
+  const addFiles = useCallback(async (files: FileList | null) => {
+    if (!files || !user) return;
 
     const incoming = Array.from(files);
     const totalAfter = data.photos.length + incoming.length;
@@ -27,20 +44,23 @@ export default function StepUpload() {
       return;
     }
 
-    // Revoke old URLs
-    data.photoUrls.forEach(url => URL.revokeObjectURL(url));
-
-    const newFiles = [...data.photos, ...incoming];
-    const newUrls = newFiles.map(f => URL.createObjectURL(f));
-    updatePhotos(newFiles, newUrls);
-  }, [data.photos, data.photoUrls, updatePhotos]);
+    setUploading(true);
+    try {
+      const newUrls = await Promise.all(incoming.map(uploadToStorage));
+      const allFiles = [...data.photos, ...incoming];
+      const allUrls = [...data.photoUrls, ...newUrls];
+      updatePhotos(allFiles, allUrls);
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      toast({ title: "Erro no upload", description: err.message, variant: "destructive" });
+    } finally {
+      setUploading(false);
+    }
+  }, [data.photos, data.photoUrls, updatePhotos, uploadToStorage, user]);
 
   const removePhoto = useCallback((index: number) => {
-    // Revoke all old URLs
-    data.photoUrls.forEach(url => URL.revokeObjectURL(url));
-
     const newFiles = data.photos.filter((_, i) => i !== index);
-    const newUrls = newFiles.map(f => URL.createObjectURL(f));
+    const newUrls = data.photoUrls.filter((_, i) => i !== index);
     updatePhotos(newFiles, newUrls);
   }, [data.photos, data.photoUrls, updatePhotos]);
 
@@ -62,12 +82,22 @@ export default function StepUpload() {
 
       <button
         onClick={() => inputRef.current?.click()}
-        className="w-full border-2 border-dashed border-primary/30 rounded-xl p-8 flex flex-col items-center gap-3 bg-primary/5 hover:bg-primary/10 transition-colors active:scale-[0.98]"
+        disabled={uploading}
+        className="w-full border-2 border-dashed border-primary/30 rounded-xl p-8 flex flex-col items-center gap-3 bg-primary/5 hover:bg-primary/10 transition-colors active:scale-[0.98] disabled:opacity-50"
       >
-        <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
-          <Camera className="w-7 h-7 text-primary" />
-        </div>
-        <span className="text-sm font-medium text-primary">Toque para adicionar fotos</span>
+        {uploading ? (
+          <>
+            <Loader2 className="w-7 h-7 text-primary animate-spin" />
+            <span className="text-sm font-medium text-primary">Enviando fotos...</span>
+          </>
+        ) : (
+          <>
+            <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+              <Camera className="w-7 h-7 text-primary" />
+            </div>
+            <span className="text-sm font-medium text-primary">Toque para adicionar fotos</span>
+          </>
+        )}
         <span className="text-xs text-muted-foreground">{data.photos.length}/{MAX_FILES} fotos · máx 10MB cada</span>
       </button>
       <input
@@ -97,7 +127,7 @@ export default function StepUpload() {
 
       <Button
         onClick={handleNext}
-        disabled={data.photos.length === 0}
+        disabled={data.photos.length === 0 || uploading}
         className="w-full h-12 text-base font-semibold gap-2"
       >
         Próximo <ArrowRight className="w-5 h-5" />

@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, authenticate, errorResponse, handleAIError } from "../_shared/helpers.ts";
 
 serve(async (req) => {
@@ -52,7 +53,6 @@ Ensure the product looks IDENTICAL to the reference and NOT reinterpreted.`,
       }
     }
 
-    // Build the final prompt text, incorporating feedback if provided
     let finalPrompt = photos.length > 0
       ? `Now generate a professional photo of the EXACT product shown in the reference images above. Follow this style direction:\n\n${prompt}`
       : prompt;
@@ -90,13 +90,51 @@ Ensure the product looks IDENTICAL to the reference and NOT reinterpreted.`,
     }
 
     const data = await response.json();
-    const imageUrl = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
+    const base64Url = data.choices?.[0]?.message?.images?.[0]?.image_url?.url;
 
-    if (!imageUrl) {
+    if (!base64Url) {
       throw new Error("No image was generated");
     }
 
-    return new Response(JSON.stringify({ imageUrl }), {
+    // Save to Storage
+    let publicUrl = base64Url;
+    try {
+      const supabaseAdmin = createClient(
+        Deno.env.get("SUPABASE_URL")!,
+        Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+      );
+
+      // Decode base64 data URI to bytes
+      const base64Data = base64Url.split(",")[1];
+      if (base64Data) {
+        const binaryStr = atob(base64Data);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let j = 0; j < binaryStr.length; j++) bytes[j] = binaryStr.charCodeAt(j);
+
+        const mimeMatch = base64Url.match(/data:(.*?);/);
+        const mime = mimeMatch?.[1] || "image/png";
+        const ext = mime.includes("png") ? "png" : "jpg";
+        const path = `${(auth as { userId: string }).userId}/${crypto.randomUUID()}.${ext}`;
+
+        const { error: uploadErr } = await supabaseAdmin.storage
+          .from("generated-images")
+          .upload(path, bytes, { contentType: mime, upsert: false });
+
+        if (!uploadErr) {
+          const { data: urlData } = supabaseAdmin.storage
+            .from("generated-images")
+            .getPublicUrl(path);
+          publicUrl = urlData.publicUrl;
+        } else {
+          console.error("Storage upload error:", uploadErr);
+        }
+      }
+    } catch (storageErr) {
+      console.error("Storage save error:", storageErr);
+      // Fall back to base64 URL
+    }
+
+    return new Response(JSON.stringify({ imageUrl: publicUrl }), {
       headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (e) {

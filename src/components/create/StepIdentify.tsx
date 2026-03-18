@@ -25,21 +25,9 @@ export default function StepIdentify() {
     }
     setLoading(true);
     try {
-      // Convert blob URLs to base64 for AI
-      const base64Urls = await Promise.all(
-        data.photoUrls.slice(0, 4).map(async (url) => {
-          const resp = await fetch(url);
-          const blob = await resp.blob();
-          return new Promise<string>((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(blob);
-          });
-        })
-      );
-
+      // photoUrls are now public Storage URLs — pass them directly
       const { data: result, error } = await supabase.functions.invoke("identify-product", {
-        body: { photoUrls: base64Urls },
+        body: { photoUrls: data.photoUrls.slice(0, 4) },
       });
 
       if (error) throw error;
@@ -78,8 +66,8 @@ export default function StepIdentify() {
   if (loading) {
     return (
       <div className="px-4 py-10 flex flex-col items-center gap-4">
-        <div className="w-16 h-16 rounded-full bg-highlight/20 flex items-center justify-center animate-pulse">
-          <Brain className="w-8 h-8 text-highlight" />
+        <div className="w-16 h-16 rounded-full bg-accent/20 flex items-center justify-center animate-pulse">
+          <Brain className="w-8 h-8 text-accent" />
         </div>
         <h2 className="font-display text-lg font-bold">Analisando produto...</h2>
         <p className="text-sm text-muted-foreground text-center">A IA está identificando seu produto pelas fotos</p>
