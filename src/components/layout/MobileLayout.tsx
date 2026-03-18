@@ -1,5 +1,5 @@
 import { ReactNode } from "react";
-import logo from "@/assets/logo.png";
+import logoHorizontal from "@/assets/logo-horizontal.png";
 import { useNavigate, useLocation } from "react-router-dom";
 import { PlusCircle, ClipboardList, LogOut } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
