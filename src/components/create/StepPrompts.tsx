@@ -40,6 +40,7 @@ export default function StepPrompts() {
         feedback: undefined,
       }));
       setPrompts(newPrompts);
+      updatePrompts(newPrompts);
       setGenerated(true);
     } catch (err: any) {
       console.error("Generate prompts error:", err);
