@@ -1,52 +1,45 @@
 
 
-## Análise das Sugestões do Auditor
+## Plano de Implementação — Segurança, Cleanup e Backend
 
-Concordo com a maioria, mas com ressalvas importantes em 2 itens. Aqui vai minha avaliação:
+### Sobre o ALLOWED_ORIGIN
 
-### Concordo e vou implementar
+O valor que você deve inserir é simplesmente a URL publicada do seu app:
 
-**1. CORS com env var** — Correto. Vou adicionar o secret `ALLOWED_ORIGIN` e usar nas 4 funções.
+```
+https://item-story-forge.lovable.app
+```
 
-**2. Erro Google genérico** — Correto. `String(error)` pode expor detalhes internos. Trocar por mensagem fixa.
-
-**4. ESLint `no-unused-vars: "warn"`** — Correto. Ajuda a detectar código morto.
-
-**6. Remover dependências não utilizadas** — Parcialmente correto. `sonner`, `next-themes`, `@hookform/resolvers` e `zod` podem ser removidos (nenhum código ativo os importa). Porém `react-hook-form` é importado por `src/components/ui/form.tsx` (wrapper shadcn/ui) — remover quebraria a compilação. Vou manter `react-hook-form`.
-
-**7. Apagar `sonner.tsx`** — Correto. O `App.tsx` já não importa Sonner, e o ficheiro depende de `next-themes` que também seria removido.
-
-**8. Extrair `_shared/helpers.ts`** — Correto. Reduz duplicação nas 4 funções.
-
-**9. Índices na tabela `listings`** — Correto. `user_id` e `created_at DESC` são usados em queries filtradas.
-
-### Discordo
-
-**3. `verify_jwt = true`** — O auditor desconhece uma limitação da plataforma. O sistema de signing-keys do Lovable Cloud requer `verify_jwt = false` no config.toml. A validação JWT já é feita manualmente via `getClaims()` no código. Mudar para `true` **quebraria todas as chamadas** às Edge Functions. Manter como está.
-
-**5. `strict: true` no TypeScript** — Concordo em princípio, mas é uma mudança grande que vai gerar dezenas de erros de compilação. Recomendo fazer incrementalmente: primeiro `strictNullChecks`, depois o resto. Não vou incluir neste PR.
+Quando eu pedir, basta colar esse valor. O CORS dinâmico vai aceitar automaticamente tanto essa URL quanto os previews do Lovable (que terminam em `.lovable.app` ou `.lovableproject.com`).
 
 ---
 
-### Plano de Implementação
+### O que será feito
 
-**Fase 1 — Segurança (3 alterações)**
-- Adicionar secret `ALLOWED_ORIGIN` com o valor `https://item-story-forge.lovable.app`
-- Atualizar CORS nas 4 Edge Functions para usar `Deno.env.get("ALLOWED_ORIGIN")`
-- Corrigir mensagem de erro do Google login em `Auth.tsx`
+**1. Corrigir erros de build (imediato)**
+- Deletar 8 ficheiros UI órfãos: `calendar.tsx`, `carousel.tsx`, `chart.tsx`, `command.tsx`, `drawer.tsx`, `input-otp.tsx`, `resizable.tsx`, `sonner.tsx`
+- Remover pacotes do `package.json`: `sonner`, `next-themes`, `@hookform/resolvers`, `zod`
 
-**Fase 2 — Cleanup (4 alterações)**
-- Apagar `src/components/ui/sonner.tsx`
-- Remover pacotes: `sonner`, `next-themes`, `@hookform/resolvers`, `zod`
-- Alterar ESLint: `no-unused-vars` de `"off"` para `"warn"`
-- Corrigir eventuais warnings gerados pela nova regra
+**2. Adicionar secret ALLOWED_ORIGIN**
+- Pedir para você inserir o valor `https://item-story-forge.lovable.app`
 
-**Fase 3 — Backend (2 alterações)**
-- Criar `supabase/functions/_shared/helpers.ts` com CORS, auth e error helpers
-- Refatorar as 4 Edge Functions para usar os helpers compartilhados
-- Migration SQL para criar índices em `listings(user_id)` e `listings(created_at DESC)`
+**3. Criar helpers compartilhados para Edge Functions**
+- Novo ficheiro: `supabase/functions/_shared/helpers.ts`
+  - `getCorsHeaders(req)` — CORS dinâmico baseado no origin (aceita produção + previews Lovable)
+  - `authenticate(req)` — extrai e valida JWT via getClaims
+  - `errorResponse(message, status, corsHeaders)` — resposta de erro padronizada
 
-### Não incluído (para PRs separados)
-- `strict: true` no TypeScript (mudança grande, fazer incremental)
-- `verify_jwt = true` (incompatível com a plataforma)
+**4. Refatorar as 4 Edge Functions**
+- `identify-product`, `generate-ads`, `generate-prompts`, `generate-image`
+- Substituir código duplicado (CORS, auth, error handling) por imports do `_shared/helpers.ts`
+
+**5. Corrigir Auth.tsx**
+- Linha 60: trocar `String(error)` por mensagem genérica fixa
+
+**6. ESLint config**
+- Mudar `no-unused-vars` de `"off"` para `"warn"`
+
+**7. Migration SQL — índices na tabela listings**
+- `CREATE INDEX IF NOT EXISTS idx_listings_user_id ON listings(user_id);`
+- `CREATE INDEX IF NOT EXISTS idx_listings_created_at ON listings(created_at DESC);`
 
