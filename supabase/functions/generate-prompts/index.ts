@@ -107,7 +107,10 @@ Prompts #2 a #7: devem cobrir diferentes estilos variados:
 
     const data = await response.json();
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    const result = toolCall ? JSON.parse(toolCall.function.arguments) : null;
+    let result = null;
+    if (toolCall) {
+      try { result = JSON.parse(toolCall.function.arguments); } catch { throw new Error("Resposta da IA inválida"); }
+    }
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
