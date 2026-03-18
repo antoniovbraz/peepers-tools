@@ -61,6 +61,10 @@ export default function PromptCardItem({ prompt: p, index: i, onUpdate, photos }
 
   const handleImageUpload = (files: FileList | null) => {
     if (!files?.[0]) return;
+    // Revoke previous blob URL if any
+    if (p.imageUrl?.startsWith("blob:")) {
+      URL.revokeObjectURL(p.imageUrl);
+    }
     const url = URL.createObjectURL(files[0]);
     onUpdate(p.id, { imageUrl: url });
   };

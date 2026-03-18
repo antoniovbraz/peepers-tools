@@ -23,10 +23,17 @@ serve(async (req) => {
     }
 
     const { productName, category, characteristics, extras } = await req.json();
+    if (!productName || typeof productName !== "string" || productName.length > 500) {
+      return new Response(JSON.stringify({ error: "Nome do produto inválido" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (category && typeof category !== "string") {
+      return new Response(JSON.stringify({ error: "Categoria inválida" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const productInfo = `Produto: ${productName}\nCategoria: ${category}\nCaracterísticas: ${(characteristics || []).join(", ")}\nInformações extras: ${extras || "nenhuma"}`;
+    const productInfo = `Produto: ${productName.slice(0, 500)}\nCategoria: ${(category || "").slice(0, 200)}\nCaracterísticas: ${(characteristics || []).slice(0, 20).join(", ").slice(0, 1000)}\nInformações extras: ${(extras || "nenhuma").slice(0, 1000)}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -107,7 +114,10 @@ Responda APENAS em português brasileiro.`,
 
     const data = await response.json();
     const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    const result = toolCall ? JSON.parse(toolCall.function.arguments) : null;
+    let result = null;
+    if (toolCall) {
+      try { result = JSON.parse(toolCall.function.arguments); } catch { throw new Error("Resposta da IA inválida"); }
+    }
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },

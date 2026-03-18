@@ -42,7 +42,11 @@ export default function Auth() {
         toast({ title: "Conta criada!", description: "Verifique seu email para confirmar." });
       }
     } catch (err: any) {
-      toast({ title: "Erro", description: err.message, variant: "destructive" });
+      const msg = err.message?.includes("Invalid login") ? "Email ou senha incorretos." 
+        : err.message?.includes("Email not confirmed") ? "Confirme seu email antes de entrar."
+        : err.message?.includes("already registered") ? "Este email já está cadastrado."
+        : err.message || "Erro desconhecido";
+      toast({ title: "Erro", description: msg, variant: "destructive" });
     } finally {
       setSubmitting(false);
     }

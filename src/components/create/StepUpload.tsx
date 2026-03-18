@@ -2,6 +2,10 @@ import { useRef, useCallback } from "react";
 import { useCreateListing } from "@/context/CreateListingContext";
 import { Camera, X, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "@/hooks/use-toast";
+
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILES = 8;
 
 export default function StepUpload() {
   const { data, updatePhotos, completeStep, goNext } = useCreateListing();
@@ -9,16 +13,36 @@ export default function StepUpload() {
 
   const addFiles = useCallback((files: FileList | null) => {
     if (!files) return;
-    const newFiles = [...data.photos, ...Array.from(files)];
+
+    const incoming = Array.from(files);
+    const totalAfter = data.photos.length + incoming.length;
+    if (totalAfter > MAX_FILES) {
+      toast({ title: `Máximo de ${MAX_FILES} fotos`, variant: "destructive" });
+      return;
+    }
+
+    const oversized = incoming.filter(f => f.size > MAX_FILE_SIZE);
+    if (oversized.length > 0) {
+      toast({ title: "Arquivo muito grande", description: "Máximo 10MB por foto", variant: "destructive" });
+      return;
+    }
+
+    // Revoke old URLs
+    data.photoUrls.forEach(url => URL.revokeObjectURL(url));
+
+    const newFiles = [...data.photos, ...incoming];
     const newUrls = newFiles.map(f => URL.createObjectURL(f));
     updatePhotos(newFiles, newUrls);
-  }, [data.photos, updatePhotos]);
+  }, [data.photos, data.photoUrls, updatePhotos]);
 
   const removePhoto = useCallback((index: number) => {
+    // Revoke all old URLs
+    data.photoUrls.forEach(url => URL.revokeObjectURL(url));
+
     const newFiles = data.photos.filter((_, i) => i !== index);
     const newUrls = newFiles.map(f => URL.createObjectURL(f));
     updatePhotos(newFiles, newUrls);
-  }, [data.photos, updatePhotos]);
+  }, [data.photos, data.photoUrls, updatePhotos]);
 
   const handleNext = () => {
     completeStep(0);
@@ -36,7 +60,6 @@ export default function StepUpload() {
         </p>
       </div>
 
-      {/* Upload Area */}
       <button
         onClick={() => inputRef.current?.click()}
         className="w-full border-2 border-dashed border-primary/30 rounded-xl p-8 flex flex-col items-center gap-3 bg-primary/5 hover:bg-primary/10 transition-colors active:scale-[0.98]"
@@ -45,6 +68,7 @@ export default function StepUpload() {
           <Camera className="w-7 h-7 text-primary" />
         </div>
         <span className="text-sm font-medium text-primary">Toque para adicionar fotos</span>
+        <span className="text-xs text-muted-foreground">{data.photos.length}/{MAX_FILES} fotos · máx 10MB cada</span>
       </button>
       <input
         ref={inputRef}
@@ -52,10 +76,9 @@ export default function StepUpload() {
         accept="image/*"
         multiple
         className="hidden"
-        onChange={e => addFiles(e.target.files)}
+        onChange={e => { addFiles(e.target.files); e.target.value = ""; }}
       />
 
-      {/* Preview Grid */}
       {data.photoUrls.length > 0 && (
         <div className="grid grid-cols-2 gap-3">
           {data.photoUrls.map((url, i) => (
@@ -72,7 +95,6 @@ export default function StepUpload() {
         </div>
       )}
 
-      {/* Next Button */}
       <Button
         onClick={handleNext}
         disabled={data.photos.length === 0}

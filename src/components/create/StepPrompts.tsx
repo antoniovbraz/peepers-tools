@@ -16,9 +16,6 @@ export default function StepPrompts() {
 
   const approvedCount = prompts.filter(p => p.approved).length;
 
-  useEffect(() => {
-    updatePrompts(prompts);
-  }, [prompts, updatePrompts]);
 
   const generatePrompts = async () => {
     setLoading(true);
@@ -43,6 +40,7 @@ export default function StepPrompts() {
         feedback: undefined,
       }));
       setPrompts(newPrompts);
+      updatePrompts(newPrompts);
       setGenerated(true);
     } catch (err: any) {
       console.error("Generate prompts error:", err);
@@ -65,7 +63,11 @@ export default function StepPrompts() {
   };
 
   const updatePrompt = (id: number, updates: Partial<PromptCard>) => {
-    setPrompts(prev => prev.map(p => (p.id === id ? { ...p, ...updates } : p)));
+    setPrompts(prev => {
+      const next = prev.map(p => (p.id === id ? { ...p, ...updates } : p));
+      updatePrompts(next);
+      return next;
+    });
   };
 
   const handleNext = () => {

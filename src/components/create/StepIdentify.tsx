@@ -146,7 +146,7 @@ export default function StepIdentify() {
         <Button variant="outline" className="gap-2" onClick={() => setEditing(!editing)}>
           <Edit3 className="w-4 h-4" /> {editing ? "Pronto" : "Editar"}
         </Button>
-        <Button variant="outline" className="gap-2" onClick={runAI}>
+        <Button variant="outline" className="gap-2" onClick={runAI} disabled={loading}>
           <Brain className="w-4 h-4" /> Re-analisar
         </Button>
       </div>

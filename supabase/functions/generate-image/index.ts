@@ -23,7 +23,12 @@ serve(async (req) => {
     }
 
     const { prompt, referencePhotos } = await req.json();
-    if (!prompt) throw new Error("Prompt is required");
+    if (!prompt || typeof prompt !== "string" || prompt.length > 5000) {
+      return new Response(JSON.stringify({ error: "Prompt inválido" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    if (referencePhotos && !Array.isArray(referencePhotos)) {
+      return new Response(JSON.stringify({ error: "Fotos de referência inválidas" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
