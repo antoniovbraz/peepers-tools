@@ -3,14 +3,17 @@ import { useCreateListing } from "@/context/CreateListingContext";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Download, Check, PartyPopper, Image, FileText, Loader2 } from "lucide-react";
+import { ArrowLeft, Download, Check, PartyPopper, Image, FileText, Loader2, Archive } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import JSZip from "jszip";
+import { saveAs } from "file-saver";
 
 export default function StepExport() {
   const { data, completeStep, goBack } = useCreateListing();
   const { user } = useAuth();
   const [saving, setSaving] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   const approvedImages = data.prompts.filter(p => p.approved && p.imageUrl);
 
@@ -36,15 +39,73 @@ export default function StepExport() {
       if (error) throw error;
 
       completeStep(4);
-      toast({
-        title: "🎉 Anúncio salvo!",
-        description: "Seu anúncio foi salvo com sucesso.",
-      });
+      toast({ title: "🎉 Anúncio salvo!", description: "Seu anúncio foi salvo com sucesso." });
     } catch (err: any) {
       console.error("Save error:", err);
       toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDownloadZip = async () => {
+    setDownloading(true);
+    try {
+      const zip = new JSZip();
+
+      // Ad texts
+      const mlText = `Título: ${data.ads.mercadoLivre.title}\n\nDescrição:\n${data.ads.mercadoLivre.description}`;
+      const shopeeText = `Título: ${data.ads.shopee.title}\n\nDescrição:\n${data.ads.shopee.description}`;
+      zip.file("anuncio_mercadolivre.txt", mlText);
+      zip.file("anuncio_shopee.txt", shopeeText);
+
+      // Product photos
+      const photosFolder = zip.folder("fotos_produto");
+      for (let i = 0; i < data.photoUrls.length; i++) {
+        try {
+          const resp = await fetch(data.photoUrls[i]);
+          const blob = await resp.blob();
+          const ext = blob.type.includes("png") ? "png" : "jpg";
+          photosFolder?.file(`foto_${i + 1}.${ext}`, blob);
+        } catch { /* skip failed photos */ }
+      }
+
+      // AI generated images
+      const aiFolder = zip.folder("imagens_ia");
+      for (let i = 0; i < approvedImages.length; i++) {
+        const img = approvedImages[i];
+        if (!img.imageUrl) continue;
+        try {
+          if (img.imageUrl.startsWith("data:")) {
+            const parts = img.imageUrl.split(",");
+            const mime = parts[0].match(/:(.*?);/)?.[1] || "image/png";
+            const ext = mime.includes("png") ? "png" : "jpg";
+            const binary = atob(parts[1]);
+            const arr = new Uint8Array(binary.length);
+            for (let j = 0; j < binary.length; j++) arr[j] = binary.charCodeAt(j);
+            aiFolder?.file(`imagem_ia_${i + 1}.${ext}`, arr);
+          } else {
+            const resp = await fetch(img.imageUrl);
+            const blob = await resp.blob();
+            const ext = blob.type.includes("png") ? "png" : "jpg";
+            aiFolder?.file(`imagem_ia_${i + 1}.${ext}`, blob);
+          }
+        } catch { /* skip failed images */ }
+      }
+
+      // Prompts
+      const promptsText = data.prompts.map((p, i) => `#${i + 1}\n${p.prompt}`).join("\n\n---\n\n");
+      zip.file("prompts.txt", promptsText);
+
+      const blob = await zip.generateAsync({ type: "blob" });
+      const safeName = (data.identification.name || "anuncio").replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30);
+      saveAs(blob, `${safeName}.zip`);
+      toast({ title: "Download iniciado!" });
+    } catch (err: any) {
+      console.error("ZIP error:", err);
+      toast({ title: "Erro ao criar ZIP", description: err.message, variant: "destructive" });
+    } finally {
+      setDownloading(false);
     }
   };
 
@@ -105,13 +166,24 @@ export default function StepExport() {
         </div>
       </div>
 
-      <div className="flex gap-3">
-        <Button variant="outline" onClick={goBack} className="h-12 px-4">
-          <ArrowLeft className="w-5 h-5" />
-        </Button>
-        <Button onClick={handleExport} disabled={saving} className="flex-1 h-14 text-base font-bold gap-2 bg-success hover:bg-success/90">
-          {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
-          {saving ? "Salvando..." : "Salvar Anúncio"}
+      <div className="space-y-3">
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={goBack} className="h-12 px-4">
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
+          <Button onClick={handleExport} disabled={saving} className="flex-1 h-14 text-base font-bold gap-2 bg-success hover:bg-success/90">
+            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
+            {saving ? "Salvando..." : "Salvar Anúncio"}
+          </Button>
+        </div>
+        <Button
+          variant="outline"
+          onClick={handleDownloadZip}
+          disabled={downloading}
+          className="w-full h-12 gap-2 text-sm font-semibold"
+        >
+          {downloading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
+          {downloading ? "Criando ZIP..." : "Baixar ZIP com tudo"}
         </Button>
       </div>
     </div>
