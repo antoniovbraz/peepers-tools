@@ -23,10 +23,19 @@ serve(async (req) => {
     }
 
     const { photoUrls } = await req.json();
+    if (!Array.isArray(photoUrls) || photoUrls.length === 0 || photoUrls.length > 4) {
+      return new Response(JSON.stringify({ error: "Envie de 1 a 4 fotos" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+    for (const url of photoUrls) {
+      if (typeof url !== "string" || (!url.startsWith("data:image/") && !url.startsWith("https://"))) {
+        return new Response(JSON.stringify({ error: "Formato de foto inválido" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+    }
+
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const imageContent = (photoUrls || []).slice(0, 4).map((url: string) => ({
+    const imageContent = photoUrls.slice(0, 4).map((url: string) => ({
       type: "image_url" as const,
       image_url: { url },
     }));
