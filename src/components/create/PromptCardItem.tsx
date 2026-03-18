@@ -11,6 +11,16 @@ interface PromptCardItemProps {
   prompt: PromptCard;
   index: number;
   onUpdate: (id: number, updates: Partial<PromptCard>) => void;
+  photos: File[];
+}
+
+function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 export default function PromptCardItem({ prompt: p, index: i, onUpdate }: PromptCardItemProps) {
