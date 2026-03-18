@@ -1,30 +1,17 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+import { getCorsHeaders, authenticate, errorResponse, handleAIError } from "../_shared/helpers.ts";
 
 serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  const cors = getCorsHeaders(req);
+  if (req.method === "OPTIONS") return new Response(null, { headers: cors });
 
   try {
-    // Auth guard
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader?.startsWith("Bearer ")) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-    const supabaseClient = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!);
-    const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabaseClient.auth.getClaims(token);
-    if (claimsError || !claimsData?.claims) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
+    const auth = await authenticate(req, cors);
+    if (auth instanceof Response) return auth;
 
     const { productName, category, characteristics, extras, adTitle } = await req.json();
     if (!productName || typeof productName !== "string" || productName.length > 500) {
-      return new Response(JSON.stringify({ error: "Nome do produto inválido" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      return errorResponse("Nome do produto inválido", 400, cors);
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -89,20 +76,8 @@ Prompts #2 a #7: devem cobrir diferentes estilos variados:
     });
 
     if (!response.ok) {
-      const status = response.status;
-      if (status === 429) {
-        return new Response(JSON.stringify({ error: "Rate limit exceeded." }), {
-          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
-      if (status === 402) {
-        return new Response(JSON.stringify({ error: "Créditos de IA insuficientes." }), {
-          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-      }
       const t = await response.text();
-      console.error("AI error:", status, t);
-      throw new Error(`AI gateway error: ${status}`);
+      return handleAIError(response.status, t, cors);
     }
 
     const data = await response.json();
@@ -113,12 +88,10 @@ Prompts #2 a #7: devem cobrir diferentes estilos variados:
     }
 
     return new Response(JSON.stringify(result), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
+      headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (e) {
     console.error("generate-prompts error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
-      status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+    return errorResponse(e instanceof Error ? e.message : "Unknown error", 500, cors);
   }
 });
