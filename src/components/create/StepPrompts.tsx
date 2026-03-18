@@ -111,6 +111,7 @@ export default function StepPrompts() {
             prompt={p}
             index={i}
             onUpdate={updatePrompt}
+            photos={data.photos}
           />
         ))}
       </div>

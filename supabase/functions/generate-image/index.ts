@@ -9,11 +9,38 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { prompt } = await req.json();
+    const { prompt, referencePhotos } = await req.json();
     if (!prompt) throw new Error("Prompt is required");
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    // Build multimodal content: reference photos + prompt text
+    const contentParts: any[] = [];
+
+    // Add reference photos if provided (up to 3)
+    const photos = (referencePhotos || []).slice(0, 3);
+    if (photos.length > 0) {
+      contentParts.push({
+        type: "text",
+        text: "Here are reference photos of the ACTUAL product. You MUST generate an image of THIS EXACT product — same shape, colors, logos, branding, packaging, and proportions. Do NOT invent a different product.",
+      });
+
+      for (const photoUrl of photos) {
+        contentParts.push({
+          type: "image_url",
+          image_url: { url: photoUrl },
+        });
+      }
+    }
+
+    // Add the main prompt
+    contentParts.push({
+      type: "text",
+      text: photos.length > 0
+        ? `Now generate a new professional photo of the EXACT product shown in the reference images above. Follow this style direction:\n\n${prompt}`
+        : prompt,
+    });
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -26,7 +53,7 @@ serve(async (req) => {
         messages: [
           {
             role: "user",
-            content: prompt,
+            content: contentParts,
           },
         ],
         modalities: ["image", "text"],
