@@ -107,6 +107,17 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
     setData(prev => ({ ...prev, prompts }));
   }, []);
 
+  const updateVisualDNA = useCallback((visualDNA: VisualDNA) => {
+    setData(prev => ({ ...prev, visualDNA }));
+  }, []);
+
+  const updateOverlayUrl = useCallback((promptId: number, url: string) => {
+    setData(prev => ({
+      ...prev,
+      overlayUrls: { ...prev.overlayUrls, [promptId]: url },
+    }));
+  }, []);
+
   const goNext = useCallback(() => {
     setCurrentStep(prev => Math.min(prev + 1, 4));
   }, []);
