@@ -176,6 +176,21 @@ export default function StepExport() {
             ))}
           </div>
         </div>
+
+        {Object.keys(data.overlayUrls || {}).length > 0 && (
+          <div className="bg-card rounded-xl border p-4 space-y-2">
+            <div className="flex items-center gap-2">
+              <Image className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold">Imagens com Overlay</span>
+              <Badge variant="secondary" className="text-xs ml-auto">{Object.keys(data.overlayUrls).length}</Badge>
+            </div>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {Object.entries(data.overlayUrls).map(([id, url]) => (
+                <img key={id} src={url} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="space-y-3">
