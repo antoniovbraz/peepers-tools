@@ -50,6 +50,8 @@ interface CreateListingContextType {
   updateIdentification: (id: ListingData["identification"]) => void;
   updateAds: (ads: ListingData["ads"]) => void;
   updatePrompts: (prompts: PromptCard[]) => void;
+  updateVisualDNA: (dna: VisualDNA) => void;
+  updateOverlayUrl: (promptId: number, url: string) => void;
   goNext: () => void;
   goBack: () => void;
   reset: () => void;
