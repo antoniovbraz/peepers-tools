@@ -8,7 +8,7 @@ import { toast } from "@/hooks/use-toast";
 import PromptCardItem from "./PromptCardItem";
 
 export default function StepPrompts() {
-  const { data, updatePrompts, completeStep, goNext, goBack } = useCreateListing();
+  const { data, updatePrompts, updateVisualDNA, updateOverlayUrl, completeStep, goNext, goBack } = useCreateListing();
   const [prompts, setPrompts] = useState<PromptCard[]>(data.prompts);
   const [loading, setLoading] = useState(false);
   const [generated, setGenerated] = useState(prompts.some(p => p.prompt && p.prompt.length > 20));
