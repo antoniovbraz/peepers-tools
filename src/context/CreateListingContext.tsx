@@ -13,6 +13,15 @@ export interface AdData {
   description: string;
 }
 
+export interface VisualDNA {
+  background: string;
+  lighting: string;
+  style: string;
+  tone: string;
+  accentColor: string;
+  headlineColor: string;
+}
+
 export interface ListingData {
   photos: File[];
   photoUrls: string[];
@@ -27,6 +36,8 @@ export interface ListingData {
     shopee: AdData;
   };
   prompts: PromptCard[];
+  visualDNA?: VisualDNA;
+  overlayUrls: Record<number, string>; // promptId -> overlay image URL
 }
 
 interface CreateListingContextType {
