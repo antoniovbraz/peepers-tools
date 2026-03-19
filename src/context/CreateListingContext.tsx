@@ -118,7 +118,7 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
   const reset = useCallback(() => {
     setCurrentStep(0);
     setCompletedSteps([false, false, false, false, false]);
-    setData({ ...initialData, prompts: defaultPrompts.map(p => ({ ...p })) });
+    setData({ ...initialData, prompts: defaultPrompts.map(p => ({ ...p })), overlayUrls: {} });
   }, []);
 
   return (
