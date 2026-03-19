@@ -8,7 +8,7 @@ import { toast } from "@/hooks/use-toast";
 import PromptCardItem from "./PromptCardItem";
 
 export default function StepPrompts() {
-  const { data, updatePrompts, completeStep, goNext, goBack } = useCreateListing();
+  const { data, updatePrompts, updateVisualDNA, updateOverlayUrl, completeStep, goNext, goBack } = useCreateListing();
   const [prompts, setPrompts] = useState<PromptCard[]>(data.prompts);
   const [loading, setLoading] = useState(false);
   const [generated, setGenerated] = useState(prompts.some(p => p.prompt && p.prompt.length > 20));
@@ -35,7 +35,13 @@ export default function StepPrompts() {
       if (error) throw error;
       if (result?.error) throw new Error(result.error);
 
-      const newPrompts = (result.prompts || []).slice(0, 7).map((text: string, i: number) => ({
+      // Save visualDNA if returned
+      if (result?.visualDNA) {
+        updateVisualDNA(result.visualDNA);
+      }
+
+      const promptsList = result?.prompts || [];
+      const newPrompts = promptsList.slice(0, 7).map((text: string, i: number) => ({
         id: i + 1,
         prompt: text,
         approved: false,
@@ -180,6 +186,12 @@ export default function StepPrompts() {
             index={i}
             onUpdate={updatePrompt}
             photoUrls={data.photoUrls}
+            headlineColor={data.visualDNA?.headlineColor}
+            accentColor={data.visualDNA?.accentColor}
+            productName={data.identification.name}
+            characteristics={data.identification.characteristics}
+            overlayUrl={data.overlayUrls[p.id]}
+            onSaveOverlay={(promptId, url) => updateOverlayUrl(promptId, url)}
           />
         ))}
       </div>

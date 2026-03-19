@@ -13,6 +13,15 @@ export interface AdData {
   description: string;
 }
 
+export interface VisualDNA {
+  background: string;
+  lighting: string;
+  style: string;
+  tone: string;
+  accentColor: string;
+  headlineColor: string;
+}
+
 export interface ListingData {
   photos: File[];
   photoUrls: string[];
@@ -27,6 +36,8 @@ export interface ListingData {
     shopee: AdData;
   };
   prompts: PromptCard[];
+  visualDNA?: VisualDNA;
+  overlayUrls: Record<number, string>; // promptId -> overlay image URL
 }
 
 interface CreateListingContextType {
@@ -39,6 +50,8 @@ interface CreateListingContextType {
   updateIdentification: (id: ListingData["identification"]) => void;
   updateAds: (ads: ListingData["ads"]) => void;
   updatePrompts: (prompts: PromptCard[]) => void;
+  updateVisualDNA: (dna: VisualDNA) => void;
+  updateOverlayUrl: (promptId: number, url: string) => void;
   goNext: () => void;
   goBack: () => void;
   reset: () => void;
@@ -59,6 +72,8 @@ const initialData: ListingData = {
     shopee: { title: "", description: "" },
   },
   prompts: defaultPrompts,
+  visualDNA: undefined,
+  overlayUrls: {},
 };
 
 const CreateListingContext = createContext<CreateListingContextType | null>(null);
@@ -92,6 +107,17 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
     setData(prev => ({ ...prev, prompts }));
   }, []);
 
+  const updateVisualDNA = useCallback((visualDNA: VisualDNA) => {
+    setData(prev => ({ ...prev, visualDNA }));
+  }, []);
+
+  const updateOverlayUrl = useCallback((promptId: number, url: string) => {
+    setData(prev => ({
+      ...prev,
+      overlayUrls: { ...prev.overlayUrls, [promptId]: url },
+    }));
+  }, []);
+
   const goNext = useCallback(() => {
     setCurrentStep(prev => Math.min(prev + 1, 4));
   }, []);
@@ -103,7 +129,7 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
   const reset = useCallback(() => {
     setCurrentStep(0);
     setCompletedSteps([false, false, false, false, false]);
-    setData({ ...initialData, prompts: defaultPrompts.map(p => ({ ...p })) });
+    setData({ ...initialData, prompts: defaultPrompts.map(p => ({ ...p })), overlayUrls: {} });
   }, []);
 
   return (
@@ -112,6 +138,7 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
         currentStep, completedSteps, data,
         setCurrentStep, completeStep,
         updatePhotos, updateIdentification, updateAds, updatePrompts,
+        updateVisualDNA, updateOverlayUrl,
         goNext, goBack, reset,
       }}
     >
