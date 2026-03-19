@@ -35,7 +35,13 @@ export default function StepPrompts() {
       if (error) throw error;
       if (result?.error) throw new Error(result.error);
 
-      const newPrompts = (result.prompts || []).slice(0, 7).map((text: string, i: number) => ({
+      // Save visualDNA if returned
+      if (result?.visualDNA) {
+        updateVisualDNA(result.visualDNA);
+      }
+
+      const promptsList = result?.prompts || [];
+      const newPrompts = promptsList.slice(0, 7).map((text: string, i: number) => ({
         id: i + 1,
         prompt: text,
         approved: false,
