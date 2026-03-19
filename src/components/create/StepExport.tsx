@@ -68,7 +68,8 @@ export default function StepExport() {
         } catch { /* skip failed photos */ }
       }
 
-      const aiFolder = zip.folder("imagens_ia");
+      // Clean AI images folder
+      const cleanFolder = zip.folder("imagens_limpas");
       for (let i = 0; i < approvedImages.length; i++) {
         const img = approvedImages[i];
         if (!img.imageUrl) continue;
@@ -80,14 +81,29 @@ export default function StepExport() {
             const binary = atob(parts[1]);
             const arr = new Uint8Array(binary.length);
             for (let j = 0; j < binary.length; j++) arr[j] = binary.charCodeAt(j);
-            aiFolder?.file(`imagem_ia_${i + 1}.${ext}`, arr);
+            cleanFolder?.file(`imagem_${i + 1}.${ext}`, arr);
           } else {
             const resp = await fetch(img.imageUrl);
             const blob = await resp.blob();
             const ext = blob.type.includes("png") ? "png" : "jpg";
-            aiFolder?.file(`imagem_ia_${i + 1}.${ext}`, blob);
+            cleanFolder?.file(`imagem_${i + 1}.${ext}`, blob);
           }
         } catch { /* skip failed images */ }
+      }
+
+      // Overlay images folder (final designed versions)
+      const overlayEntries = Object.entries(data.overlayUrls || {});
+      if (overlayEntries.length > 0) {
+        const finalFolder = zip.folder("imagens_finais");
+        for (const [promptId, url] of overlayEntries) {
+          if (!url) continue;
+          try {
+            const resp = await fetch(url);
+            const blob = await resp.blob();
+            const ext = blob.type.includes("png") ? "png" : "jpg";
+            finalFolder?.file(`imagem_final_${promptId}.${ext}`, blob);
+          } catch { /* skip */ }
+        }
       }
 
       const promptsText = data.prompts.map((p, i) => `#${i + 1}\n${p.prompt}`).join("\n\n---\n\n");
