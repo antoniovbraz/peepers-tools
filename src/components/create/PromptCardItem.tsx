@@ -193,6 +193,21 @@ export default function PromptCardItem({
             </Button>
           </div>
         )}
+
+        {/* Overlay Editor */}
+        {p.imageUrl && p.approved && i > 0 && (
+          <ImageOverlayEditor
+            open={overlayOpen}
+            onClose={() => setOverlayOpen(false)}
+            imageUrl={p.imageUrl}
+            imageIndex={i + 1}
+            headlineColor={headlineColor}
+            accentColor={accentColor}
+            productName={productName}
+            characteristics={characteristics}
+            onSaveOverlay={(url) => onSaveOverlay?.(p.id, url)}
+          />
+        )}
       </div>
     </div>
   );
