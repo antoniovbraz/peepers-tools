@@ -72,6 +72,8 @@ const initialData: ListingData = {
     shopee: { title: "", description: "" },
   },
   prompts: defaultPrompts,
+  visualDNA: undefined,
+  overlayUrls: {},
 };
 
 const CreateListingContext = createContext<CreateListingContextType | null>(null);
