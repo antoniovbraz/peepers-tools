@@ -186,6 +186,12 @@ export default function StepPrompts() {
             index={i}
             onUpdate={updatePrompt}
             photoUrls={data.photoUrls}
+            headlineColor={data.visualDNA?.headlineColor}
+            accentColor={data.visualDNA?.accentColor}
+            productName={data.identification.name}
+            characteristics={data.identification.characteristics}
+            overlayUrl={data.overlayUrls[p.id]}
+            onSaveOverlay={(promptId, url) => updateOverlayUrl(promptId, url)}
           />
         ))}
       </div>
