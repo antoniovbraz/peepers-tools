@@ -136,6 +136,24 @@ export default function PromptCardItem({
                 </Button>
               </div>
             )}
+            {p.approved && i > 0 && (
+              <div className="space-y-1.5">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="w-full gap-1 text-xs"
+                  onClick={() => setOverlayOpen(true)}
+                >
+                  <Layers className="w-3.5 h-3.5" /> Adicionar texto / efeitos
+                </Button>
+                {overlayUrl && (
+                  <div className="flex items-center gap-2">
+                    <img src={overlayUrl} alt="Overlay" className="w-10 h-10 rounded object-cover" />
+                    <span className="text-xs text-success font-medium">Overlay salvo ✓</span>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex gap-2">
