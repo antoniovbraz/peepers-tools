@@ -19,17 +19,70 @@ serve(async (req) => {
 
     const productInfo = `Produto: ${productName.slice(0, 500)}\nCategoria: ${(category || "").slice(0, 200)}\nCaracterísticas: ${(characteristics || []).slice(0, 20).join(", ").slice(0, 1000)}\nExtras: ${(extras || "nenhuma").slice(0, 1000)}\nTítulo do anúncio: ${(adTitle || productName).slice(0, 200)}`;
 
-    const systemPrompt = `You are an expert e-commerce product photographer and prompt engineer.
+    const systemPrompt = `You are an expert e-commerce product photographer, prompt engineer, and visual campaign director.
 
-You must generate EXACTLY 7 image prompts in ENGLISH for the product described below.
+You must generate EXACTLY 7 image prompts in ENGLISH for the product described below, PLUS a "visualDNA" object that defines the shared art direction for the entire campaign.
+
+═══════════════════════════════════════
+VISUAL DNA — CAMPAIGN CONSISTENCY
+═══════════════════════════════════════
+
+BEFORE writing any prompt, you must define a "visualDNA" object that controls the entire campaign's look and feel. All 7 image prompts MUST inherit from this visual DNA to ensure the images look like they belong to the same product listing page.
+
+The visualDNA must include:
+- background: the shared background style (e.g. "soft white to light grey flowing gradient")
+- lighting: the shared lighting setup (e.g. "soft studio key light upper-left, subtle rim light on edges, warm fill")
+- style: the rendering approach (e.g. "ultra realistic commercial product photography")
+- tone: the overall mood (e.g. "premium, clean, minimal")
+- accentColor: a suggested accent color for overlays that complements the product (e.g. "warm gold #D4A853")
+- headlineColor: a suggested headline text color (e.g. "dark navy #1A2332")
+
+═══════════════════════════════════════
+IMAGE ROLES
+═══════════════════════════════════════
+
+Each of the 7 images has a specific role. The prompt for each must be a CLEAN image prompt (NO text overlays, NO typography, NO arrows or graphics — those will be added programmatically later).
+
+#1 — COVER (Hero / Marketplace main image)
+- Clean white background, product centered, no text, no effects
+- 3/4 angle, slightly elevated, 85mm lens compression
+- Soft studio key light, rim light for separation
+
+#2 — BENEFITS (will receive text overlay later)
+- Product prominently displayed with generous negative space on the LEFT side for text placement
+- Same lighting and background as campaign DNA
+- Leave ~40% of frame as clean space for headline + bullets overlay
+
+#3 — FEATURES (will receive icons overlay later)
+- Product at slight angle showing key feature areas
+- Even lighting revealing all details
+- Generous margins around product for icon placement
+
+#4 — CLOSE-UP DETAIL
+- Macro/close-up of the most interesting product detail
+- Directional cross-lighting to reveal texture
+- Shallow depth of field, tight crop
+
+#5 — LIFESTYLE / USAGE CONTEXT
+- Product in realistic usage environment
+- Natural/ambient lighting, contextual props
+- Rule of thirds, product as focal point
+
+#6 — PORTABILITY / SCALE
+- Product next to familiar reference object (hand, coin, phone)
+- Clean background, even lighting
+- Both objects clearly visible for size comparison
+
+#7 — IN-BOX / WHAT'S INCLUDED
+- Flat lay or 45° angle showing all included items
+- Clean surface, soft overhead lighting
+- Organized layout with product centered
 
 CRITICAL: The AI that will generate images will ALSO receive real reference photos of the product. Every prompt must assume reference photos are available and instruct strict fidelity to them.
 
 EVERY prompt MUST contain these 3 MANDATORY BLOCKS in this exact order:
 
-═══════════════════════════════════════
 BLOCK 1 — FIDELITY (mandatory in ALL 7 prompts)
-═══════════════════════════════════════
 Every prompt must START with:
 
 "Using the EXACT product from the reference photos.
@@ -40,9 +93,7 @@ FIDELITY RULES:
 - Maintain all physical characteristics exactly as shown in the reference
 - Do not add, remove, or modify any product feature"
 
-═══════════════════════════════════════
 BLOCK 2 — REALISM (mandatory in ALL 7 prompts)
-═══════════════════════════════════════
 Every prompt must include:
 
 "REALISM RULES:
@@ -52,82 +103,16 @@ Every prompt must include:
 - Subtle micro imperfections for photorealism (minor surface variations, realistic edge quality)
 - AVOID: plastic look, over-smoothing, fake edges, CGI sheen, unrealistic specular highlights"
 
-═══════════════════════════════════════
 BLOCK 3 — SCENE DIRECTION (specific per image type)
-═══════════════════════════════════════
 Each prompt must have detailed, specific scene direction with ALL of these sub-sections:
 - Camera: angle, lens equivalent, perspective, distance
-- Lighting: key light position, fill light, rim/edge light, shadow quality
-- Background: specific color/environment, gradients
+- Lighting: must be CONSISTENT with the visualDNA lighting
+- Background: must be CONSISTENT with the visualDNA background
 - Composition: product position, negative space, framing
-- Props (if applicable): specific contextual objects
 
-═══════════════════════════════════════
 FINAL LINE (mandatory in ALL 7 prompts)
-═══════════════════════════════════════
 Every prompt must END with:
-"Output: ultra high resolution, professional product photography, e-commerce ready, no text overlays, no watermarks. Ensure the product looks identical to the reference image and not reinterpreted."
-
-═══════════════════════════════════════
-THE 7 IMAGE TYPES (in this exact order)
-═══════════════════════════════════════
-
-#1 — HERO (Marketplace Cover)
-Purpose: Main listing image for Mercado Livre / Shopee / Amazon
-Scene direction:
-- Camera: 3/4 angle, slightly elevated perspective, 85mm lens style compression
-- Lighting: soft studio key light from upper-left, subtle rim light on edges for separation, soft diffused shadow under product
-- Background: pure white (#FFFFFF), slight warm gradient near base for grounding
-- Composition: product centered, floating slightly above surface, dominant in frame, balanced negative space on all sides
-
-#2 — LIFESTYLE
-Purpose: Product naturally placed in a real-life environment matching its category
-Scene direction:
-- Camera: 35-50mm natural perspective, eye-level or slightly above
-- Lighting: natural window light or warm ambient lighting, soft shadows
-- Background: contextual environment (desk, kitchen, bedroom, etc. — choose based on product category)
-- Composition: product as focal point but integrated into scene, rule of thirds, lifestyle props that complement (NOT distract)
-
-#3 — REAL USE
-Purpose: Product being used by a person (hands visible or person interacting)
-Scene direction:
-- Camera: close-medium shot, 50mm lens, natural angle showing interaction
-- Lighting: natural/ambient lighting matching usage context
-- Background: blurred real environment (shallow depth of field, f/2.8 look)
-- Composition: hands/person partially visible, product clearly identifiable, action moment captured
-
-#4 — TECHNICAL CLOSE-UP
-Purpose: Show material quality, texture, craftsmanship, ports, buttons, details
-Scene direction:
-- Camera: macro/close-up, 100mm macro lens style, very close to surface
-- Lighting: directional light to reveal texture and surface detail, cross-lighting for dimension
-- Background: clean, minimal, dark or neutral to contrast product detail
-- Composition: tight crop on most interesting detail area, sharp focus on textures, shallow depth of field
-
-#5 — SCALE REFERENCE
-Purpose: Show product size relative to familiar everyday objects
-Scene direction:
-- Camera: straight-on or slight angle, 50mm, clear comparison view
-- Lighting: even studio lighting, minimal shadows for clarity
-- Background: clean white or light neutral
-- Composition: product next to common reference object (hand, coin, pen, smartphone, ruler — choose most appropriate), both objects clearly visible and in focus
-- Props: one familiar scale reference object only
-
-#6 — BOX CONTENTS / UNBOXING
-Purpose: Show everything included in the package
-Scene direction:
-- Camera: top-down (flat lay) or 45-degree elevated angle, 35mm wide
-- Lighting: soft even overhead lighting, minimal shadows
-- Background: clean surface (white, light wood, or neutral)
-- Composition: product centered with all accessories and included items arranged neatly around it, organized layout showing complete package contents
-
-#7 — EMOTIONAL CONTEXT
-Purpose: Aspirational scene that creates desire and emotional connection
-Scene direction:
-- Camera: cinematic angle, 35mm wide or 85mm portrait style depending on mood
-- Lighting: golden hour, warm tones, dramatic but natural lighting with lens flare or bokeh
-- Background: aspirational environment that evokes the lifestyle the product enables
-- Composition: product visible but scene tells a story, mood-driven, premium feel, could be used as a social media hero image
+"Output: ultra high resolution, professional product photography, e-commerce ready, no text overlays, no watermarks, no arrows, no graphics, no typography. Clean product image only. Ensure the product looks identical to the reference image and not reinterpreted."
 
 Each prompt should be 150-250 words, highly detailed and specific. Do NOT use vague instructions.`;
 
@@ -141,30 +126,42 @@ Each prompt should be 150-250 words, highly detailed and specific. Do NOT use va
         model: "google/gemini-2.5-flash",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Crie 7 prompts de imagem para este produto:\n\n${productInfo}` },
+          { role: "user", content: `Crie o Visual DNA e 7 prompts de imagem para este produto:\n\n${productInfo}` },
         ],
         tools: [
           {
             type: "function",
             function: {
-              name: "generate_prompts",
-              description: "Retorna 7 prompts de imagem estruturados para o produto",
+              name: "generate_campaign",
+              description: "Retorna o Visual DNA da campanha e 7 prompts de imagem estruturados",
               parameters: {
                 type: "object",
                 properties: {
+                  visualDNA: {
+                    type: "object",
+                    properties: {
+                      background: { type: "string", description: "Shared background style for all images" },
+                      lighting: { type: "string", description: "Shared lighting setup" },
+                      style: { type: "string", description: "Rendering approach" },
+                      tone: { type: "string", description: "Overall mood/feel" },
+                      accentColor: { type: "string", description: "Accent color hex for overlays (e.g. #D4A853)" },
+                      headlineColor: { type: "string", description: "Headline text color hex (e.g. #1A2332)" },
+                    },
+                    required: ["background", "lighting", "style", "tone", "accentColor", "headlineColor"],
+                  },
                   prompts: {
                     type: "array",
                     items: { type: "string" },
                     description: "Lista de 7 prompts em inglês, cada um com os 3 blocos obrigatórios",
                   },
                 },
-                required: ["prompts"],
+                required: ["visualDNA", "prompts"],
                 additionalProperties: false,
               },
             },
           },
         ],
-        tool_choice: { type: "function", function: { name: "generate_prompts" } },
+        tool_choice: { type: "function", function: { name: "generate_campaign" } },
       }),
     });
 

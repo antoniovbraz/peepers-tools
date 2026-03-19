@@ -127,6 +127,7 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
         currentStep, completedSteps, data,
         setCurrentStep, completeStep,
         updatePhotos, updateIdentification, updateAds, updatePrompts,
+        updateVisualDNA, updateOverlayUrl,
         goNext, goBack, reset,
       }}
     >
