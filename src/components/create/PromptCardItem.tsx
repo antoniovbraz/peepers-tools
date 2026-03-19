@@ -21,11 +21,23 @@ interface PromptCardItemProps {
   onSaveOverlay?: (promptId: number, url: string) => void;
 }
 
-export default function PromptCardItem({ prompt: p, index: i, onUpdate, photoUrls }: PromptCardItemProps) {
+export default function PromptCardItem({
+  prompt: p,
+  index: i,
+  onUpdate,
+  photoUrls,
+  headlineColor = "#1A2332",
+  accentColor = "#D4A853",
+  productName = "",
+  characteristics = [],
+  overlayUrl,
+  onSaveOverlay,
+}: PromptCardItemProps) {
   const [copiedId, setCopiedId] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
+  const [overlayOpen, setOverlayOpen] = useState(false);
   const uploadRef = useRef<HTMLInputElement | null>(null);
 
   const copyPrompt = () => {
