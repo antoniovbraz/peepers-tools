@@ -3,15 +3,22 @@ import { PromptCard } from "@/context/CreateListingContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Check, Upload, ThumbsUp, RefreshCw, MessageSquare, Sparkles, Loader2, X } from "lucide-react";
+import { Copy, Check, Upload, ThumbsUp, RefreshCw, MessageSquare, Sparkles, Loader2, X, Layers } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import ImageOverlayEditor from "./ImageOverlayEditor";
 
 interface PromptCardItemProps {
   prompt: PromptCard;
   index: number;
   onUpdate: (id: number, updates: Partial<PromptCard>) => void;
   photoUrls: string[];
+  headlineColor?: string;
+  accentColor?: string;
+  productName?: string;
+  characteristics?: string[];
+  overlayUrl?: string;
+  onSaveOverlay?: (promptId: number, url: string) => void;
 }
 
 export default function PromptCardItem({ prompt: p, index: i, onUpdate, photoUrls }: PromptCardItemProps) {
