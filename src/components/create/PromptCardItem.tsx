@@ -68,13 +68,35 @@ export default function PromptCardItem({
     }
   };
 
-  const handleImageUpload = (files: FileList | null) => {
+  const handleImageUpload = async (files: FileList | null) => {
     if (!files?.[0]) return;
+    const file = files[0];
+    // Show blob preview immediately
     if (p.imageUrl?.startsWith("blob:")) {
       URL.revokeObjectURL(p.imageUrl);
     }
-    const url = URL.createObjectURL(files[0]);
-    onUpdate(p.id, { imageUrl: url });
+    const blobUrl = URL.createObjectURL(file);
+    onUpdate(p.id, { imageUrl: blobUrl });
+
+    // Upload to Storage for persistence
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const ext = file.name.split(".").pop() || "jpg";
+      const path = `${user.id}/${crypto.randomUUID()}.${ext}`;
+      const { error } = await supabase.storage
+        .from("generated-images")
+        .upload(path, file, { contentType: file.type, upsert: false });
+      if (error) throw error;
+      const { data: urlData } = supabase.storage
+        .from("generated-images")
+        .getPublicUrl(path);
+      URL.revokeObjectURL(blobUrl);
+      onUpdate(p.id, { imageUrl: urlData.publicUrl });
+    } catch (err: any) {
+      console.error("Upload to storage failed:", err);
+      // Keep blob URL as fallback
+    }
   };
 
   const submitFeedback = () => {
