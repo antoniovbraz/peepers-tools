@@ -1,115 +1,64 @@
 
 
-## Plano: Overlay Editor Inteligente
+## Auditoria do Overlay Editor — Minha Avaliação
 
-### Problemas Atuais
+Concordo com a maioria dos pontos. Vou categorizar cada item com minha opinião e ajustes:
 
-1. **IA gera copy genérico** — sem contexto das outras imagens, resulta em textos repetidos entre overlays
-2. **Tudo ou nada** — o botão "Gerar texto com IA" sobrescreve TODOS os elementos de uma vez, sem controle granular
-3. **UX do editor limitada** — lista de elementos não visível, seleção só por clique no canvas (hit area de 50px), sem undo, sem layer list
-4. **Reset ao reabrir** — `useEffect` no `open` reseta `elements` para o template default, perdendo edições anteriores
-5. **Canvas sem rAF** — drag causa setState a cada pixel (já diagnosticado no Sprint 2 mas não implementado)
+### Concordo totalmente (implementar)
 
----
+| # | Item | Justificativa |
+|---|------|---------------|
+| 1.1 | Aspect ratio canvas mobile | `max-h-[50vh]` + `w-full` realmente quebra 1:1. Container `aspect-square` com `min(width, 50vh)` resolve. |
+| 1.2 | Hit target maior | Raio 50px em 1080-space = ~17px mobile. Escalar para `isMobile ? 120 : 50` é correto. |
+| 1.3 | Scroll vs drag | `touchAction: "none"` trava scroll. O código já faz `preventDefault` condicional no `touchStart`, mas `touchAction: "none"` no CSS bloqueia antes. Fix: `pan-y` default, `none` só durante drag ativo. |
+| 1.5 | Seleção invisível | `strokeRect(px-6, py-6, 12, 12)` é um quadradinho fixo de 12px em 1080-space. Precisa bounding box real por tipo. |
+| 2.1 | Layout 2 colunas desktop | `max-w-2xl` empilhado desperdiça espaço. `max-w-5xl` + `grid-cols-[1fr_320px]` é o layout correto. |
+| 2.2 | Atalhos de teclado | Delete, Escape, Arrows — essenciais para editor visual. Baixo esforço, alto impacto. |
+| 2.3 | X/Y numérico | Já temos `NumberStepper` no código. Adicionar para posição é trivial. |
+| 3.1 | Hit test por bounding box | Ponto-a-ponto é impreciso. `measureText` para texto, raio para círculo, box para badge. |
+| 3.2 | Toggle bold | `bold` existe no modelo, falta UI. Trivial. |
+| 3.4 | Font loading | `document.fonts.ready` antes do render é uma linha. |
+| 4.1 | Touch targets layer list | Botões `h-7 w-7` são 28px, abaixo do mínimo 44px. Aumentar para `h-9 w-9`. |
 
-### Arquitetura das Mudanças
+### Concordo parcialmente (ajustar escopo)
 
-#### 1. IA Contextual e Não-Repetitiva (Edge Function)
+| # | Item | Minha posição |
+|---|------|---------------|
+| 1.4 | Teclado virtual | `scrollIntoView` ajuda, mas `visualViewport API` é over-engineering. Implementar só o `scrollIntoView` + mover input para fora do canvas area. |
+| 3.3 | Undo/Redo | Concordo que é importante, mas a auditoria já marca como "pode ser diferido". Implementar versão simples: array de snapshots com `Ctrl+Z` / `Ctrl+Shift+Z`, limite 20. |
+| 4.2 | Reordenação z-index | Útil mas baixa prioridade. Botões up/down na layer list, implementar se sobrar tempo. |
 
-**Arquivo:** `supabase/functions/generate-overlay-copy/index.ts`
+### Plano de Implementação (4 fases como proposto)
 
-- Aceitar novo campo `previousCopies: string[]` no body — array com headlines/bullets já gerados nas outras imagens
-- Adicionar instrução no system prompt: "NEVER repeat or paraphrase headlines/bullets already used. Each image must highlight a DIFFERENT angle."
-- Incluir a lista de copies anteriores no user prompt como contexto negativo
+**Fase 1 — Mobile Critical** (prioridade máxima)
+- Canvas em container `aspect-square` com dimensão dinâmica
+- Hit target escalado por viewport (`isMobile ? 120 : 50`)
+- `touchAction: "pan-y"` default, `"none"` só durante drag
+- `scrollIntoView` no foco de inputs
+- Bounding box real para indicador de seleção
 
-#### 2. Geração Seletiva por Elemento (Frontend)
+**Fase 2 — Desktop UX**
+- Dialog `max-w-5xl` com `grid grid-cols-[1fr_320px]` (canvas | controles)
+- Atalhos: Delete, Escape, Arrow keys (1%/5% com Shift)
+- NumberStepper para X/Y no painel de propriedades
 
-**Arquivo:** `ImageOverlayEditor.tsx`
+**Fase 3 — Qualidade Cross-platform**
+- Hit test por bounding box real (measureText, radius, padded box)
+- Toggle Bold na UI
+- Undo/Redo simples (snapshot stack, Ctrl+Z)
+- `document.fonts.ready` antes do primeiro render
 
-- Adicionar checkbox de seleção em cada elemento da layer list
-- Botão "Gerar texto com IA" agora gera APENAS para elementos selecionados (ou todos se nenhum selecionado)
-- Cada elemento de texto ganha um mini botão de IA inline (ícone Sparkles) para regenerar individualmente
-- O `generateCopy` recebe `targetElementIds: string[]` e só sobrescreve esses
+**Fase 4 — Polimento**
+- Layer list touch targets `h-9 w-9` + `py-2.5`
+- Botões up/down para z-index na layer list
 
-#### 3. Layer List Visual
+### Arquivos alterados
+- `src/components/create/ImageOverlayEditor.tsx` — todas as fases
+- Nenhum outro arquivo precisa mudar
 
-**Arquivo:** `ImageOverlayEditor.tsx`
-
-- Criar painel de layers abaixo do toolbar com lista dos elementos atuais
-- Cada item mostra: ícone do tipo, preview do texto (truncado), checkbox de seleção para IA, botão delete
-- Click na layer seleciona o elemento no canvas (highlight visual)
-- Drag-to-reorder (opcional, futuro)
-
-#### 4. Persistir Estado do Editor
-
-**Arquivo:** `ImageOverlayEditor.tsx` + `CreateListingContext.tsx`
-
-- Guardar `elements[]` por imageIndex no context (novo campo `overlayElements: Record<number, OverlayElement[]>`)
-- Ao reabrir o editor, restaurar elementos salvos em vez de resetar para template default
-- Template default só é usado na primeira abertura
-
-#### 5. Canvas Performance (rAF)
-
-**Arquivo:** `ImageOverlayEditor.tsx`
-
-- Usar `useRef` para posição de drag em vez de `setState` a cada pixel
-- `requestAnimationFrame` para throttle do redraw
-- Commit final no `mouseUp`/`touchEnd`
-
----
-
-### Mudanças por Arquivo
-
-| Arquivo | Mudanças |
-|---------|----------|
-| `supabase/functions/generate-overlay-copy/index.ts` | Aceitar `previousCopies`, `targetElements`, instrução anti-repetição |
-| `src/components/create/ImageOverlayEditor.tsx` | Layer list, geração seletiva, mini botão IA por elemento, rAF drag, persistência de estado |
-| `src/context/CreateListingContext.tsx` | Novo campo `overlayElements: Record<number, OverlayElement[]>`, métodos `updateOverlayElements` |
-| `src/lib/overlayTemplates.ts` | Sem mudanças |
-
-### UX do Editor Melhorado
-
-```text
-┌─────────────────────────────────────────┐
-│ Editor de Overlay — Benefícios      [X] │
-├─────────────────────────────────────────┤
-│ ┌─────────────────────────────────────┐ │
-│ │                                     │ │
-│ │         [Canvas 1080x1080]          │ │
-│ │     arraste elementos no canvas     │ │
-│ │                                     │ │
-│ └─────────────────────────────────────┘ │
-│                                         │
-│ [+ Título] [+ Bullet] [+ Badge] ...    │
-│                                         │
-│ ── Elementos ──────────────────────────│
-│ ☑ 📝 "Conforto Garantido"    [✨][🗑] │
-│ ☑ 📝 "✓ Benefício 1"         [✨][🗑] │
-│ ☐ 📝 "✓ Benefício 2"         [✨][🗑] │
-│ ☑ 🏷️ "Badge texto"           [✨][🗑] │
-│                                         │
-│ [✨ Gerar IA p/ selecionados (2)]       │
-│                                         │
-│ ── Propriedades (se selecionado) ──    │
-│ Texto: [________________]               │
-│ Tamanho: [- 28 +] ══════○══            │
-│ Cor: [██]                               │
-│                                         │
-│ [💾 Salvar imagem com overlay]          │
-└─────────────────────────────────────────┘
-```
-
-### Opinião Técnica — O que torna o editor "perfeito"
-
-1. **Layer list é obrigatória** — clicar em canvas de 50px de hit area é frustrante; lista de layers resolve discovery e seleção
-2. **IA seletiva é diferencial** — competidores fazem tudo-ou-nada; deixar o usuário escolher quais textos regenerar dá controle sem tirar automação
-3. **Contexto entre imagens é crítico** — passar `previousCopies` evita o problema #1 (textos repetidos) que é o maior irritante do editor atual
-4. **Persistir estado elimina retrabalho** — usuário que ajustou posições e textos não pode perder ao fechar/reabrir
-5. **rAF no drag** — sem isso, arrastar elementos em mobile é inutilizável (jank visível)
-
-### O que NÃO fazer agora
-- Undo/redo (complexidade alta, baixo ROI neste estágio)
-- Drag-to-reorder layers (nice-to-have futuro)
-- Templates prontos de layout (feature separada, P2)
-- Fontes customizadas (Inter é suficiente para marketplaces)
+### Estimativa
+- Fase 1: ~300 linhas de mudança
+- Fase 2: ~150 linhas
+- Fase 3: ~200 linhas
+- Fase 4: ~50 linhas
 
