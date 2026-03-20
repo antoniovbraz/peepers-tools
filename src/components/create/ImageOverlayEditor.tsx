@@ -902,6 +902,8 @@ export default function ImageOverlayEditor({
       // Wait for re-render
       await new Promise(r => setTimeout(r, 50));
       renderCanvas();
+      // Restore selection after export canvas capture
+      const restoreSelection = () => setSelectedId(savedSelected);
 
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/png", 1.0));
       if (!blob) throw new Error("Failed to create image blob");
