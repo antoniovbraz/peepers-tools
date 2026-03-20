@@ -26,7 +26,7 @@ serve(async (req) => {
     if (photos.length > 0) {
       contentParts.push({
         type: "text",
-        text: `Here are reference photos of the ACTUAL product.
+        text: `${LLM_SAFETY_INSTRUCTION}\n\nHere are reference photos of the ACTUAL product.
 
 FIDELITY RULES (MANDATORY — NEVER VIOLATE):
 - Use the EXACT product from these reference photos
