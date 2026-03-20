@@ -23,7 +23,7 @@ export default function MobileLayout({ children }: { children: ReactNode }) {
         </button>
       </header>
 
-      <main className="flex-1 overflow-y-auto pb-20">
+      <main className="flex-1 overflow-y-auto pb-24">
         {children}
       </main>
 

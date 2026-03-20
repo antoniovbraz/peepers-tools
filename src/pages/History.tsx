@@ -240,9 +240,9 @@ export default function History() {
               {getApprovedImages(selected.prompts).length > 0 && (
                 <div>
                   <p className="font-semibold text-muted-foreground text-xs uppercase mb-1">Imagens Geradas por IA</p>
-                  <div className="grid grid-cols-2 gap-2">
+                  <div className="grid grid-cols-2 gap-2 overflow-hidden">
                     {getApprovedImages(selected.prompts).map((p, i) => (
-                      <img key={i} src={p.imageUrl} alt={`IA ${i + 1}`} className="w-full aspect-square rounded-lg object-cover" />
+                      <img key={i} src={p.imageUrl} alt={`IA ${i + 1}`} className="w-full aspect-square rounded-lg object-cover overflow-hidden" />
                     ))}
                   </div>
                 </div>

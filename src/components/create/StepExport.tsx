@@ -13,6 +13,7 @@ export default function StepExport() {
   const { data, completeStep, goBack } = useCreateListing();
   const { user } = useAuth();
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
   const approvedImages = data.prompts.filter(p => p.approved && p.imageUrl);
@@ -39,6 +40,7 @@ export default function StepExport() {
       if (error) throw error;
 
       completeStep(4);
+      setSaved(true);
       toast({ title: "🎉 Anúncio salvo!", description: "Seu anúncio foi salvo com sucesso." });
     } catch (err: any) {
       console.error("Save error:", err);
@@ -198,9 +200,9 @@ export default function StepExport() {
           <Button variant="outline" onClick={goBack} className="h-12 px-4">
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <Button onClick={handleExport} disabled={saving} className="flex-1 h-14 text-base font-bold gap-2 bg-success hover:bg-success/90">
-            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Download className="w-5 h-5" />}
-            {saving ? "Salvando..." : "Salvar Anúncio"}
+          <Button onClick={handleExport} disabled={saving || saved} className={`flex-1 h-14 text-base font-bold gap-2 ${saved ? "bg-success/70" : "bg-success hover:bg-success/90"}`}>
+            {saving ? <Loader2 className="w-5 h-5 animate-spin" /> : saved ? <Check className="w-5 h-5" /> : <Download className="w-5 h-5" />}
+            {saving ? "Salvando..." : saved ? "Salvo ✓" : "Salvar Anúncio"}
           </Button>
         </div>
         <Button

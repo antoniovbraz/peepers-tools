@@ -74,12 +74,12 @@ export default function StepAds() {
       <div className="bg-card rounded-xl border p-4 space-y-3">
         <Badge className="bg-[hsl(50,95%,55%)] text-black text-xs font-bold">Mercado Livre</Badge>
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground">Título</label>
-          <Input value={ml.title} onChange={e => setMl({ ...ml, title: e.target.value })} />
+          <label htmlFor="ml-title" className="text-xs font-semibold text-muted-foreground">Título</label>
+          <Input id="ml-title" value={ml.title} onChange={e => setMl({ ...ml, title: e.target.value })} />
         </div>
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground">Descrição</label>
-          <Textarea value={ml.description} onChange={e => setMl({ ...ml, description: e.target.value })} rows={5} />
+          <label htmlFor="ml-desc" className="text-xs font-semibold text-muted-foreground">Descrição</label>
+          <Textarea id="ml-desc" value={ml.description} onChange={e => setMl({ ...ml, description: e.target.value })} rows={5} />
         </div>
       </div>
 
@@ -87,12 +87,12 @@ export default function StepAds() {
       <div className="bg-card rounded-xl border p-4 space-y-3">
         <Badge className="bg-[hsl(10,85%,55%)] text-white text-xs font-bold">Shopee</Badge>
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground">Título</label>
-          <Input value={shopee.title} onChange={e => setShopee({ ...shopee, title: e.target.value })} />
+          <label htmlFor="shopee-title" className="text-xs font-semibold text-muted-foreground">Título</label>
+          <Input id="shopee-title" value={shopee.title} onChange={e => setShopee({ ...shopee, title: e.target.value })} />
         </div>
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground">Descrição</label>
-          <Textarea value={shopee.description} onChange={e => setShopee({ ...shopee, description: e.target.value })} rows={5} />
+          <label htmlFor="shopee-desc" className="text-xs font-semibold text-muted-foreground">Descrição</label>
+          <Textarea id="shopee-desc" value={shopee.description} onChange={e => setShopee({ ...shopee, description: e.target.value })} rows={5} />
         </div>
       </div>
 

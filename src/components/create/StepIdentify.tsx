@@ -85,12 +85,12 @@ export default function StepIdentify() {
 
       <div className="bg-card rounded-xl border p-4 space-y-4">
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase">Nome</label>
-          <Input value={name} onChange={e => setName(e.target.value)} disabled={!editing} />
+          <label htmlFor="product-name" className="text-xs font-semibold text-muted-foreground uppercase">Nome</label>
+          <Input id="product-name" value={name} onChange={e => setName(e.target.value)} disabled={!editing} />
         </div>
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase">Categoria</label>
-          <Input value={category} onChange={e => setCategory(e.target.value)} disabled={!editing} />
+          <label htmlFor="product-category" className="text-xs font-semibold text-muted-foreground uppercase">Categoria</label>
+          <Input id="product-category" value={category} onChange={e => setCategory(e.target.value)} disabled={!editing} />
         </div>
         <div className="space-y-2">
           <label className="text-xs font-semibold text-muted-foreground uppercase">Características</label>
@@ -139,9 +139,14 @@ export default function StepIdentify() {
         </Button>
       </div>
 
-      <Button onClick={handleConfirm} disabled={!name} className="w-full h-14 text-base font-bold gap-2">
-        <Check className="w-5 h-5" /> Tá correto, próximo <ArrowRight className="w-5 h-5" />
-      </Button>
+      <div className="flex gap-3">
+        <Button variant="outline" onClick={goBack} className="h-14 px-4">
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <Button onClick={handleConfirm} disabled={!name} className="flex-1 h-14 text-base font-bold gap-2">
+          <Check className="w-5 h-5" /> Confirmar <ArrowRight className="w-5 h-5" />
+        </Button>
+      </div>
     </div>
   );
 }
