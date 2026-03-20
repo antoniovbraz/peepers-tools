@@ -121,8 +121,7 @@ export default function StepIdentify() {
             )}
           </div>
         </div>
-        <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase">Informações extras</label>
+        <div className="space-y-2 md:col-span-2">
           <Textarea
             value={extras}
             onChange={e => setExtras(e.target.value)}

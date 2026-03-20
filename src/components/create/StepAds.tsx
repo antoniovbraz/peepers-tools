@@ -101,7 +101,7 @@ export default function StepAds() {
           <Textarea id="shopee-desc" value={shopee.description} onChange={e => setShopee({ ...shopee, description: e.target.value })} rows={5} />
         </div>
       </div>
-
+      </div>
       <Button variant="outline" className="w-full gap-2" onClick={generateAds}>
         <RefreshCw className="w-4 h-4" /> Regenerar tudo
       </Button>

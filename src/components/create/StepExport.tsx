@@ -146,7 +146,7 @@ export default function StepExport() {
         <p className="text-sm text-muted-foreground">Confira tudo antes de salvar</p>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
         <div className="bg-card rounded-xl border p-4 space-y-2">
           <div className="flex items-center gap-2">
             <Image className="w-4 h-4 text-primary" />

@@ -222,7 +222,7 @@ export default function StepPrompts() {
         </div>
       )}
 
-      <div className="space-y-4">
+      <div className="space-y-4 lg:grid lg:grid-cols-2 lg:gap-4 lg:space-y-0">
         {prompts.map((p, i) => (
           <PromptCardItem
             key={p.id}

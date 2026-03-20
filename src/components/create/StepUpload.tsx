@@ -126,13 +126,15 @@ export default function StepUpload() {
         </div>
       )}
 
-      <Button
-        onClick={handleNext}
-        disabled={data.photos.length === 0 || uploading}
-        className="w-full h-12 text-base font-semibold gap-2"
-      >
-        Próximo <ArrowRight className="w-5 h-5" />
-      </Button>
+      <div className="flex gap-3 md:justify-end">
+        <Button
+          onClick={handleNext}
+          disabled={data.photos.length === 0 || uploading}
+          className="w-full md:w-auto h-12 text-base font-semibold gap-2"
+        >
+          Próximo <ArrowRight className="w-5 h-5" />
+        </Button>
+      </div>
     </div>
   );
 }
