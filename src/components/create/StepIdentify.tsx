@@ -139,9 +139,14 @@ export default function StepIdentify() {
         </Button>
       </div>
 
-      <Button onClick={handleConfirm} disabled={!name} className="w-full h-14 text-base font-bold gap-2">
-        <Check className="w-5 h-5" /> Tá correto, próximo <ArrowRight className="w-5 h-5" />
-      </Button>
+      <div className="flex gap-3">
+        <Button variant="outline" onClick={goBack} className="h-14 px-4">
+          <ArrowLeft className="w-5 h-5" />
+        </Button>
+        <Button onClick={handleConfirm} disabled={!name} className="flex-1 h-14 text-base font-bold gap-2">
+          <Check className="w-5 h-5" /> Confirmar <ArrowRight className="w-5 h-5" />
+        </Button>
+      </div>
     </div>
   );
 }
