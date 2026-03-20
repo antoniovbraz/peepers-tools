@@ -137,12 +137,12 @@ export default function StepExport() {
   };
 
   return (
-    <div className="px-4 py-6 space-y-5">
+    <div className="px-4 sm:px-6 py-6 space-y-5">
       <div className="text-center space-y-2">
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-success/10 mx-auto">
           <PartyPopper className="w-7 h-7 text-success" />
         </div>
-        <h2 className="font-display text-xl font-bold text-foreground">Revisão Final</h2>
+        <h2 className="font-display text-xl md:text-2xl font-bold text-foreground">Revisão Final</h2>
         <p className="text-sm text-muted-foreground">Confira tudo antes de salvar</p>
       </div>
 
