@@ -86,7 +86,7 @@ export default function StepIdentify() {
         <p className="text-sm text-muted-foreground">Confira e ajuste se necessário</p>
       </div>
 
-      <div className="bg-card rounded-xl border p-4 space-y-4">
+      <div className="bg-card rounded-xl border p-4 space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
         <div className="space-y-2">
           <label htmlFor="product-name" className="text-xs font-semibold text-muted-foreground uppercase">Nome</label>
           <Input id="product-name" value={name} onChange={e => setName(e.target.value)} disabled={!editing} />
