@@ -254,6 +254,29 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
     }));
   }, []);
 
+  const updateOverlayElements = useCallback((imageIndex: number, elements: OverlayElementData[]) => {
+    setData(prev => ({
+      ...prev,
+      overlayElements: { ...prev.overlayElements, [imageIndex]: elements },
+    }));
+  }, []);
+
+  const getOverlayElements = useCallback((imageIndex: number): OverlayElementData[] | undefined => {
+    return data.overlayElements[imageIndex];
+  }, [data.overlayElements]);
+
+  const getAllOverlayCopies = useCallback((): string[] => {
+    const copies: string[] = [];
+    for (const elements of Object.values(data.overlayElements)) {
+      for (const el of elements) {
+        if (el.text && (el.type === "headline" || el.type === "bullet" || el.type === "badge")) {
+          copies.push(el.text);
+        }
+      }
+    }
+    return copies;
+  }, [data.overlayElements]);
+
   const goNext = useCallback(() => {
     setCurrentStep(prev => Math.min(prev + 1, 4));
   }, []);
