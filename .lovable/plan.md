@@ -1,74 +1,97 @@
 
 
-## Plano Consolidado: Bugs + UX Mobile/Desktop
+## Avaliação da Auditoria de Responsividade
 
-Confrontei a auditoria externa com o código atual e meu plano. Dois bugs confirmados como reais e bloqueantes. Várias sugestões de UX mobile são superiores ao que temos.
+### Diagnóstico: Correto
 
-### O que incorporo da auditoria externa
+A auditoria acerta no ponto principal: a aplicação é mobile-only. Nenhum componente além do `ImageOverlayEditor` usa breakpoints. O `MobileLayout` é o shell único. Conteúdo estica 100% em telas grandes.
 
-| # | Item | Veredito | Razão |
-|---|------|----------|-------|
-| 1.1 | touchActionRef bug | **ACEITO — BUG REAL** | Linha 722: `style={{ touchAction: touchActionRef.current }}` — ref não causa re-render. O fix de scroll vs. drag está efetivamente quebrado. |
-| 1.2 | Undo a cada tecla | **ACEITO — BUG REAL** | Linha 237-242: `useEffect` em `elements` chama `pushSnapshot` em toda mudança, incluindo cada caractere digitado. |
-| 2.1 | Bottom Sheet mobile | **ACEITO** | Substituir o `elementEditor` inline por um `Sheet` (bottom) ao selecionar elemento. Canvas fica visível acima. Melhor que scroll. |
-| 2.2 | Toolbar sticky | **ACEITO** | Mover toolbar para fora da `overflow-y-auto` div (linha 1054). Canvas + toolbar fixos, só layers rola. |
-| 2.3 | Layer list colapsável | **ACEITO** | Usar `Collapsible` existente. Default colapsado com badge de count. |
-| 3.1 | Hover state canvas | **ACEITO** | `hoveredId` state + outline sutil no `renderCanvas`. Baixo esforço, bom feedback visual desktop. |
-| 4.1 | Simplificar layer mobile | **ACEITO** | Mobile: só checkbox + nome + delete inline. Z-index e AI vão para dentro do Sheet de propriedades. |
-| 4.2 | Badge fade-out | **ACEITO** | "Arraste para mover" some após 3s. `setTimeout` + `opacity-0 transition-opacity`. |
+### Minha avaliação item a item
 
-| # | Item | Veredito | Razão |
-|---|------|----------|-------|
-| 3.2 | Export separado sidebar | **REJEITADO** | Já está no bottom da ScrollArea desktop (linha 1090). Separar não melhora significativamente. |
-| 2.1 layout | O layout fixo proposto | **PARCIAL** | Concordo com a estrutura, mas uso Sheet em vez de redesenhar todo o mobile layout. |
+| Item | Veredito | Comentário |
+|---|---|---|
+| **Fase 1: AppLayout** | **ACEITO** | Fundação obrigatória. Opção A (sidebar customizada) é melhor — mais leve, sem overhead do `SidebarProvider`. |
+| **Fase 1: App.tsx update** | **ACEITO** | Trivial após AppLayout. |
+| **Fase 1: Container max-w** | **ACEITO** | `max-w-3xl mx-auto` no wizard, `max-w-7xl` no History. |
+| **Fase 1: Remover MobileLayout** | **ACEITO** | Substituir, não manter como alias. |
+| **Fase 2: CreateListing container** | **ACEITO** | Uma linha. |
+| **Fase 2: StepperProgress** | **ACEITO** | `md:text-xs` + `md:px-8`. Trivial. |
+| **Fase 2: StepUpload grid** | **ACEITO** | `grid-cols-2 md:grid-cols-3 lg:grid-cols-4`. |
+| **Fase 2: StepIdentify 2-col** | **ACEITO** | Nome + Categoria lado a lado no desktop. |
+| **Fase 2: StepAds 2-col** | **ACEITO** | ML + Shopee lado a lado. |
+| **Fase 2: StepPrompts 2-col** | **ACEITO** | Prompt cards em grid. |
+| **Fase 2: StepExport 2-col** | **ACEITO** | Review cards em grid. |
+| **Fase 3: History grid** | **ACEITO** | 1/2/3 colunas + dialog wider. |
+| **Fase 3: Auth split-screen** | **ACEITO** | Branding panel à esquerda no desktop. Boa impressão visual. |
+| **Fase 4: touchAction bug** | **JA CORRIGIDO** | Já implementamos `touchAction: "pan-y"` fixo + `e.preventDefault()` no sprint anterior. Verificar se está de fato aplicado. |
+| **Fase 4: Undo debounce** | **JA CORRIGIDO** | Já implementamos `textDebounceRef` com 500ms no sprint anterior. Verificar. |
+| **Fase 5: Padding responsivo** | **ACEITO** | `px-4 sm:px-6` em todos os steps. |
+| **Fase 5: Tipografia** | **ACEITO** | `text-xl md:text-2xl` nos títulos. |
+| **Fase 5: Botões desktop** | **ACEITO** | Auto-width + align-right no desktop. |
+| **Fase 5: Hover states** | **ACEITO** | `hover:shadow-md` nos cards. |
+| **Fase 5: Upload text** | **ACEITO** | "Clique" vs "Toque". |
 
-### O que já estava no meu plano (mantido)
+### Plano de Implementação
 
-- Snap & alignment guides
-- Duplicar elemento
-- Text alignment (left/center/right)
-- Color presets (swatches)
-- Opacidade por elemento
-- Double-click para foco no input
-- Text styles (shadow, stroke)
+**Fase 1 — Fundação (bloqueante, fazer primeiro)**
 
----
+1. Criar `src/components/layout/AppLayout.tsx` com `useIsMobile()`:
+   - Mobile: exatamente o layout atual do MobileLayout (header + bottom tabs)
+   - Desktop: sidebar lateral (240px) + header com PageTitle + content area com `max-w`
+   - Opção A (sidebar customizada, sem SidebarProvider)
 
-### Plano Final de Implementação
+2. Atualizar `App.tsx`: trocar `MobileLayout` por `AppLayout`
 
-**Sprint 1 — Bug fixes (bloqueante)**
-1. **Fix touchAction**: Remover `touchActionRef`, usar `e.preventDefault()` no `handleTouchStart` (já feito parcialmente). Manter `touchAction: "pan-y"` sempre no CSS.
-2. **Fix undo por tecla**: Debounce de 500ms para mudanças de texto. Snapshot imediato para add/delete/drag-end. Usar `useRef` com `setTimeout` para agrupar edições de texto.
+3. Deletar `MobileLayout.tsx`
 
-**Sprint 2 — Mobile UX (maior impacto)**
-3. **Bottom Sheet**: Ao selecionar elemento no canvas mobile → `Sheet` sobe de baixo com `elementEditor`. Ao deselecionar → Sheet fecha.
-4. **Toolbar sticky**: Canvas + toolbar em `shrink-0`, só layers + AI button na área scrollável.
-5. **Layer list colapsável**: `Collapsible` com badge count. Default colapsado mobile.
-6. **Layer list simplificada mobile**: Só checkbox + nome + delete. Z-index e AI movidos para Sheet.
-7. **Badge fade-out**: "Arraste para mover" some após 3s.
+**Fase 2 — Steps do Wizard (todas independentes)**
 
-**Sprint 3 — Desktop + Cross-platform**
-8. **Hover state canvas**: `hoveredId` + outline pontilhado sutil (cor diferente da seleção).
-9. **Snap guides**: Linhas magnéticas em 50% (centro) e 5%/95% (margens).
-10. **Duplicar elemento**: Botão na layer list + dentro do Sheet. Copia com offset +5%.
-11. **Text alignment**: `textAlign` property + 3 botões (L/C/R) no elementEditor.
-12. **Opacidade**: Slider 0-100% por elemento. `ctx.globalAlpha`.
-13. **Color presets**: 5 swatches rápidos (headlineColor, accentColor, preto, branco, cinza).
+4. `CreateListing.tsx`: `max-w-3xl mx-auto`
+5. `StepperProgress.tsx`: `md:text-xs`, `md:px-8`
+6. `StepUpload.tsx`: grid responsivo + padding `sm:px-6` + "Clique" no desktop
+7. `StepIdentify.tsx`: Nome/Categoria em `md:grid-cols-2`
+8. `StepAds.tsx`: ML/Shopee em `lg:grid-cols-2`
+9. `StepPrompts.tsx`: cards em `lg:grid-cols-2`
+10. `StepExport.tsx`: review cards em `md:grid-cols-2`
 
-**Sprint 4 — Polish**
-14. **Double-click/tap → foco input**: Double-click no canvas foca o input de texto no Sheet/painel.
-15. **Text styles**: Shadow e stroke como opções no elementEditor.
+**Fase 3 — Standalone pages**
+
+11. `History.tsx`: grid 1/2/3 colunas + `max-w-7xl` + dialog wider
+12. `Auth.tsx`: split-screen desktop com branding panel
+
+**Fase 4 — Polish**
+
+13. Padding responsivo global (`sm:px-6`)
+14. Tipografia responsiva (`md:text-2xl`)
+15. Botões desktop: auto-width, align-right
+16. Hover states nos cards
+17. Verificar que bugs do Overlay Editor (touchAction + undo) estao de fato corrigidos
 
 ### Arquivos alterados
 
-| Arquivo | Mudanças |
-|---------|----------|
-| `ImageOverlayEditor.tsx` | Todos os sprints |
-| `overlayTemplates.ts` | Adicionar `opacity`, `textAlign`, `textStyle` ao tipo `OverlayElement` |
+| Arquivo | Acao |
+|---|---|
+| `src/components/layout/AppLayout.tsx` | CRIAR |
+| `src/components/layout/MobileLayout.tsx` | DELETAR |
+| `src/App.tsx` | Trocar import |
+| `src/pages/CreateListing.tsx` | max-w-3xl |
+| `src/components/create/StepperProgress.tsx` | breakpoints |
+| `src/components/create/StepUpload.tsx` | grid + padding + texto |
+| `src/components/create/StepIdentify.tsx` | grid 2-col |
+| `src/components/create/StepAds.tsx` | grid 2-col |
+| `src/components/create/StepPrompts.tsx` | grid 2-col |
+| `src/components/create/StepExport.tsx` | grid 2-col |
+| `src/pages/History.tsx` | grid + max-w + dialog |
+| `src/pages/Auth.tsx` | split-screen desktop |
 
 ### Estimativa
-- Sprint 1: ~40 linhas (bugs pontuais)
-- Sprint 2: ~200 linhas (reestruturação mobile)
-- Sprint 3: ~250 linhas (features novas)
-- Sprint 4: ~100 linhas (polish)
+- Fase 1: ~120 linhas (AppLayout novo)
+- Fase 2: ~30 linhas total (maioria 1-2 linhas de Tailwind por arquivo)
+- Fase 3: ~60 linhas (History grid + Auth split)
+- Fase 4: ~20 linhas (polish CSS)
+
+### O que descarto / ajusto
+- **Fase 4 bugs do overlay**: ja implementados nos sprints anteriores, so verificar
+- **Opção B (SidebarProvider)**: rejeitada — overhead desnecessario para 2 itens de nav
+- **page-container utility CSS**: nao vale a pena, Tailwind inline e mais explicito
 
