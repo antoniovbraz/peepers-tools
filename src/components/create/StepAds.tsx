@@ -76,7 +76,7 @@ export default function StepAds() {
         <p className="text-sm text-muted-foreground">Textos gerados pela IA — edite à vontade</p>
       </div>
 
-      {/* Mercado Livre */}
+      <div className="space-y-5 lg:grid lg:grid-cols-2 lg:gap-5 lg:space-y-0">
       <div className="bg-card rounded-xl border p-4 space-y-3">
         <Badge className="bg-[hsl(50,95%,55%)] text-black text-xs font-bold">Mercado Livre</Badge>
         <div className="space-y-2">
