@@ -49,7 +49,7 @@ export default function StepperProgress() {
                 )}
               </div>
               <span
-                className={`text-[10px] mt-1 font-medium ${
+                className={`text-[10px] md:text-xs mt-1 font-medium ${
                   isCompleted
                     ? "text-success"
                     : isCurrent
