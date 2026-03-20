@@ -63,7 +63,7 @@ export default function Auth() {
   };
 
   return (
-    <div className="px-6 py-10 space-y-6 max-w-sm mx-auto">
+    <div className="px-6 py-10 space-y-6 max-w-sm mx-auto min-h-[100dvh] flex flex-col justify-center">
       <div className="text-center space-y-2">
         <img src={logo} alt="Peepers Shop" className="h-12 mx-auto" />
         <h1 className="font-display text-2xl font-bold text-foreground">Peepers Shop</h1>

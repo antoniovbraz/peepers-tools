@@ -468,7 +468,7 @@ export default function ImageOverlayEditor({
           </div>
 
           {/* Toolbar */}
-          <div className="flex flex-wrap gap-1.5">
+          <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-1.5">
             <Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => addElement("headline")}>
               <Type className="w-3 h-3" /> Título
             </Button>
@@ -485,7 +485,7 @@ export default function ImageOverlayEditor({
               <Circle className="w-3 h-3" /> Círculo
             </Button>
             {selectedId && (
-              <Button size="sm" variant="destructive" className="text-xs gap-1 ml-auto" onClick={deleteSelected}>
+              <Button size="sm" variant="destructive" className="text-xs gap-1" onClick={deleteSelected}>
                 <Trash2 className="w-3 h-3" /> Remover
               </Button>
             )}

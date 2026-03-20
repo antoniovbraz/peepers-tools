@@ -34,7 +34,7 @@ export default function StepperProgress() {
                   isCompleted
                     ? "bg-success"
                     : isCurrent
-                    ? "bg-primary animate-pulse-blue"
+                    ? "bg-primary animate-pulse-green"
                     : "bg-muted"
                 }`}
               >
