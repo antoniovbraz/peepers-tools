@@ -3,20 +3,69 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
+import { Slider } from "@/components/ui/slider";
 import {
   Type, Plus, Trash2, Download, Loader2, Sparkles, Move,
-  ArrowRight, Circle, RotateCw,
+  ArrowRight, Circle, RotateCw, X, Minus,
 } from "lucide-react";
 import { OverlayElement, getDefaultTemplate, IMAGE_ROLES } from "@/lib/overlayTemplates";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useIsMobile } from "@/hooks/use-mobile";
 
+/* ── NumberStepper ── */
+function NumberStepper({
+  value,
+  onChange,
+  min = 0,
+  max = 999,
+  step = 1,
+  label,
+}: {
+  value: number;
+  onChange: (v: number) => void;
+  min?: number;
+  max?: number;
+  step?: number;
+  label?: string;
+}) {
+  const clamp = (v: number) => Math.max(min, Math.min(max, v));
+  return (
+    <div className="space-y-1">
+      {label && <span className="text-xs text-muted-foreground">{label}</span>}
+      <div className="flex items-center gap-2">
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-11 w-11 shrink-0"
+          onClick={() => onChange(clamp(value - step))}
+        >
+          <Minus className="w-4 h-4" />
+        </Button>
+        <span className="min-w-[3ch] text-center font-mono text-sm tabular-nums">
+          {value}
+        </span>
+        <Button
+          type="button"
+          variant="outline"
+          size="icon"
+          className="h-11 w-11 shrink-0"
+          onClick={() => onChange(clamp(value + step))}
+        >
+          <Plus className="w-4 h-4" />
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Props ── */
 interface ImageOverlayEditorProps {
   open: boolean;
   onClose: () => void;
   imageUrl: string;
-  imageIndex: number; // 1-7
+  imageIndex: number;
   headlineColor: string;
   accentColor: string;
   productName: string;
@@ -43,6 +92,7 @@ export default function ImageOverlayEditor({
   const [loadedImage, setLoadedImage] = useState<HTMLImageElement | null>(null);
   const [exporting, setExporting] = useState(false);
   const [generatingCopy, setGeneratingCopy] = useState(false);
+  const isMobile = useIsMobile();
 
   const role = IMAGE_ROLES[imageIndex - 1];
 
@@ -78,10 +128,8 @@ export default function ImageOverlayEditor({
     canvas.width = W;
     canvas.height = H;
 
-    // Draw base image
     ctx.drawImage(loadedImage, 0, 0, W, H);
 
-    // Draw elements
     for (const el of elements) {
       const px = (el.x / 100) * W;
       const py = (el.y / 100) * H;
@@ -103,7 +151,6 @@ export default function ImageOverlayEditor({
           ctx.fillStyle = el.color || headlineColor;
           ctx.textBaseline = "top";
 
-          // Word wrap
           const maxWidth = el.width ? (el.width / 100) * W : W - px - 20;
           const words = (el.text || "").split(" ");
           let line = "";
@@ -113,7 +160,6 @@ export default function ImageOverlayEditor({
           for (const word of words) {
             const test = line + (line ? " " : "") + word;
             if (ctx.measureText(test).width > maxWidth && line) {
-              // Draw shadow for readability
               ctx.fillStyle = "rgba(255,255,255,0.7)";
               ctx.fillRect(px - 4, lineY - 2, ctx.measureText(line).width + 8, lineHeight);
               ctx.fillStyle = el.color || headlineColor;
@@ -142,7 +188,6 @@ export default function ImageOverlayEditor({
           const bw = metrics.width + padX * 2;
           const bh = fontSize + padY * 2;
 
-          // Rounded rect
           const radius = bh / 2;
           ctx.fillStyle = el.bgColor || accentColor;
           ctx.beginPath();
@@ -175,7 +220,6 @@ export default function ImageOverlayEditor({
           ctx.lineTo(px + 60, py + 40);
           ctx.stroke();
 
-          // Arrowhead
           ctx.fillStyle = el.color || headlineColor;
           ctx.beginPath();
           ctx.moveTo(px + 60, py + 40);
@@ -194,7 +238,6 @@ export default function ImageOverlayEditor({
         }
       }
 
-      // Selection indicator
       if (el.id === selectedId) {
         ctx.strokeStyle = "#3B82F6";
         ctx.lineWidth = 2;
@@ -211,49 +254,54 @@ export default function ImageOverlayEditor({
     renderCanvas();
   }, [renderCanvas]);
 
-  // Mouse handlers for drag
-  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // ── Pointer helpers ──
+  const getCanvasCoords = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) return null;
     const rect = canvas.getBoundingClientRect();
     const scaleX = canvas.width / rect.width;
     const scaleY = canvas.height / rect.height;
-    const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top) * scaleY;
+    return {
+      mx: (clientX - rect.left) * scaleX,
+      my: (clientY - rect.top) * scaleY,
+      canvas,
+    };
+  };
 
-    // Find clicked element (reverse order = top first)
+  const hitTest = (mx: number, my: number, canvas: HTMLCanvasElement) => {
     for (let i = elements.length - 1; i >= 0; i--) {
       const el = elements[i];
       const ex = (el.x / 100) * canvas.width;
       const ey = (el.y / 100) * canvas.height;
-      const hitSize = 50;
-      if (Math.abs(mx - ex) < hitSize && Math.abs(my - ey) < hitSize) {
-        setSelectedId(el.id);
-        setDragging(el.id);
-        setDragOffset({ x: mx - ex, y: my - ey });
-        return;
-      }
+      if (Math.abs(mx - ex) < 50 && Math.abs(my - ey) < 50) return el;
     }
-    setSelectedId(null);
+    return null;
+  };
+
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    const c = getCanvasCoords(e.clientX, e.clientY);
+    if (!c) return;
+    const el = hitTest(c.mx, c.my, c.canvas);
+    if (el) {
+      setSelectedId(el.id);
+      setDragging(el.id);
+      setDragOffset({ x: c.mx - (el.x / 100) * c.canvas.width, y: c.my - (el.y / 100) * c.canvas.height });
+    } else {
+      setSelectedId(null);
+    }
   };
 
   const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (!dragging) return;
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const mx = (e.clientX - rect.left) * scaleX;
-    const my = (e.clientY - rect.top) * scaleY;
-
+    const c = getCanvasCoords(e.clientX, e.clientY);
+    if (!c) return;
     setElements(prev =>
       prev.map(el =>
         el.id === dragging
           ? {
               ...el,
-              x: Math.max(0, Math.min(100, ((mx - dragOffset.x) / canvas.width) * 100)),
-              y: Math.max(0, Math.min(100, ((my - dragOffset.y) / canvas.height) * 100)),
+              x: Math.max(0, Math.min(100, ((c.mx - dragOffset.x) / c.canvas.width) * 100)),
+              y: Math.max(0, Math.min(100, ((c.my - dragOffset.y) / c.canvas.height) * 100)),
             }
           : el
       )
@@ -262,51 +310,36 @@ export default function ImageOverlayEditor({
 
   const handleCanvasMouseUp = () => setDragging(null);
 
-  // Touch handlers for mobile
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     const touch = e.touches[0];
-    const canvas = canvasRef.current;
-    if (!canvas || !touch) return;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const mx = (touch.clientX - rect.left) * scaleX;
-    const my = (touch.clientY - rect.top) * scaleY;
-
-    for (let i = elements.length - 1; i >= 0; i--) {
-      const el = elements[i];
-      const ex = (el.x / 100) * canvas.width;
-      const ey = (el.y / 100) * canvas.height;
-      if (Math.abs(mx - ex) < 50 && Math.abs(my - ey) < 50) {
-        setSelectedId(el.id);
-        setDragging(el.id);
-        setDragOffset({ x: mx - ex, y: my - ey });
-        e.preventDefault();
-        return;
-      }
+    if (!touch) return;
+    const c = getCanvasCoords(touch.clientX, touch.clientY);
+    if (!c) return;
+    const el = hitTest(c.mx, c.my, c.canvas);
+    if (el) {
+      setSelectedId(el.id);
+      setDragging(el.id);
+      setDragOffset({ x: c.mx - (el.x / 100) * c.canvas.width, y: c.my - (el.y / 100) * c.canvas.height });
+      e.preventDefault();
+    } else {
+      setSelectedId(null);
     }
-    setSelectedId(null);
   };
 
   const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
     if (!dragging) return;
     e.preventDefault();
     const touch = e.touches[0];
-    const canvas = canvasRef.current;
-    if (!canvas || !touch) return;
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const mx = (touch.clientX - rect.left) * scaleX;
-    const my = (touch.clientY - rect.top) * scaleY;
-
+    if (!touch) return;
+    const c = getCanvasCoords(touch.clientX, touch.clientY);
+    if (!c) return;
     setElements(prev =>
       prev.map(el =>
         el.id === dragging
           ? {
               ...el,
-              x: Math.max(0, Math.min(100, ((mx - dragOffset.x) / canvas.width) * 100)),
-              y: Math.max(0, Math.min(100, ((my - dragOffset.y) / canvas.height) * 100)),
+              x: Math.max(0, Math.min(100, ((c.mx - dragOffset.x) / c.canvas.width) * 100)),
+              y: Math.max(0, Math.min(100, ((c.my - dragOffset.y) / c.canvas.height) * 100)),
             }
           : el
       )
@@ -315,7 +348,7 @@ export default function ImageOverlayEditor({
 
   const handleTouchEnd = () => setDragging(null);
 
-  // Add element
+  // ── Element CRUD ──
   const addElement = (type: OverlayElement["type"]) => {
     const id = `${type}-${Date.now()}`;
     const defaults: Record<string, Partial<OverlayElement>> = {
@@ -343,31 +376,21 @@ export default function ImageOverlayEditor({
 
   const selectedElement = elements.find(el => el.id === selectedId);
 
-  // Generate AI copy
+  // ── AI copy ──
   const generateCopy = async () => {
     setGeneratingCopy(true);
     try {
       const roleKey = role?.role || "benefits";
       const { data, error } = await supabase.functions.invoke("generate-overlay-copy", {
-        body: {
-          productName,
-          characteristics,
-          imageRole: roleKey,
-          imageIndex,
-        },
+        body: { productName, characteristics, imageRole: roleKey, imageIndex },
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      // Apply generated copy to elements
       if (data?.headline) {
-        const headlineEl = elements.find(el => el.type === "headline");
-        if (headlineEl) {
-          updateSelected({ text: data.headline });
-          setElements(prev =>
-            prev.map(el => (el.type === "headline" ? { ...el, text: data.headline } : el))
-          );
-        }
+        setElements(prev =>
+          prev.map(el => (el.type === "headline" ? { ...el, text: data.headline } : el))
+        );
       }
       if (data?.bullets && Array.isArray(data.bullets)) {
         setElements(prev => {
@@ -398,7 +421,7 @@ export default function ImageOverlayEditor({
     }
   };
 
-  // Export final image
+  // ── Export ──
   const handleExport = async () => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -412,7 +435,6 @@ export default function ImageOverlayEditor({
       );
       if (!blob) throw new Error("Failed to create image blob");
 
-      // Upload to storage
       const path = `overlays/${crypto.randomUUID()}.png`;
       const { error: uploadErr } = await supabase.storage
         .from("generated-images")
@@ -435,9 +457,251 @@ export default function ImageOverlayEditor({
     }
   };
 
+  // ── Shared UI pieces ──
+  const canvasElement = (
+    <div className="relative border rounded-lg overflow-hidden bg-muted">
+      <canvas
+        ref={canvasRef}
+        className={`w-full cursor-move ${isMobile ? "max-h-[50vh]" : ""}`}
+        style={{ touchAction: "none" }}
+        onMouseDown={handleCanvasMouseDown}
+        onMouseMove={handleCanvasMouseMove}
+        onMouseUp={handleCanvasMouseUp}
+        onMouseLeave={handleCanvasMouseUp}
+        onTouchStart={handleTouchStart}
+        onTouchMove={handleTouchMove}
+        onTouchEnd={handleTouchEnd}
+      />
+      <div className="absolute top-2 left-2">
+        <Badge variant="secondary" className="text-xs">
+          <Move className="w-3 h-3 mr-1" /> Arraste para mover
+        </Badge>
+      </div>
+    </div>
+  );
+
+  const toolbarElement = (
+    <div className="grid grid-cols-3 gap-1.5">
+      <Button size="sm" variant="outline" className="text-xs gap-1 h-10" onClick={() => addElement("headline")}>
+        <Type className="w-3 h-3" /> Título
+      </Button>
+      <Button size="sm" variant="outline" className="text-xs gap-1 h-10" onClick={() => addElement("bullet")}>
+        <Plus className="w-3 h-3" /> Bullet
+      </Button>
+      <Button size="sm" variant="outline" className="text-xs gap-1 h-10" onClick={() => addElement("badge")}>
+        <Plus className="w-3 h-3" /> Badge
+      </Button>
+      <Button size="sm" variant="outline" className="text-xs gap-1 h-10" onClick={() => addElement("arrow")}>
+        <ArrowRight className="w-3 h-3" /> Seta
+      </Button>
+      <Button size="sm" variant="outline" className="text-xs gap-1 h-10" onClick={() => addElement("circle")}>
+        <Circle className="w-3 h-3" /> Círculo
+      </Button>
+      {selectedId && (
+        <Button size="sm" variant="destructive" className="text-xs gap-1 h-10" onClick={deleteSelected}>
+          <Trash2 className="w-3 h-3" /> Remover
+        </Button>
+      )}
+    </div>
+  );
+
+  const aiCopyButton = imageIndex > 1 ? (
+    <Button
+      size="sm"
+      variant="outline"
+      className="w-full text-xs gap-1 h-10"
+      onClick={generateCopy}
+      disabled={generatingCopy}
+    >
+      {generatingCopy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+      {generatingCopy ? "Gerando copy..." : "Gerar texto com IA"}
+    </Button>
+  ) : null;
+
+  const hasText = selectedElement && (
+    selectedElement.type === "headline" ||
+    selectedElement.type === "subheadline" ||
+    selectedElement.type === "bullet" ||
+    selectedElement.type === "badge" ||
+    selectedElement.type === "arrow"
+  );
+
+  const hasWidth = selectedElement && (
+    selectedElement.type === "headline" ||
+    selectedElement.type === "subheadline" ||
+    selectedElement.type === "bullet"
+  );
+
+  const hasRotation = selectedElement && (
+    selectedElement.type === "arrow" || selectedElement.type === "circle"
+  );
+
+  const elementEditor = selectedElement ? (
+    <div className="bg-muted/50 rounded-lg p-3 space-y-3 border">
+      <p className="text-xs font-semibold text-muted-foreground uppercase">
+        Editando: {selectedElement.type}
+      </p>
+
+      {/* Text input */}
+      {hasText && (
+        <Input
+          value={selectedElement.text || ""}
+          onChange={e => updateSelected({ text: e.target.value })}
+          placeholder="Texto..."
+          className="text-sm"
+        />
+      )}
+
+      {/* Font size — Stepper + Slider */}
+      <div className="space-y-2">
+        <NumberStepper
+          label="Tamanho"
+          value={selectedElement.fontSize || 16}
+          onChange={v => updateSelected({ fontSize: v })}
+          min={8}
+          max={72}
+          step={2}
+        />
+        <Slider
+          value={[selectedElement.fontSize || 16]}
+          onValueChange={([v]) => updateSelected({ fontSize: v })}
+          min={8}
+          max={72}
+          step={1}
+          className="w-full"
+        />
+      </div>
+
+      {/* Width — Slider (only for text elements) */}
+      {hasWidth && (
+        <div className="space-y-1">
+          <span className="text-xs text-muted-foreground">
+            Largura: {selectedElement.width || 40}%
+          </span>
+          <Slider
+            value={[selectedElement.width || 40]}
+            onValueChange={([v]) => updateSelected({ width: v })}
+            min={20}
+            max={90}
+            step={5}
+            className="w-full"
+          />
+        </div>
+      )}
+
+      {/* Colors */}
+      <div className="flex gap-2">
+        <div className="flex-1">
+          <label className="text-xs text-muted-foreground">Cor</label>
+          <Input
+            type="color"
+            value={selectedElement.color || headlineColor}
+            onChange={e => updateSelected({ color: e.target.value })}
+            className="h-11"
+          />
+        </div>
+        {selectedElement.type === "badge" && (
+          <div className="flex-1">
+            <label className="text-xs text-muted-foreground">Fundo</label>
+            <Input
+              type="color"
+              value={selectedElement.bgColor || accentColor}
+              onChange={e => updateSelected({ bgColor: e.target.value })}
+              className="h-11"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Rotation — Stepper ±15° + reset */}
+      {hasRotation && (
+        <div className="space-y-1">
+          <span className="text-xs text-muted-foreground">Rotação</span>
+          <div className="flex items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-11 px-3 text-xs"
+              onClick={() => updateSelected({ rotation: Math.max(-180, (selectedElement.rotation || 0) - 15) })}
+            >
+              −15°
+            </Button>
+            <span className="min-w-[4ch] text-center font-mono text-sm tabular-nums">
+              {selectedElement.rotation || 0}°
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-11 px-3 text-xs"
+              onClick={() => updateSelected({ rotation: Math.min(180, (selectedElement.rotation || 0) + 15) })}
+            >
+              +15°
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11"
+              onClick={() => updateSelected({ rotation: 0 })}
+              title="Resetar rotação"
+            >
+              <RotateCw className="w-4 h-4" />
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  ) : null;
+
+  const exportButton = (
+    <Button
+      className="w-full h-12 gap-2 font-semibold"
+      onClick={handleExport}
+      disabled={exporting}
+    >
+      {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+      {exporting ? "Exportando..." : "Salvar imagem com overlay"}
+    </Button>
+  );
+
+  // ── MOBILE: fullscreen layout ──
+  if (isMobile) {
+    if (!open) return null;
+    return (
+      <div className="fixed inset-0 z-50 bg-background flex flex-col">
+        {/* Fixed header */}
+        <div className="flex items-center justify-between px-3 py-2 border-b shrink-0">
+          <h2 className="text-sm font-bold flex items-center gap-2 truncate">
+            <Type className="w-4 h-4 shrink-0" />
+            Overlay — {role?.label || `#${imageIndex}`}
+          </h2>
+          <Button variant="ghost" size="icon" className="h-9 w-9 shrink-0" onClick={onClose}>
+            <X className="w-5 h-5" />
+          </Button>
+        </div>
+
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 pb-24">
+          {canvasElement}
+          {toolbarElement}
+          {aiCopyButton}
+          {elementEditor}
+        </div>
+
+        {/* Sticky bottom export */}
+        <div className="shrink-0 px-3 py-2 border-t bg-background">
+          {exportButton}
+        </div>
+      </div>
+    );
+  }
+
+  // ── DESKTOP: Dialog ──
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-[95vw] max-h-[95vh] overflow-auto p-3 sm:p-6 sm:max-w-2xl">
+      <DialogContent className="max-w-2xl max-h-[95vh] overflow-auto p-6">
         <DialogHeader>
           <DialogTitle className="text-base font-bold flex items-center gap-2">
             <Type className="w-4 h-4" />
@@ -446,142 +710,11 @@ export default function ImageOverlayEditor({
         </DialogHeader>
 
         <div className="space-y-3">
-          {/* Canvas preview */}
-          <div className="relative border rounded-lg overflow-hidden bg-muted">
-            <canvas
-              ref={canvasRef}
-              className="w-full cursor-move"
-              style={{ touchAction: "none" }}
-              onMouseDown={handleCanvasMouseDown}
-              onMouseMove={handleCanvasMouseMove}
-              onMouseUp={handleCanvasMouseUp}
-              onMouseLeave={handleCanvasMouseUp}
-              onTouchStart={handleTouchStart}
-              onTouchMove={handleTouchMove}
-              onTouchEnd={handleTouchEnd}
-            />
-            <div className="absolute top-2 left-2">
-              <Badge variant="secondary" className="text-xs">
-                <Move className="w-3 h-3 mr-1" /> Arraste para mover
-              </Badge>
-            </div>
-          </div>
-
-          {/* Toolbar */}
-          <div className="grid grid-cols-3 sm:flex sm:flex-wrap gap-1.5">
-            <Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => addElement("headline")}>
-              <Type className="w-3 h-3" /> Título
-            </Button>
-            <Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => addElement("bullet")}>
-              <Plus className="w-3 h-3" /> Bullet
-            </Button>
-            <Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => addElement("badge")}>
-              <Plus className="w-3 h-3" /> Badge
-            </Button>
-            <Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => addElement("arrow")}>
-              <ArrowRight className="w-3 h-3" /> Seta
-            </Button>
-            <Button size="sm" variant="outline" className="text-xs gap-1" onClick={() => addElement("circle")}>
-              <Circle className="w-3 h-3" /> Círculo
-            </Button>
-            {selectedId && (
-              <Button size="sm" variant="destructive" className="text-xs gap-1" onClick={deleteSelected}>
-                <Trash2 className="w-3 h-3" /> Remover
-              </Button>
-            )}
-          </div>
-
-          {/* AI Copy generator */}
-          {imageIndex > 1 && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="w-full text-xs gap-1"
-              onClick={generateCopy}
-              disabled={generatingCopy}
-            >
-              {generatingCopy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
-              {generatingCopy ? "Gerando copy..." : "Gerar texto com IA"}
-            </Button>
-          )}
-
-          {/* Selected element editor */}
-          {selectedElement && (
-            <div className="bg-muted/50 rounded-lg p-3 space-y-2 border">
-              <p className="text-xs font-semibold text-muted-foreground uppercase">
-                Editando: {selectedElement.type}
-              </p>
-              {(selectedElement.type === "headline" ||
-                selectedElement.type === "subheadline" ||
-                selectedElement.type === "bullet" ||
-                selectedElement.type === "badge" ||
-                selectedElement.type === "arrow") && (
-                <Input
-                  value={selectedElement.text || ""}
-                  onChange={e => updateSelected({ text: e.target.value })}
-                  placeholder="Texto..."
-                  className="text-sm"
-                />
-              )}
-              <div className="flex gap-2">
-                <div className="flex-1">
-                  <label className="text-xs text-muted-foreground">Tamanho</label>
-                  <Input
-                    type="number"
-                    value={selectedElement.fontSize || 16}
-                    onChange={e => updateSelected({ fontSize: parseInt(e.target.value) || 16 })}
-                    className="text-sm"
-                    min={8}
-                    max={72}
-                  />
-                </div>
-                <div className="flex-1">
-                  <label className="text-xs text-muted-foreground">Cor</label>
-                  <Input
-                    type="color"
-                    value={selectedElement.color || headlineColor}
-                    onChange={e => updateSelected({ color: e.target.value })}
-                    className="h-9"
-                  />
-                </div>
-                {selectedElement.type === "badge" && (
-                  <div className="flex-1">
-                    <label className="text-xs text-muted-foreground">Fundo</label>
-                    <Input
-                      type="color"
-                      value={selectedElement.bgColor || accentColor}
-                      onChange={e => updateSelected({ bgColor: e.target.value })}
-                      className="h-9"
-                    />
-                  </div>
-                )}
-              </div>
-              {(selectedElement.type === "arrow" || selectedElement.type === "circle") && (
-                <div className="flex gap-2 items-center">
-                  <RotateCw className="w-3 h-3 text-muted-foreground" />
-                  <Input
-                    type="number"
-                    value={selectedElement.rotation || 0}
-                    onChange={e => updateSelected({ rotation: parseInt(e.target.value) || 0 })}
-                    className="text-sm w-20"
-                    min={-180}
-                    max={180}
-                  />
-                  <span className="text-xs text-muted-foreground">graus</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Export button */}
-          <Button
-            className="w-full h-11 gap-2 font-semibold"
-            onClick={handleExport}
-            disabled={exporting}
-          >
-            {exporting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-            {exporting ? "Exportando..." : "Salvar imagem com overlay"}
-          </Button>
+          {canvasElement}
+          {toolbarElement}
+          {aiCopyButton}
+          {elementEditor}
+          {exportButton}
         </div>
       </DialogContent>
     </Dialog>
