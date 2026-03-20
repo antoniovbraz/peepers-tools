@@ -154,12 +154,12 @@ export default function History() {
   }
 
   return (
-    <div className="px-4 py-6 space-y-4">
-      <h2 className="font-display text-xl font-bold text-foreground">Histórico</h2>
+    <div className="px-4 sm:px-6 py-6 space-y-4 max-w-7xl mx-auto">
+      <h2 className="font-display text-xl md:text-2xl font-bold text-foreground">Histórico</h2>
 
-      <div className="space-y-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
         {listings.map(listing => (
-          <div key={listing.id} className="bg-card rounded-xl border p-4 space-y-3">
+          <div key={listing.id} className="bg-card rounded-xl border p-4 space-y-3 hover:shadow-md transition-shadow">
             <div className="flex items-start gap-3">
               <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                 {listing.photo_urls?.[0] ? (
@@ -222,7 +222,7 @@ export default function History() {
       )}
 
       <Dialog open={!!selected} onOpenChange={() => setSelected(null)}>
-        <DialogContent className="max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg md:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{selected?.product_name}</DialogTitle>
           </DialogHeader>

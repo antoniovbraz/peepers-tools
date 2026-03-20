@@ -70,9 +70,9 @@ export default function StepUpload() {
   };
 
   return (
-    <div className="px-4 py-6 space-y-5">
+    <div className="px-4 sm:px-6 py-6 space-y-5">
       <div className="text-center space-y-2">
-        <h2 className="font-display text-xl font-bold text-foreground">
+        <h2 className="font-display text-xl md:text-2xl font-bold text-foreground">
           Envie as fotos do produto
         </h2>
         <p className="text-sm text-muted-foreground">
@@ -95,7 +95,8 @@ export default function StepUpload() {
             <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
               <Camera className="w-7 h-7 text-primary" />
             </div>
-            <span className="text-sm font-medium text-primary">Toque para adicionar fotos</span>
+            <span className="text-sm font-medium text-primary hidden md:inline">Clique para adicionar fotos</span>
+            <span className="text-sm font-medium text-primary md:hidden">Toque para adicionar fotos</span>
           </>
         )}
         <span className="text-xs text-muted-foreground">{data.photos.length}/{MAX_FILES} fotos · máx 10MB cada</span>
@@ -110,7 +111,7 @@ export default function StepUpload() {
       />
 
       {data.photoUrls.length > 0 && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {data.photoUrls.map((url, i) => (
             <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-muted">
               <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
@@ -125,13 +126,15 @@ export default function StepUpload() {
         </div>
       )}
 
-      <Button
-        onClick={handleNext}
-        disabled={data.photos.length === 0 || uploading}
-        className="w-full h-12 text-base font-semibold gap-2"
-      >
-        Próximo <ArrowRight className="w-5 h-5" />
-      </Button>
+      <div className="flex gap-3 md:justify-end">
+        <Button
+          onClick={handleNext}
+          disabled={data.photos.length === 0 || uploading}
+          className="w-full md:w-auto h-12 text-base font-semibold gap-2"
+        >
+          Próximo <ArrowRight className="w-5 h-5" />
+        </Button>
+      </div>
     </div>
   );
 }

@@ -5,7 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
-import MobileLayout from "@/components/layout/MobileLayout";
+import AppLayout from "@/components/layout/AppLayout";
 
 const CreateListing = lazy(() => import("./pages/CreateListing"));
 const History = lazy(() => import("./pages/History"));
@@ -43,14 +43,14 @@ const App = () => (
                   path="/*"
                   element={
                     <ProtectedRoute>
-                      <MobileLayout>
+                      <AppLayout>
                         <Routes>
                           <Route path="/" element={<Navigate to="/create" replace />} />
                           <Route path="/create" element={<CreateListing />} />
                           <Route path="/history" element={<History />} />
                           <Route path="*" element={<NotFound />} />
                         </Routes>
-                      </MobileLayout>
+                      </AppLayout>
                     </ProtectedRoute>
                   }
                 />

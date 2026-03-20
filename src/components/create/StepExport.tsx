@@ -137,16 +137,16 @@ export default function StepExport() {
   };
 
   return (
-    <div className="px-4 py-6 space-y-5">
+    <div className="px-4 sm:px-6 py-6 space-y-5">
       <div className="text-center space-y-2">
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-success/10 mx-auto">
           <PartyPopper className="w-7 h-7 text-success" />
         </div>
-        <h2 className="font-display text-xl font-bold text-foreground">Revisão Final</h2>
+        <h2 className="font-display text-xl md:text-2xl font-bold text-foreground">Revisão Final</h2>
         <p className="text-sm text-muted-foreground">Confira tudo antes de salvar</p>
       </div>
 
-      <div className="space-y-3">
+      <div className="space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
         <div className="bg-card rounded-xl border p-4 space-y-2">
           <div className="flex items-center gap-2">
             <Image className="w-4 h-4 text-primary" />

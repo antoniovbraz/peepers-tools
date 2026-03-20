@@ -13,7 +13,7 @@ export default function StepperProgress() {
   const { currentStep, completedSteps } = useCreateListing();
 
   return (
-    <div className="px-4 py-3">
+    <div className="px-4 md:px-8 py-3">
       <div className="flex items-center justify-between relative">
         {/* Connector line */}
         <div className="absolute top-4 left-[10%] right-[10%] h-0.5 bg-border" />
@@ -49,7 +49,7 @@ export default function StepperProgress() {
                 )}
               </div>
               <span
-                className={`text-[10px] mt-1 font-medium ${
+                className={`text-[10px] md:text-xs mt-1 font-medium ${
                   isCompleted
                     ? "text-success"
                     : isCurrent

@@ -80,13 +80,13 @@ export default function StepIdentify() {
   }
 
   return (
-    <div className="px-4 py-6 space-y-5">
+    <div className="px-4 sm:px-6 py-6 space-y-5">
       <div className="text-center space-y-1">
-        <h2 className="font-display text-xl font-bold text-foreground">Produto Identificado</h2>
+        <h2 className="font-display text-xl md:text-2xl font-bold text-foreground">Produto Identificado</h2>
         <p className="text-sm text-muted-foreground">Confira e ajuste se necessário</p>
       </div>
 
-      <div className="bg-card rounded-xl border p-4 space-y-4">
+      <div className="bg-card rounded-xl border p-4 space-y-4 md:grid md:grid-cols-2 md:gap-4 md:space-y-0">
         <div className="space-y-2">
           <label htmlFor="product-name" className="text-xs font-semibold text-muted-foreground uppercase">Nome</label>
           <Input id="product-name" value={name} onChange={e => setName(e.target.value)} disabled={!editing} />
@@ -95,8 +95,7 @@ export default function StepIdentify() {
           <label htmlFor="product-category" className="text-xs font-semibold text-muted-foreground uppercase">Categoria</label>
           <Input id="product-category" value={category} onChange={e => setCategory(e.target.value)} disabled={!editing} />
         </div>
-        <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase">Características</label>
+        <div className="space-y-2 md:col-span-2">
           <div className="flex flex-wrap gap-2">
             {characteristics.map((c, i) => (
               <Badge key={i} variant="secondary" className="text-xs">
@@ -122,8 +121,7 @@ export default function StepIdentify() {
             )}
           </div>
         </div>
-        <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase">Informações extras</label>
+        <div className="space-y-2 md:col-span-2">
           <Textarea
             value={extras}
             onChange={e => setExtras(e.target.value)}

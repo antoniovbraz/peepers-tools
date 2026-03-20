@@ -14,7 +14,7 @@ function CreateListingInner() {
   const StepComponent = steps[currentStep];
 
   return (
-    <div>
+    <div className="max-w-3xl mx-auto">
       <StepperProgress />
       <AnimatePresence mode="wait">
         <motion.div

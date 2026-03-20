@@ -63,14 +63,26 @@ export default function Auth() {
   };
 
   return (
-    <div className="px-6 py-10 space-y-6 max-w-sm mx-auto min-h-[100dvh] flex flex-col justify-center">
-      <div className="text-center space-y-2">
-        <img src={logo} alt="Peepers Shop" className="h-12 mx-auto" />
-        <h1 className="font-display text-2xl font-bold text-foreground">Peepers Shop</h1>
-        <p className="text-sm text-muted-foreground">
-          {isLogin ? "Entre na sua conta" : "Crie sua conta"}
-        </p>
+    <div className="min-h-[100dvh] flex">
+      {/* Desktop branding panel */}
+      <div className="hidden md:flex md:w-1/2 lg:w-3/5 bg-primary/5 items-center justify-center p-12">
+        <div className="max-w-md text-center space-y-6">
+          <img src={logo} alt="Peepers Shop" className="h-20 mx-auto" />
+          <h2 className="font-display text-3xl font-bold text-foreground">Peepers Shop</h2>
+          <p className="text-muted-foreground">Crie anúncios profissionais com IA para Mercado Livre e Shopee em minutos.</p>
+        </div>
       </div>
+
+      {/* Auth form */}
+      <div className="flex-1 flex items-center justify-center px-6 py-10">
+        <div className="w-full max-w-sm space-y-6">
+          <div className="text-center space-y-2 md:text-left">
+            <img src={logo} alt="Peepers Shop" className="h-12 mx-auto md:mx-0 md:hidden" />
+            <h1 className="font-display text-2xl font-bold text-foreground">Peepers Shop</h1>
+            <p className="text-sm text-muted-foreground">
+              {isLogin ? "Entre na sua conta" : "Crie sua conta"}
+            </p>
+          </div>
 
       <Button
         variant="outline"
@@ -131,6 +143,8 @@ export default function Auth() {
           {isLogin ? "Criar conta" : "Fazer login"}
         </button>
       </p>
+        </div>
+      </div>
     </div>
   );
 }

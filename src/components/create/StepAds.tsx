@@ -70,13 +70,13 @@ export default function StepAds() {
   }
 
   return (
-    <div className="px-4 py-6 space-y-5">
+    <div className="px-4 sm:px-6 py-6 space-y-5">
       <div className="text-center space-y-1">
-        <h2 className="font-display text-xl font-bold text-foreground">Anúncios</h2>
+        <h2 className="font-display text-xl md:text-2xl font-bold text-foreground">Anúncios</h2>
         <p className="text-sm text-muted-foreground">Textos gerados pela IA — edite à vontade</p>
       </div>
 
-      {/* Mercado Livre */}
+      <div className="space-y-5 lg:grid lg:grid-cols-2 lg:gap-5 lg:space-y-0">
       <div className="bg-card rounded-xl border p-4 space-y-3">
         <Badge className="bg-[hsl(50,95%,55%)] text-black text-xs font-bold">Mercado Livre</Badge>
         <div className="space-y-2">
@@ -101,7 +101,7 @@ export default function StepAds() {
           <Textarea id="shopee-desc" value={shopee.description} onChange={e => setShopee({ ...shopee, description: e.target.value })} rows={5} />
         </div>
       </div>
-
+      </div>
       <Button variant="outline" className="w-full gap-2" onClick={generateAds}>
         <RefreshCw className="w-4 h-4" /> Regenerar tudo
       </Button>
