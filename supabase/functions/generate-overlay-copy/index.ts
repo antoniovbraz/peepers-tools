@@ -28,7 +28,7 @@ serve(async (req) => {
 
     const roleDesc = roleDescriptions[imageRole] || "Product image that needs marketing text";
 
-    const systemPrompt = `You are a high-conversion e-commerce copywriter specializing in Brazilian Portuguese marketplace listings (Mercado Livre, Shopee, Amazon).
+    const systemPrompt = `${LLM_SAFETY_INSTRUCTION}\n\nYou are a high-conversion e-commerce copywriter specializing in Brazilian Portuguese marketplace listings (Mercado Livre, Shopee, Amazon).
 
 Generate short, punchy, benefit-driven marketing copy for a product image overlay.
 
