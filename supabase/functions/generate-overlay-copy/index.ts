@@ -9,9 +9,10 @@ serve(async (req) => {
     const auth = await authenticate(req, cors);
     if (auth instanceof Response) return auth;
     const log = createRequestLogger("generate-overlay-copy", (auth as { userId: string }).userId);
-    log.info("start", { imageIndex: undefined });
 
-    const { productName, characteristics, imageRole, imageIndex } = await req.json();
+    const { productName, characteristics, imageRole, imageIndex, previousCopies, targetElements } = await req.json();
+    log.info("start", { imageIndex, targetElements, hasPrevious: !!previousCopies?.length });
+
     if (!productName || typeof productName !== "string") {
       return errorResponse("Nome do produto inválido", 400, cors);
     }
@@ -30,6 +31,16 @@ serve(async (req) => {
 
     const roleDesc = roleDescriptions[imageRole] || "Product image that needs marketing text";
 
+    // Build anti-repetition context
+    const previousContext = Array.isArray(previousCopies) && previousCopies.length > 0
+      ? `\n\nALREADY USED (do NOT repeat, paraphrase, or use similar angles):\n${previousCopies.map((c: string) => `- ${c}`).join("\n")}`
+      : "";
+
+    // Build target elements instruction
+    const targetInstruction = Array.isArray(targetElements) && targetElements.length > 0
+      ? `\nOnly generate copy for these element types: ${targetElements.join(", ")}. Leave other fields empty or omit them.`
+      : "";
+
     const systemPrompt = `${LLM_SAFETY_INSTRUCTION}\n\nYou are a high-conversion e-commerce copywriter specializing in Brazilian Portuguese marketplace listings (Mercado Livre, Shopee, Amazon).
 
 Generate short, punchy, benefit-driven marketing copy for a product image overlay.
@@ -40,7 +51,9 @@ Rules:
 - Bullets/labels: max 8 words each, clear and simple
 - Use action words and emotional triggers
 - Focus on what the customer GAINS, not technical specs
-- Use ✓ prefix for bullet items`;
+- Use ✓ prefix for bullet items
+- CRITICAL: Each image MUST highlight a COMPLETELY DIFFERENT angle/benefit. NEVER repeat or paraphrase headlines or bullets from other images.
+- If previous copies exist, find a FRESH angle not yet covered.${targetInstruction}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -54,7 +67,7 @@ Rules:
           { role: "system", content: systemPrompt },
           {
             role: "user",
-            content: `Produto: ${sanitizeForLLM(productName, 300)}\nCaracterísticas: ${sanitizeArrayForLLM(characteristics || [], 10, 200)}\n\nTipo de imagem (#${imageIndex}): ${roleDesc}\n\nGere o copy de marketing para este overlay.`,
+            content: `Produto: ${sanitizeForLLM(productName, 300)}\nCaracterísticas: ${sanitizeArrayForLLM(characteristics || [], 10, 200)}\n\nTipo de imagem (#${imageIndex}): ${roleDesc}${previousContext}\n\nGere o copy de marketing para este overlay.`,
           },
         ],
         tools: [
@@ -100,6 +113,7 @@ Rules:
       }
     }
 
+    log.info("done", { hasResult: !!result });
     return new Response(JSON.stringify(result), {
       headers: { ...cors, "Content-Type": "application/json" },
     });

@@ -24,6 +24,21 @@ export interface VisualDNA {
   headlineColor: string;
 }
 
+export interface OverlayElementData {
+  id: string;
+  type: "headline" | "subheadline" | "bullet" | "badge" | "arrow" | "circle";
+  text?: string;
+  x: number;
+  y: number;
+  width?: number;
+  fontSize?: number;
+  color?: string;
+  bgColor?: string;
+  bold?: boolean;
+  rotation?: number;
+  icon?: string;
+}
+
 export interface ListingData {
   photos: File[];
   photoUrls: string[];
@@ -39,7 +54,8 @@ export interface ListingData {
   };
   prompts: PromptCard[];
   visualDNA?: VisualDNA;
-  overlayUrls: Record<number, string>; // promptId -> overlay image URL
+  overlayUrls: Record<number, string>;
+  overlayElements: Record<number, OverlayElementData[]>;
 }
 
 interface CreateListingContextType {
