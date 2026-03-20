@@ -11,6 +11,9 @@ export interface OverlayElement {
   bold?: boolean;
   rotation?: number; // degrees
   icon?: string; // lucide icon name
+  opacity?: number; // 0-100, default 100
+  textAlign?: "left" | "center" | "right"; // default left
+  textStyle?: "none" | "shadow" | "stroke"; // default none
 }
 
 export interface OverlayTemplate {
