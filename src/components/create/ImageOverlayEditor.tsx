@@ -922,6 +922,7 @@ export default function ImageOverlayEditor({
       const msg = err instanceof Error ? err.message : "Erro desconhecido";
       console.error("Export overlay error:", err);
       toast({ title: "Erro ao exportar", description: msg, variant: "destructive" });
+      restoreSelection();
     } finally {
       setExporting(false);
     }
