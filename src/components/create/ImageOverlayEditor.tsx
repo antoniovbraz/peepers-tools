@@ -263,9 +263,18 @@ export default function ImageOverlayEditor({
     return () => clearTimeout(t);
   }, [open]);
 
-  // Load template or persisted elements on open
+  // Load template or persisted elements on open (ref-gated to avoid re-running on context changes)
+  const loadedForRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      loadedForRef.current = null;
+      return;
+    }
+    const key = `${imageIndex}`;
+    if (loadedForRef.current === key) return; // already loaded for this session
+    loadedForRef.current = key;
+
     const saved = getOverlayElements(imageIndex);
     if (saved && saved.length > 0) {
       setElements(saved as OverlayElement[]);
@@ -275,7 +284,8 @@ export default function ImageOverlayEditor({
     setSelectedId(null);
     setCheckedIds(new Set());
     setSheetOpen(false);
-  }, [open, imageIndex, headlineColor, accentColor, getOverlayElements]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, imageIndex]);
 
   // Persist elements to context on change
   useEffect(() => {
