@@ -58,7 +58,7 @@ Ensure the product looks IDENTICAL to the reference and NOT reinterpreted.`,
       : prompt;
 
     if (feedback && typeof feedback === "string" && feedback.trim().length > 0) {
-      finalPrompt += `\n\nIMPORTANT CORRECTION FROM PREVIOUS ATTEMPT:\nThe previous image had these problems that MUST be fixed: ${feedback.trim().slice(0, 500)}\nMake sure to address these issues while maintaining full product fidelity.`;
+      finalPrompt += `\n\nIMPORTANT CORRECTION FROM PREVIOUS ATTEMPT:\nThe previous image had these problems that MUST be fixed: ${sanitizeForLLM(feedback.trim(), 500)}\nMake sure to address these issues while maintaining full product fidelity.`;
     }
 
     contentParts.push({

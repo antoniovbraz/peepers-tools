@@ -19,7 +19,7 @@ serve(async (req) => {
 
     const productInfo = `Produto: ${sanitizeForLLM(productName, 500)}\nCategoria: ${sanitizeForLLM(category || "", 200)}\nCaracterísticas: ${sanitizeArrayForLLM(characteristics || [], 20, 200)}\nExtras: ${sanitizeForLLM(extras || "nenhuma", 1000)}\nTítulo do anúncio: ${sanitizeForLLM(adTitle || productName, 200)}`;
 
-    const systemPrompt = `You are an expert e-commerce product photographer, prompt engineer, and visual campaign director.
+    const systemPrompt = `${LLM_SAFETY_INSTRUCTION}\n\nYou are an expert e-commerce product photographer, prompt engineer, and visual campaign director.
 
 You must generate EXACTLY 7 image prompts in ENGLISH for the product described below, PLUS a "visualDNA" object that defines the shared art direction for the entire campaign.
 

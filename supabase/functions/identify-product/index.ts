@@ -38,7 +38,7 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `Você é um especialista em identificação de produtos para e-commerce brasileiro.
+            content: `${LLM_SAFETY_INSTRUCTION}\n\nVocê é um especialista em identificação de produtos para e-commerce brasileiro.
 Analise as fotos do produto e retorne informações detalhadas.
 Responda APENAS em português brasileiro.`,
           },

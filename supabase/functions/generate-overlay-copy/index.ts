@@ -52,7 +52,7 @@ Rules:
           { role: "system", content: systemPrompt },
           {
             role: "user",
-            content: `Produto: ${productName.slice(0, 300)}\nCaracterísticas: ${(characteristics || []).slice(0, 10).join(", ").slice(0, 500)}\n\nTipo de imagem (#${imageIndex}): ${roleDesc}\n\nGere o copy de marketing para este overlay.`,
+            content: `Produto: ${sanitizeForLLM(productName, 300)}\nCaracterísticas: ${sanitizeArrayForLLM(characteristics || [], 10, 200)}\n\nTipo de imagem (#${imageIndex}): ${roleDesc}\n\nGere o copy de marketing para este overlay.`,
           },
         ],
         tools: [
