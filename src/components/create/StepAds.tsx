@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, ArrowLeft, RefreshCw, Loader2, Check, X } from "lucide-react";
+import { ArrowRight, ArrowLeft, RefreshCw, Loader2, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -29,12 +29,10 @@ export default function StepAds() {
       if (error) throw error;
       if (result?.error) throw new Error(result.error);
 
-      const mlData = { ...result.mercadoLivre, tags: result.mercadoLivre.tags || [] };
-      const shopeeData = { ...result.shopee, tags: result.shopee.tags || [] };
-      setMl(mlData);
-      setShopee(shopeeData);
+      setMl(result.mercadoLivre);
+      setShopee(result.shopee);
       setGenerated(true);
-      updateAds({ mercadoLivre: mlData, shopee: shopeeData });
+      updateAds({ mercadoLivre: result.mercadoLivre, shopee: result.shopee });
     } catch (err: any) {
       console.error("Generate ads error:", err);
       toast({ title: "Erro ao gerar anúncios", description: err.message, variant: "destructive" });
@@ -49,14 +47,6 @@ export default function StepAds() {
     }
   }, []);
 
-  const removeTag = (marketplace: "ml" | "shopee", index: number) => {
-    if (marketplace === "ml") {
-      setMl(prev => ({ ...prev, tags: prev.tags.filter((_, i) => i !== index) }));
-    } else {
-      setShopee(prev => ({ ...prev, tags: prev.tags.filter((_, i) => i !== index) }));
-    }
-  };
-
   const handleConfirm = () => {
     updateAds({ mercadoLivre: ml, shopee });
     completeStep(2);
@@ -68,7 +58,7 @@ export default function StepAds() {
       <div className="px-4 py-10 flex flex-col items-center gap-4">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
         <h2 className="font-display text-lg font-bold">Gerando anúncios...</h2>
-        <p className="text-sm text-muted-foreground text-center">A IA está criando textos otimizados com técnicas de copywriting profissional</p>
+        <p className="text-sm text-muted-foreground text-center">A IA está criando textos otimizados para ML e Shopee</p>
       </div>
     );
   }
@@ -77,73 +67,33 @@ export default function StepAds() {
     <div className="px-4 py-6 space-y-5">
       <div className="text-center space-y-1">
         <h2 className="font-display text-xl font-bold text-foreground">Anúncios</h2>
-        <p className="text-sm text-muted-foreground">Textos gerados com AIDA + SEO — edite à vontade</p>
+        <p className="text-sm text-muted-foreground">Textos gerados pela IA — edite à vontade</p>
       </div>
 
       {/* Mercado Livre */}
       <div className="bg-card rounded-xl border p-4 space-y-3">
         <Badge className="bg-[hsl(50,95%,55%)] text-black text-xs font-bold">Mercado Livre</Badge>
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground">Título (máx 60 chars)</label>
-          <Input
-            value={ml.title}
-            onChange={e => setMl({ ...ml, title: e.target.value })}
-            maxLength={60}
-          />
-          <span className="text-[10px] text-muted-foreground">{ml.title.length}/60</span>
+          <label className="text-xs font-semibold text-muted-foreground">Título</label>
+          <Input value={ml.title} onChange={e => setMl({ ...ml, title: e.target.value })} />
         </div>
         <div className="space-y-2">
           <label className="text-xs font-semibold text-muted-foreground">Descrição</label>
-          <Textarea value={ml.description} onChange={e => setMl({ ...ml, description: e.target.value })} rows={6} />
+          <Textarea value={ml.description} onChange={e => setMl({ ...ml, description: e.target.value })} rows={5} />
         </div>
-        {ml.tags?.length > 0 && (
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-muted-foreground">Tags sugeridas</label>
-            <div className="flex flex-wrap gap-1.5">
-              {ml.tags.map((tag, i) => (
-                <Badge key={i} variant="secondary" className="text-xs gap-1 pr-1">
-                  {tag}
-                  <button onClick={() => removeTag("ml", i)} className="ml-0.5 hover:text-destructive">
-                    <X className="w-3 h-3" />
-                  </button>
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       {/* Shopee */}
       <div className="bg-card rounded-xl border p-4 space-y-3">
         <Badge className="bg-[hsl(10,85%,55%)] text-white text-xs font-bold">Shopee</Badge>
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground">Título (máx 120 chars)</label>
-          <Input
-            value={shopee.title}
-            onChange={e => setShopee({ ...shopee, title: e.target.value })}
-            maxLength={120}
-          />
-          <span className="text-[10px] text-muted-foreground">{shopee.title.length}/120</span>
+          <label className="text-xs font-semibold text-muted-foreground">Título</label>
+          <Input value={shopee.title} onChange={e => setShopee({ ...shopee, title: e.target.value })} />
         </div>
         <div className="space-y-2">
           <label className="text-xs font-semibold text-muted-foreground">Descrição</label>
-          <Textarea value={shopee.description} onChange={e => setShopee({ ...shopee, description: e.target.value })} rows={6} />
+          <Textarea value={shopee.description} onChange={e => setShopee({ ...shopee, description: e.target.value })} rows={5} />
         </div>
-        {shopee.tags?.length > 0 && (
-          <div className="space-y-2">
-            <label className="text-xs font-semibold text-muted-foreground">Tags sugeridas</label>
-            <div className="flex flex-wrap gap-1.5">
-              {shopee.tags.map((tag, i) => (
-                <Badge key={i} variant="secondary" className="text-xs gap-1 pr-1">
-                  {tag}
-                  <button onClick={() => removeTag("shopee", i)} className="ml-0.5 hover:text-destructive">
-                    <X className="w-3 h-3" />
-                  </button>
-                </Badge>
-              ))}
-            </div>
-          </div>
-        )}
       </div>
 
       <Button variant="outline" className="w-full gap-2" onClick={generateAds}>
