@@ -1263,6 +1263,7 @@ export default function ImageOverlayEditor({
         <Slider
           value={[selectedElement.fontSize || 16]}
           onValueChange={([v]) => updateElement(selectedElement.id, { fontSize: v })}
+          onValueCommit={() => pushStructuralSnapshot()}
           min={8} max={72} step={1} className="w-full"
         />
       </div>
