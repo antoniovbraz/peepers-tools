@@ -902,8 +902,6 @@ export default function ImageOverlayEditor({
       // Wait for re-render
       await new Promise(r => setTimeout(r, 50));
       renderCanvas();
-      // Restore selection after export canvas capture
-      const restoreSelection = () => setSelectedId(savedSelected);
 
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/png", 1.0));
       if (!blob) throw new Error("Failed to create image blob");
@@ -912,7 +910,10 @@ export default function ImageOverlayEditor({
       const { error: uploadErr } = await supabase.storage
         .from("generated-images")
         .upload(path, blob, { contentType: "image/png", upsert: false });
-      if (uploadErr) throw uploadErr;
+      if (uploadErr) {
+        setSelectedId(savedSelected);
+        throw uploadErr;
+      }
 
       const { data: urlData } = supabase.storage.from("generated-images").getPublicUrl(path);
       onSaveOverlay(urlData.publicUrl);
@@ -922,7 +923,6 @@ export default function ImageOverlayEditor({
       const msg = err instanceof Error ? err.message : "Erro desconhecido";
       console.error("Export overlay error:", err);
       toast({ title: "Erro ao exportar", description: msg, variant: "destructive" });
-      restoreSelection();
     } finally {
       setExporting(false);
     }
