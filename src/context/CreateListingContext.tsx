@@ -79,7 +79,10 @@ interface CreateListingContextType {
   clearDraft: () => void;
 }
 
-const defaultPrompts: PromptCard[] = Array.from({ length: 7 }, (_, i) => ({
+const DEFAULT_PROMPT_COUNT = 3;
+const MAX_PROMPT_COUNT = 7;
+
+const defaultPrompts: PromptCard[] = Array.from({ length: DEFAULT_PROMPT_COUNT }, (_, i) => ({
   id: i + 1,
   prompt: "",
   approved: false,
