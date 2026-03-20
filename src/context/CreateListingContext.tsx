@@ -119,6 +119,7 @@ function saveDraft(step: number, completed: boolean[], data: ListingData) {
         prompts: data.prompts,
         visualDNA: data.visualDNA,
         overlayUrls: data.overlayUrls,
+        overlayElements: data.overlayElements,
       },
     };
     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
