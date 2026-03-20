@@ -91,6 +91,7 @@ Responda APENAS em português brasileiro.`,
       try { result = JSON.parse(toolCall.function.arguments); } catch { throw new Error("Resposta da IA inválida"); }
     }
 
+    log.info("done", { product: result?.name });
     return new Response(JSON.stringify(result), {
       headers: { ...cors, "Content-Type": "application/json" },
     });
