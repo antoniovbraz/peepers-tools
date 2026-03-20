@@ -11,6 +11,7 @@ export interface PromptCard {
 export interface AdData {
   title: string;
   description: string;
+  tags: string[];
 }
 
 export interface VisualDNA {
