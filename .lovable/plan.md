@@ -1,71 +1,32 @@
+## Plano de Implementação — Item Story Forge
 
+### Sprint 1 — Quick Wins ✅ CONCLUÍDO
 
-## Plano: Editor de Overlay Mobile-Friendly
+| # | Tarefa | Status |
+|---|--------|--------|
+| 1 | Input sanitization LLM (`sanitizeForLLM`, `sanitizeArrayForLLM`, `LLM_SAFETY_INSTRUCTION`) | ✅ |
+| 2 | Error Boundary global com fallback UI + retry | ✅ |
+| 3 | Export paralelo (`Promise.all` nos 3 blocos de fetch) | ✅ |
+| 4 | Meta tags reais (PT-BR, description, OG tags) | ✅ |
+| 5 | CORS produção (allowlist exata + wildcards dev) | ✅ |
 
-### Problema
-O editor de overlay usa um `Dialog` que no mobile (393px) fica com scroll quebrado, conteúdo fora da viewport e inputs numéricos impossíveis de usar (sem setas −/+).
+### Sprint 2 — Estabilidade e UX (próximo)
 
-### Solução em 2 partes
+| # | Tarefa | Status |
+|---|--------|--------|
+| 6 | Save/Resume Draft (localStorage + toast) | ⬜ |
+| 7 | Paginação History (infinite scroll / .range()) | ⬜ |
+| 8 | Feedback de progresso AI (mensagens de estágio) | ⬜ |
+| 9 | Canvas rAF (requestAnimationFrame no drag) | ⬜ |
+| 10 | Índice DB (user_id, created_at DESC) | ⬜ |
+| 11 | Reduzir friction (avançar com <7 imagens) | ⬜ |
 
----
+### Sprint 3 — Qualidade e Observabilidade
 
-### Parte 1 — Layout fullscreen no mobile
-
-**Arquivo:** `ImageOverlayEditor.tsx`
-
-Substituir o `Dialog` por renderização condicional:
-- **Mobile (< 640px):** `div` fixa `fixed inset-0 z-50 bg-background` com `overflow-y-auto`, header fixo (título + botão X), canvas limitado a `max-h-[50vh]`, e botão "Salvar" sticky no bottom
-- **Desktop (≥ 640px):** manter o `Dialog` atual sem mudanças
-
-Usar o hook `useIsMobile()` já existente em `src/hooks/use-mobile.tsx`.
-
-Estrutura mobile:
-```text
-┌─────────────────────┐  ← header fixo (título + X)
-│  Canvas (50vh max)   │  ← touch-action: none
-├─────────────────────┤
-│  Toolbar (3 cols)    │
-│  AI Copy button      │  ← tudo scrollável
-│  Element editor      │
-│  [Salvar] sticky     │
-└─────────────────────┘
-```
-
-### Parte 2 — Inputs touch-friendly
-
-**Arquivo:** `ImageOverlayEditor.tsx` (seção "Selected element editor", linhas 509-573)
-
-| Controle | Antes | Depois |
-|----------|-------|--------|
-| Tamanho fonte | `<Input type="number">` | Botões `[ − ]  valor  [ + ]` (44px touch) + `<Slider>` range 8–72 |
-| Rotação | `<Input type="number">` | Botões `[ −15° ]  valor  [ +15° ]` + botão reset 0° |
-| Largura | Não existia | `<Slider>` range 20–90% para headlines/bullets |
-| Cor / Fundo | `<Input type="color">` | Mantém (color picker nativo funciona bem) |
-
-Componente helper inline `NumberStepper`:
-```text
-[ − ]   28   [ + ]
-  ████████░░░░░░░░
-     Slider
-```
-
-- Botões `h-11 w-11` (touch target 44px)
-- Valor exibido como texto centralizado entre os botões
-- Slider abaixo para ajuste fino
-
-### Resumo de mudanças
-
-| Mudança | Detalhe |
-|---------|---------|
-| Import `useIsMobile` | De `@/hooks/use-mobile` |
-| Import `Slider` | De `@/components/ui/slider` |
-| Import `X` | De `lucide-react` (para fechar mobile) |
-| Render condicional | `isMobile ? <FullscreenEditor> : <Dialog>` |
-| Canvas mobile | `max-h-[50vh] w-full` |
-| NumberStepper | Componente inline para fontSize e rotation |
-| Slider fontSize | Range 8–72, step 1 |
-| Slider width | Range 20–90%, step 5 (headlines/bullets) |
-| Rotation stepper | Step ±15°, botão reset |
-
-**Arquivo único afetado:** `src/components/create/ImageOverlayEditor.tsx`
-
+| # | Tarefa | Status |
+|---|--------|--------|
+| 12 | TypeScript strict: true | ⬜ |
+| 13 | Testes unitários (40% coverage) | ⬜ |
+| 14 | Logging estruturado (request ID, userId) | ⬜ |
+| 15 | Code splitting (React.lazy) | ⬜ |
+| 16 | Acessibilidade canvas (ARIA, keyboard) | ⬜ |
