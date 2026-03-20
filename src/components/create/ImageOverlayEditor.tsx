@@ -9,6 +9,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Type, Plus, Trash2, Download, Loader2, Sparkles, Move,
   ArrowRight, Circle, RotateCw, X, Minus, Tag, ListChecks,
+  Bold, ChevronUp, ChevronDown, Undo2, Redo2,
 } from "lucide-react";
 import { OverlayElement, getDefaultTemplate, IMAGE_ROLES } from "@/lib/overlayTemplates";
 import { supabase } from "@/integrations/supabase/client";
@@ -68,11 +69,104 @@ interface ImageOverlayEditorProps {
   onSaveOverlay: (overlayUrl: string) => void;
 }
 
+/* ── Undo/Redo hook ── */
+const MAX_HISTORY = 20;
+
+function useUndoRedo(elements: OverlayElement[], setElements: React.Dispatch<React.SetStateAction<OverlayElement[]>>) {
+  const historyRef = useRef<OverlayElement[][]>([]);
+  const futureRef = useRef<OverlayElement[][]>([]);
+  const skipRef = useRef(false);
+
+  const pushSnapshot = useCallback((snapshot: OverlayElement[]) => {
+    if (skipRef.current) { skipRef.current = false; return; }
+    historyRef.current = [...historyRef.current.slice(-(MAX_HISTORY - 1)), snapshot];
+    futureRef.current = [];
+  }, []);
+
+  const undo = useCallback(() => {
+    if (historyRef.current.length === 0) return;
+    const prev = historyRef.current[historyRef.current.length - 1];
+    historyRef.current = historyRef.current.slice(0, -1);
+    futureRef.current = [...futureRef.current, elements];
+    skipRef.current = true;
+    setElements(prev);
+  }, [elements, setElements]);
+
+  const redo = useCallback(() => {
+    if (futureRef.current.length === 0) return;
+    const next = futureRef.current[futureRef.current.length - 1];
+    futureRef.current = futureRef.current.slice(0, -1);
+    historyRef.current = [...historyRef.current, elements];
+    skipRef.current = true;
+    setElements(next);
+  }, [elements, setElements]);
+
+  const canUndo = historyRef.current.length > 0;
+  const canRedo = futureRef.current.length > 0;
+
+  return { pushSnapshot, undo, redo, canUndo, canRedo };
+}
+
+/* ── Bounding box helpers ── */
+function getElementBounds(
+  el: OverlayElement,
+  ctx: CanvasRenderingContext2D,
+  W: number, H: number,
+  headlineColor: string,
+): { x1: number; y1: number; x2: number; y2: number } {
+  const px = (el.x / 100) * W;
+  const py = (el.y / 100) * H;
+  const fontSize = el.fontSize || 16;
+
+  switch (el.type) {
+    case "headline":
+    case "subheadline":
+    case "bullet": {
+      ctx.font = `${el.bold ? "bold " : ""}${fontSize}px Inter, sans-serif`;
+      const maxWidth = el.width ? (el.width / 100) * W : W - px - 20;
+      const words = (el.text || "").split(" ");
+      let line = "";
+      let lineY = py;
+      const lineHeight = fontSize * 1.3;
+      let maxLineW = 0;
+      for (const word of words) {
+        const test = line + (line ? " " : "") + word;
+        if (ctx.measureText(test).width > maxWidth && line) {
+          maxLineW = Math.max(maxLineW, ctx.measureText(line).width);
+          line = word;
+          lineY += lineHeight;
+        } else {
+          line = test;
+        }
+      }
+      if (line) maxLineW = Math.max(maxLineW, ctx.measureText(line).width);
+      return { x1: px - 4, y1: py - 2, x2: px + maxLineW + 8, y2: lineY + lineHeight + 2 };
+    }
+    case "badge": {
+      ctx.font = `bold ${fontSize}px Inter, sans-serif`;
+      const text = el.text || "";
+      const metrics = ctx.measureText(text);
+      const padX = 12, padY = 8;
+      return { x1: px, y1: py, x2: px + metrics.width + padX * 2, y2: py + fontSize + padY * 2 };
+    }
+    case "circle": {
+      const r = el.width ? ((el.width / 100) * W) / 2 : 60;
+      return { x1: px - r, y1: py - r, x2: px + r, y2: py + r };
+    }
+    case "arrow": {
+      return { x1: px - 10, y1: py - 20, x2: px + 70, y2: py + 50 };
+    }
+    default:
+      return { x1: px - 20, y1: py - 20, x2: px + 20, y2: py + 20 };
+  }
+}
+
 export default function ImageOverlayEditor({
   open, onClose, imageUrl, imageIndex,
   headlineColor, accentColor, productName, characteristics, onSaveOverlay,
 }: ImageOverlayEditorProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [elements, setElements] = useState<OverlayElement[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loadedImage, setLoadedImage] = useState<HTMLImageElement | null>(null);
@@ -80,17 +174,44 @@ export default function ImageOverlayEditor({
   const [generatingCopy, setGeneratingCopy] = useState(false);
   const [generatingElementId, setGeneratingElementId] = useState<string | null>(null);
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
+  const [fontsReady, setFontsReady] = useState(false);
+  const [canvasSize, setCanvasSize] = useState(400);
   const isMobile = useIsMobile();
 
   const { updateOverlayElements, getOverlayElements, getAllOverlayCopies } = useCreateListing();
+  const { pushSnapshot, undo, redo, canUndo, canRedo } = useUndoRedo(elements, setElements);
 
   // rAF drag refs
   const draggingRef = useRef<string | null>(null);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
   const dragPosRef = useRef<{ x: number; y: number } | null>(null);
   const rafRef = useRef<number | null>(null);
+  const touchActionRef = useRef<"pan-y" | "none">("pan-y");
+  const prevElementsRef = useRef<OverlayElement[]>([]);
 
   const role = IMAGE_ROLES[imageIndex - 1];
+
+  // Phase 3.4: Font loading
+  useEffect(() => {
+    document.fonts.ready.then(() => setFontsReady(true));
+  }, []);
+
+  // Phase 1.1: Dynamic canvas sizing
+  useEffect(() => {
+    if (!open) return;
+    const update = () => {
+      if (isMobile) {
+        const vw = window.innerWidth - 24; // px-3 padding
+        const vh = window.innerHeight * 0.5;
+        setCanvasSize(Math.floor(Math.min(vw, vh)));
+      } else {
+        setCanvasSize(0); // desktop uses flex sizing
+      }
+    };
+    update();
+    window.addEventListener("resize", update);
+    return () => window.removeEventListener("resize", update);
+  }, [open, isMobile]);
 
   // Load template or persisted elements on open
   useEffect(() => {
@@ -112,6 +233,14 @@ export default function ImageOverlayEditor({
     }
   }, [elements, open, imageIndex, updateOverlayElements]);
 
+  // Push undo snapshots when elements change meaningfully
+  useEffect(() => {
+    if (prevElementsRef.current.length > 0 && elements !== prevElementsRef.current) {
+      pushSnapshot(prevElementsRef.current);
+    }
+    prevElementsRef.current = elements;
+  }, [elements, pushSnapshot]);
+
   // Load base image
   useEffect(() => {
     if (!imageUrl || !open) return;
@@ -122,10 +251,54 @@ export default function ImageOverlayEditor({
     img.src = imageUrl;
   }, [imageUrl, open]);
 
+  // Phase 2.2: Keyboard shortcuts
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: KeyboardEvent) => {
+      // Don't intercept if typing in input
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA") return;
+
+      // Undo/Redo
+      if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
+        e.preventDefault(); undo(); return;
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "z" && e.shiftKey) {
+        e.preventDefault(); redo(); return;
+      }
+
+      // Delete
+      if ((e.key === "Delete" || e.key === "Backspace") && selectedId) {
+        e.preventDefault();
+        setElements(prev => prev.filter(el => el.id !== selectedId));
+        setSelectedId(null);
+        return;
+      }
+      // Escape
+      if (e.key === "Escape") {
+        setSelectedId(null); return;
+      }
+      // Arrow keys: move selected element
+      if (selectedId && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
+        e.preventDefault();
+        const delta = e.shiftKey ? 5 : 1;
+        const dx = e.key === "ArrowLeft" ? -delta : e.key === "ArrowRight" ? delta : 0;
+        const dy = e.key === "ArrowUp" ? -delta : e.key === "ArrowDown" ? delta : 0;
+        setElements(prev => prev.map(el =>
+          el.id === selectedId
+            ? { ...el, x: Math.max(0, Math.min(100, el.x + dx)), y: Math.max(0, Math.min(100, el.y + dy)) }
+            : el
+        ));
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [open, selectedId, undo, redo]);
+
   // Render canvas
   const renderCanvas = useCallback(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !loadedImage) return;
+    if (!canvas || !loadedImage || !fontsReady) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
@@ -230,17 +403,18 @@ export default function ImageOverlayEditor({
         }
       }
 
-      // Selection indicator
+      // Phase 1.5: Real bounding box selection indicator
       if (el.id === selectedId) {
+        const bounds = getElementBounds(el, ctx, W, H, headlineColor);
         ctx.strokeStyle = "hsl(217.2 91.2% 59.8%)";
-        ctx.lineWidth = 2;
-        ctx.setLineDash([4, 4]);
-        ctx.strokeRect(px - 6, py - 6, 12, 12);
+        ctx.lineWidth = 3;
+        ctx.setLineDash([6, 4]);
+        ctx.strokeRect(bounds.x1 - 4, bounds.y1 - 4, bounds.x2 - bounds.x1 + 8, bounds.y2 - bounds.y1 + 8);
         ctx.setLineDash([]);
       }
       ctx.restore();
     }
-  }, [elements, loadedImage, selectedId, headlineColor, accentColor]);
+  }, [elements, loadedImage, selectedId, headlineColor, accentColor, fontsReady]);
 
   useEffect(() => { renderCanvas(); }, [renderCanvas]);
 
@@ -272,26 +446,41 @@ export default function ImageOverlayEditor({
     return { mx: (clientX - rect.left) * scaleX, my: (clientY - rect.top) * scaleY, canvas };
   };
 
+  // Phase 3.1: Bounding box hit test
   const hitTest = (mx: number, my: number, canvas: HTMLCanvasElement) => {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    const W = canvas.width, H = canvas.height;
+    // Phase 1.2: Scale threshold for mobile
+    const threshold = isMobile ? 120 : 50;
+
     for (let i = elements.length - 1; i >= 0; i--) {
       const el = elements[i];
-      const ex = (el.x / 100) * canvas.width;
-      const ey = (el.y / 100) * canvas.height;
-      if (Math.abs(mx - ex) < 50 && Math.abs(my - ey) < 50) return el;
+      const bounds = getElementBounds(el, ctx, W, H, headlineColor);
+      // Expand bounds by threshold for easier touch
+      const pad = threshold / 2;
+      if (
+        mx >= bounds.x1 - pad && mx <= bounds.x2 + pad &&
+        my >= bounds.y1 - pad && my <= bounds.y2 + pad
+      ) {
+        return el;
+      }
     }
     return null;
   };
 
   const startDrag = (clientX: number, clientY: number) => {
     const c = getCanvasCoords(clientX, clientY);
-    if (!c) return;
+    if (!c) return false;
     const el = hitTest(c.mx, c.my, c.canvas);
     if (el) {
       setSelectedId(el.id);
       draggingRef.current = el.id;
       dragOffsetRef.current = { x: c.mx - (el.x / 100) * c.canvas.width, y: c.my - (el.y / 100) * c.canvas.height };
+      return true;
     } else {
       setSelectedId(null);
+      return false;
     }
   };
 
@@ -309,7 +498,6 @@ export default function ImageOverlayEditor({
   const endDrag = () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = null;
-    // Final commit
     const pos = dragPosRef.current;
     const id = draggingRef.current;
     if (pos && id) {
@@ -317,6 +505,8 @@ export default function ImageOverlayEditor({
     }
     draggingRef.current = null;
     dragPosRef.current = null;
+    // Phase 1.3: restore touchAction
+    touchActionRef.current = "pan-y";
   };
 
   // Mouse/touch handlers
@@ -325,8 +515,12 @@ export default function ImageOverlayEditor({
   const handleCanvasMouseUp = () => endDrag();
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     const t = e.touches[0]; if (!t) return;
-    startDrag(t.clientX, t.clientY);
-    if (draggingRef.current) e.preventDefault();
+    const hit = startDrag(t.clientX, t.clientY);
+    if (hit) {
+      // Phase 1.3: Only prevent scroll when dragging an element
+      touchActionRef.current = "none";
+      e.preventDefault();
+    }
   };
   const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
     if (!draggingRef.current) return;
@@ -369,6 +563,19 @@ export default function ImageOverlayEditor({
     });
   };
 
+  // Phase 4.2: Z-index reorder
+  const moveLayer = (id: string, direction: "up" | "down") => {
+    setElements(prev => {
+      const idx = prev.findIndex(el => el.id === id);
+      if (idx < 0) return prev;
+      const target = direction === "up" ? idx + 1 : idx - 1;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
+      [next[idx], next[target]] = [next[target], next[idx]];
+      return next;
+    });
+  };
+
   const selectedElement = elements.find(el => el.id === selectedId);
 
   // ── AI copy — full or selective ──
@@ -378,7 +585,6 @@ export default function ImageOverlayEditor({
       const roleKey = role?.role || "benefits";
       const previousCopies = getAllOverlayCopies();
 
-      // Determine which element types to target
       let targetElements: string[] | undefined;
       if (targetIds && targetIds.length > 0) {
         targetElements = [...new Set(
@@ -392,7 +598,6 @@ export default function ImageOverlayEditor({
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      // Apply only to targeted elements (or all if no targets)
       const idsToUpdate = targetIds && targetIds.length > 0
         ? new Set(targetIds)
         : null;
@@ -423,20 +628,16 @@ export default function ImageOverlayEditor({
             : bulletEls;
 
           const bulletTexts = data.bullets.slice(0, targetBullets.length || 5) as string[];
-          const updatedBulletIds = new Set<string>();
-
           const updated = prev.map(el => {
             if (el.type !== "bullet") return el;
             if (idsToUpdate && !idsToUpdate.has(el.id)) return el;
             const idx = targetBullets.indexOf(el);
             if (idx >= 0 && idx < bulletTexts.length) {
-              updatedBulletIds.add(el.id);
               return { ...el, text: bulletTexts[idx] };
             }
             return el;
           });
 
-          // If no targets and fewer bullets exist than generated, add new ones
           if (!idsToUpdate) {
             const existingBulletCount = bulletEls.length;
             for (let i = existingBulletCount; i < bulletTexts.length && i < 5; i++) {
@@ -463,7 +664,6 @@ export default function ImageOverlayEditor({
     }
   };
 
-  // ── AI for single element ──
   const generateSingleCopy = async (elementId: string) => {
     setGeneratingElementId(elementId);
     try {
@@ -508,12 +708,18 @@ export default function ImageOverlayEditor({
   const checkedCount = checkedTextElements.length;
 
   // ── UI Pieces ──
+
+  // Phase 1.1: Canvas with proper aspect ratio
   const canvasElement = (
-    <div className="relative border rounded-lg overflow-hidden bg-muted">
+    <div
+      ref={containerRef}
+      className="relative border rounded-lg overflow-hidden bg-muted aspect-square"
+      style={isMobile && canvasSize > 0 ? { width: canvasSize, height: canvasSize, margin: "0 auto" } : undefined}
+    >
       <canvas
         ref={canvasRef}
-        className={`w-full cursor-move ${isMobile ? "max-h-[50vh]" : ""}`}
-        style={{ touchAction: "none" }}
+        className="w-full h-full cursor-move"
+        style={{ touchAction: touchActionRef.current }}
         onMouseDown={handleCanvasMouseDown}
         onMouseMove={handleCanvasMouseMove}
         onMouseUp={handleCanvasMouseUp}
@@ -553,15 +759,30 @@ export default function ImageOverlayEditor({
     </div>
   );
 
-  // ── Layer List ──
+  // Phase 3.3: Undo/Redo toolbar
+  const undoRedoBar = (
+    <div className="flex items-center gap-1">
+      <Button type="button" variant="ghost" size="icon" className="h-9 w-9" disabled={!canUndo} onClick={undo} title="Desfazer (Ctrl+Z)">
+        <Undo2 className="w-4 h-4" />
+      </Button>
+      <Button type="button" variant="ghost" size="icon" className="h-9 w-9" disabled={!canRedo} onClick={redo} title="Refazer (Ctrl+Shift+Z)">
+        <Redo2 className="w-4 h-4" />
+      </Button>
+    </div>
+  );
+
+  // ── Layer List (Phase 4.1: bigger touch targets) ──
   const layerList = (
     <div className="space-y-1.5">
-      <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
-        <ListChecks className="w-3.5 h-3.5" /> Elementos ({elements.length})
-      </p>
-      <ScrollArea className="max-h-[180px]">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide flex items-center gap-1.5">
+          <ListChecks className="w-3.5 h-3.5" /> Elementos ({elements.length})
+        </p>
+        {undoRedoBar}
+      </div>
+      <ScrollArea className="max-h-[220px]">
         <div className="space-y-1">
-          {elements.map(el => {
+          {elements.map((el, idx) => {
             const isSelected = el.id === selectedId;
             const isChecked = checkedIds.has(el.id);
             const hasTextContent = textTypes.has(el.type);
@@ -570,14 +791,13 @@ export default function ImageOverlayEditor({
             return (
               <div
                 key={el.id}
-                className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer transition-colors ${
+                className={`flex items-center gap-2 px-2 py-2.5 rounded-md cursor-pointer transition-colors ${
                   isSelected
                     ? "bg-primary/10 ring-1 ring-primary/30"
                     : "hover:bg-muted/80"
                 }`}
                 onClick={() => setSelectedId(el.id)}
               >
-                {/* Checkbox for AI selection */}
                 {hasTextContent && (
                   <Checkbox
                     checked={isChecked}
@@ -588,43 +808,55 @@ export default function ImageOverlayEditor({
                 )}
                 {!hasTextContent && <div className="w-4 shrink-0" />}
 
-                {/* Icon */}
                 <LayerIcon type={el.type} />
 
-                {/* Text preview */}
                 <span className="text-xs truncate flex-1 text-foreground">
                   {el.text ? `"${el.text}"` : el.type}
                 </span>
 
-                {/* Inline AI button */}
+                {/* Phase 4.2: Z-index controls */}
+                <Button
+                  type="button" variant="ghost" size="icon"
+                  className="h-9 w-9 shrink-0"
+                  disabled={idx >= elements.length - 1}
+                  onClick={e => { e.stopPropagation(); moveLayer(el.id, "up"); }}
+                  title="Mover para cima"
+                >
+                  <ChevronUp className="w-3.5 h-3.5" />
+                </Button>
+                <Button
+                  type="button" variant="ghost" size="icon"
+                  className="h-9 w-9 shrink-0"
+                  disabled={idx <= 0}
+                  onClick={e => { e.stopPropagation(); moveLayer(el.id, "down"); }}
+                  title="Mover para baixo"
+                >
+                  <ChevronDown className="w-3.5 h-3.5" />
+                </Button>
+
                 {hasTextContent && (
                   <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-7 w-7 shrink-0"
+                    type="button" variant="ghost" size="icon"
+                    className="h-9 w-9 shrink-0"
                     disabled={isGenerating || generatingCopy}
                     onClick={e => { e.stopPropagation(); generateSingleCopy(el.id); }}
                     title="Regenerar texto com IA"
                   >
                     {isGenerating ? (
-                      <Loader2 className="w-3 h-3 animate-spin" />
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
                     ) : (
-                      <Sparkles className="w-3 h-3" />
+                      <Sparkles className="w-3.5 h-3.5" />
                     )}
                   </Button>
                 )}
 
-                {/* Delete */}
                 <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7 shrink-0 text-destructive/60 hover:text-destructive"
+                  type="button" variant="ghost" size="icon"
+                  className="h-9 w-9 shrink-0 text-destructive/60 hover:text-destructive"
                   onClick={e => { e.stopPropagation(); deleteElement(el.id); }}
                   title="Remover"
                 >
-                  <Trash2 className="w-3 h-3" />
+                  <Trash2 className="w-3.5 h-3.5" />
                 </Button>
               </div>
             );
@@ -668,6 +900,11 @@ export default function ImageOverlayEditor({
   const hasRotation = selectedElement && (
     selectedElement.type === "arrow" || selectedElement.type === "circle"
   );
+  const canBold = selectedElement && (
+    selectedElement.type === "headline" ||
+    selectedElement.type === "subheadline" ||
+    selectedElement.type === "bullet"
+  );
 
   const elementEditor = selectedElement ? (
     <div className="bg-muted/50 rounded-lg p-3 space-y-3 border">
@@ -679,9 +916,29 @@ export default function ImageOverlayEditor({
         <Input
           value={selectedElement.text || ""}
           onChange={e => updateElement(selectedElement.id, { text: e.target.value })}
+          onFocus={e => {
+            // Phase 1.4: scroll input into view on mobile
+            if (isMobile) {
+              setTimeout(() => e.target.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
+            }
+          }}
           placeholder="Texto..."
           className="text-sm"
         />
+      )}
+
+      {/* Phase 3.2: Bold toggle */}
+      {canBold && (
+        <Button
+          type="button"
+          variant={selectedElement.bold ? "default" : "outline"}
+          size="sm"
+          className="h-10 gap-1.5 text-xs"
+          onClick={() => updateElement(selectedElement.id, { bold: !selectedElement.bold })}
+        >
+          <Bold className="w-3.5 h-3.5" />
+          {selectedElement.bold ? "Bold ativo" : "Bold"}
+        </Button>
       )}
 
       <div className="space-y-2">
@@ -695,6 +952,22 @@ export default function ImageOverlayEditor({
           value={[selectedElement.fontSize || 16]}
           onValueChange={([v]) => updateElement(selectedElement.id, { fontSize: v })}
           min={8} max={72} step={1} className="w-full"
+        />
+      </div>
+
+      {/* Phase 2.3: X/Y position steppers */}
+      <div className="grid grid-cols-2 gap-2">
+        <NumberStepper
+          label="X (%)"
+          value={Math.round(selectedElement.x)}
+          onChange={v => updateElement(selectedElement.id, { x: v })}
+          min={0} max={100} step={1}
+        />
+        <NumberStepper
+          label="Y (%)"
+          value={Math.round(selectedElement.y)}
+          onChange={v => updateElement(selectedElement.id, { y: v })}
+          min={0} max={100} step={1}
         />
       </div>
 
@@ -792,23 +1065,31 @@ export default function ImageOverlayEditor({
     );
   }
 
-  // ── DESKTOP: Dialog ──
+  // ── DESKTOP: Dialog with 2-column layout (Phase 2.1) ──
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-2xl max-h-[95vh] overflow-auto p-6">
+      <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden p-6">
         <DialogHeader>
           <DialogTitle className="text-base font-bold flex items-center gap-2">
             <Type className="w-4 h-4" />
             Editor de Overlay — {role?.label || `Imagem #${imageIndex}`}
           </DialogTitle>
         </DialogHeader>
-        <div className="space-y-3">
-          {canvasElement}
-          {toolbarElement}
-          {layerList}
-          {aiCopyButton}
-          {elementEditor}
-          {exportButton}
+        <div className="grid grid-cols-[1fr_320px] gap-4 min-h-0">
+          {/* Left: Canvas */}
+          <div className="min-h-0 flex flex-col">
+            {canvasElement}
+          </div>
+          {/* Right: Controls */}
+          <ScrollArea className="max-h-[calc(95vh-120px)]">
+            <div className="space-y-3 pr-2">
+              {toolbarElement}
+              {layerList}
+              {aiCopyButton}
+              {elementEditor}
+              {exportButton}
+            </div>
+          </ScrollArea>
         </div>
       </DialogContent>
     </Dialog>
