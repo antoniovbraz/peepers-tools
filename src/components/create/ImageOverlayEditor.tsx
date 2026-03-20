@@ -263,9 +263,18 @@ export default function ImageOverlayEditor({
     return () => clearTimeout(t);
   }, [open]);
 
-  // Load template or persisted elements on open
+  // Load template or persisted elements on open (ref-gated to avoid re-running on context changes)
+  const loadedForRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      loadedForRef.current = null;
+      return;
+    }
+    const key = `${imageIndex}`;
+    if (loadedForRef.current === key) return; // already loaded for this session
+    loadedForRef.current = key;
+
     const saved = getOverlayElements(imageIndex);
     if (saved && saved.length > 0) {
       setElements(saved as OverlayElement[]);
@@ -275,7 +284,8 @@ export default function ImageOverlayEditor({
     setSelectedId(null);
     setCheckedIds(new Set());
     setSheetOpen(false);
-  }, [open, imageIndex, headlineColor, accentColor, getOverlayElements]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, imageIndex]);
 
   // Persist elements to context on change
   useEffect(() => {
@@ -900,7 +910,10 @@ export default function ImageOverlayEditor({
       const { error: uploadErr } = await supabase.storage
         .from("generated-images")
         .upload(path, blob, { contentType: "image/png", upsert: false });
-      if (uploadErr) throw uploadErr;
+      if (uploadErr) {
+        setSelectedId(savedSelected);
+        throw uploadErr;
+      }
 
       const { data: urlData } = supabase.storage.from("generated-images").getPublicUrl(path);
       onSaveOverlay(urlData.publicUrl);
@@ -954,7 +967,7 @@ export default function ImageOverlayEditor({
   );
 
   const toolbarElement = (
-    <div className="grid grid-cols-3 gap-1.5">
+    <div className={`grid gap-1.5 ${isMobile ? "grid-cols-3" : "grid-cols-2"}`}>
       <Button size="sm" variant="outline" className="text-xs gap-1 h-10" onClick={() => addElement("headline")}>
         <Type className="w-3 h-3" /> Título
       </Button>
@@ -1187,9 +1200,9 @@ export default function ImageOverlayEditor({
         />
       )}
 
-      {/* Bold + Alignment + Text Style row */}
-      {(canBold || canAlign || canTextStyle) && (
-        <div className="flex items-center gap-1 flex-wrap">
+      {/* Bold + Alignment row */}
+      {(canBold || canAlign) && (
+        <div className="flex items-center gap-1">
           {canBold && (
             <Button
               type="button"
@@ -1203,6 +1216,7 @@ export default function ImageOverlayEditor({
           )}
           {canAlign && (
             <>
+              <div className="w-px h-6 bg-border mx-1" />
               <Button type="button" size="sm" className="h-9 w-9 p-0"
                 variant={(!selectedElement.textAlign || selectedElement.textAlign === "left") ? "default" : "outline"}
                 onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { textAlign: "left" }); }}>
@@ -1220,26 +1234,27 @@ export default function ImageOverlayEditor({
               </Button>
             </>
           )}
-          {canTextStyle && (
-            <>
-              <div className="w-px h-6 bg-border mx-1" />
-              <Button type="button" size="sm" className="h-9 text-xs px-2"
-                variant={(!selectedElement.textStyle || selectedElement.textStyle === "none") ? "outline" : "ghost"}
-                onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { textStyle: "none" }); }}>
-                Normal
-              </Button>
-              <Button type="button" size="sm" className="h-9 text-xs px-2"
-                variant={selectedElement.textStyle === "shadow" ? "default" : "outline"}
-                onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { textStyle: "shadow" }); }}>
-                Sombra
-              </Button>
-              <Button type="button" size="sm" className="h-9 text-xs px-2"
-                variant={selectedElement.textStyle === "stroke" ? "default" : "outline"}
-                onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { textStyle: "stroke" }); }}>
-                Contorno
-              </Button>
-            </>
-          )}
+        </div>
+      )}
+
+      {/* Text style row */}
+      {canTextStyle && (
+        <div className="flex items-center gap-1">
+          <Button type="button" size="sm" className="h-9 text-xs px-2"
+            variant={(!selectedElement.textStyle || selectedElement.textStyle === "none") ? "outline" : "ghost"}
+            onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { textStyle: "none" }); }}>
+            Normal
+          </Button>
+          <Button type="button" size="sm" className="h-9 text-xs px-2"
+            variant={selectedElement.textStyle === "shadow" ? "default" : "outline"}
+            onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { textStyle: "shadow" }); }}>
+            Sombra
+          </Button>
+          <Button type="button" size="sm" className="h-9 text-xs px-2"
+            variant={selectedElement.textStyle === "stroke" ? "default" : "outline"}
+            onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { textStyle: "stroke" }); }}>
+            Contorno
+          </Button>
         </div>
       )}
 
@@ -1253,6 +1268,7 @@ export default function ImageOverlayEditor({
         <Slider
           value={[selectedElement.fontSize || 16]}
           onValueChange={([v]) => updateElement(selectedElement.id, { fontSize: v })}
+          onValueCommit={() => pushStructuralSnapshot()}
           min={8} max={72} step={1} className="w-full"
         />
       </div>
@@ -1444,7 +1460,7 @@ export default function ImageOverlayEditor({
             Editor de Overlay — {role?.label || `Imagem #${imageIndex}`}
           </DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-[1fr_320px] gap-4 min-h-0">
+        <div className="grid grid-cols-[1fr_360px] gap-4 min-h-0">
           {/* Left: Canvas */}
           <div className="min-h-0 flex flex-col">
             {canvasElement}
