@@ -70,6 +70,9 @@ interface CreateListingContextType {
   updatePrompts: (prompts: PromptCard[]) => void;
   updateVisualDNA: (dna: VisualDNA) => void;
   updateOverlayUrl: (promptId: number, url: string) => void;
+  updateOverlayElements: (imageIndex: number, elements: OverlayElementData[]) => void;
+  getOverlayElements: (imageIndex: number) => OverlayElementData[] | undefined;
+  getAllOverlayCopies: () => string[];
   goNext: () => void;
   goBack: () => void;
   reset: () => void;
