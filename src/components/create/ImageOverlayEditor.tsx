@@ -967,7 +967,7 @@ export default function ImageOverlayEditor({
   );
 
   const toolbarElement = (
-    <div className="grid grid-cols-3 gap-1.5">
+    <div className={`grid gap-1.5 ${isMobile ? "grid-cols-3" : "grid-cols-2"}`}>
       <Button size="sm" variant="outline" className="text-xs gap-1 h-10" onClick={() => addElement("headline")}>
         <Type className="w-3 h-3" /> Título
       </Button>
