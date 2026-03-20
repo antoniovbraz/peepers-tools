@@ -127,9 +127,15 @@ export default function StepPrompts() {
   if (loading) {
     return (
       <div className="px-4 py-10 flex flex-col items-center gap-4">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center animate-pulse">
+          <Sparkles className="w-8 h-8 text-primary" />
+        </div>
         <h2 className="font-display text-lg font-bold">Gerando prompts...</h2>
-        <p className="text-sm text-muted-foreground text-center">A IA está criando 7 prompts de imagem para seu produto</p>
+        <p className="text-sm text-muted-foreground text-center">Criando 7 prompts de imagem com Visual DNA para seu produto</p>
+        <div className="w-48 h-1.5 rounded-full bg-muted overflow-hidden">
+          <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: "40%" }} />
+        </div>
+        <p className="text-xs text-muted-foreground">Estimativa: ~10 segundos</p>
       </div>
     );
   }

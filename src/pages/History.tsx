@@ -45,33 +45,51 @@ interface Listing {
   created_at: string;
 }
 
+const PAGE_SIZE = 20;
+
 export default function History() {
   const { user } = useAuth();
   const [listings, setListings] = useState<Listing[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
   const [selected, setSelected] = useState<Listing | null>(null);
 
-  const fetchListings = async () => {
+  const fetchListings = async (offset = 0, append = false) => {
     if (!user) return;
-    setLoading(true);
+    if (!append) setLoading(true);
+    else setLoadingMore(true);
+
     const { data, error } = await supabase
       .from("listings")
       .select("*")
       .eq("user_id", user.id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false })
+      .range(offset, offset + PAGE_SIZE - 1);
 
     if (error) {
       console.error(error);
       toast({ title: "Erro ao carregar histórico", variant: "destructive" });
     } else {
-      setListings(data || []);
+      const rows = data || [];
+      if (append) {
+        setListings(prev => [...prev, ...rows]);
+      } else {
+        setListings(rows);
+      }
+      setHasMore(rows.length === PAGE_SIZE);
     }
     setLoading(false);
+    setLoadingMore(false);
   };
 
   useEffect(() => {
     fetchListings();
   }, [user]);
+
+  const loadMore = () => {
+    fetchListings(listings.length, true);
+  };
 
   const deleteListing = async (id: string) => {
     const { error } = await supabase.from("listings").delete().eq("id", id);
@@ -190,6 +208,18 @@ export default function History() {
           </div>
         ))}
       </div>
+
+      {hasMore && (
+        <Button
+          variant="outline"
+          className="w-full h-11 gap-2 text-sm"
+          onClick={loadMore}
+          disabled={loadingMore}
+        >
+          {loadingMore ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+          {loadingMore ? "Carregando..." : "Carregar mais"}
+        </Button>
+      )}
 
       <Dialog open={!!selected} onOpenChange={() => setSelected(null)}>
         <DialogContent className="max-h-[80vh] overflow-y-auto">

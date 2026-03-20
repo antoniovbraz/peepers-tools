@@ -56,9 +56,15 @@ export default function StepAds() {
   if (loading) {
     return (
       <div className="px-4 py-10 flex flex-col items-center gap-4">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center animate-pulse">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
         <h2 className="font-display text-lg font-bold">Gerando anúncios...</h2>
-        <p className="text-sm text-muted-foreground text-center">A IA está criando textos otimizados para ML e Shopee</p>
+        <p className="text-sm text-muted-foreground text-center">Criando textos otimizados para Mercado Livre e Shopee</p>
+        <div className="w-48 h-1.5 rounded-full bg-muted overflow-hidden">
+          <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: "50%" }} />
+        </div>
+        <p className="text-xs text-muted-foreground">Estimativa: ~8 segundos</p>
       </div>
     );
   }

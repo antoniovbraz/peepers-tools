@@ -10,7 +10,7 @@ import JSZip from "jszip";
 import { saveAs } from "file-saver";
 
 export default function StepExport() {
-  const { data, completeStep, goBack } = useCreateListing();
+  const { data, completeStep, goBack, clearDraft } = useCreateListing();
   const { user } = useAuth();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -41,6 +41,7 @@ export default function StepExport() {
 
       completeStep(4);
       setSaved(true);
+      clearDraft();
       toast({ title: "🎉 Anúncio salvo!", description: "Seu anúncio foi salvo com sucesso." });
     } catch (err: any) {
       console.error("Save error:", err);
