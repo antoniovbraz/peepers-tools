@@ -70,9 +70,9 @@ export default function StepAds() {
   }
 
   return (
-    <div className="px-4 py-6 space-y-5">
+    <div className="px-4 sm:px-6 py-6 space-y-5">
       <div className="text-center space-y-1">
-        <h2 className="font-display text-xl font-bold text-foreground">Anúncios</h2>
+        <h2 className="font-display text-xl md:text-2xl font-bold text-foreground">Anúncios</h2>
         <p className="text-sm text-muted-foreground">Textos gerados pela IA — edite à vontade</p>
       </div>
 
