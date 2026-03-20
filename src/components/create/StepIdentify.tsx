@@ -85,12 +85,12 @@ export default function StepIdentify() {
 
       <div className="bg-card rounded-xl border p-4 space-y-4">
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase">Nome</label>
-          <Input value={name} onChange={e => setName(e.target.value)} disabled={!editing} />
+          <label htmlFor="product-name" className="text-xs font-semibold text-muted-foreground uppercase">Nome</label>
+          <Input id="product-name" value={name} onChange={e => setName(e.target.value)} disabled={!editing} />
         </div>
         <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase">Categoria</label>
-          <Input value={category} onChange={e => setCategory(e.target.value)} disabled={!editing} />
+          <label htmlFor="product-category" className="text-xs font-semibold text-muted-foreground uppercase">Categoria</label>
+          <Input id="product-category" value={category} onChange={e => setCategory(e.target.value)} disabled={!editing} />
         </div>
         <div className="space-y-2">
           <label className="text-xs font-semibold text-muted-foreground uppercase">Características</label>
