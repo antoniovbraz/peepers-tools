@@ -179,13 +179,14 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
                 setCurrentStep(draft.currentStep);
                 setCompletedSteps(draft.completedSteps);
                 setData({
-                  photos: [], // Files can't be restored
+                  photos: [],
                   photoUrls: draft.data.photoUrls || [],
                   identification: draft.data.identification,
                   ads: draft.data.ads,
                   prompts: draft.data.prompts,
                   visualDNA: draft.data.visualDNA,
                   overlayUrls: draft.data.overlayUrls || {},
+                  overlayElements: draft.data.overlayElements || {},
                 });
                 toast({ title: "Rascunho restaurado ✓" });
               }}
