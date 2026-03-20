@@ -11,6 +11,7 @@ export interface PromptCard {
 export interface AdData {
   title: string;
   description: string;
+  tags: string[];
 }
 
 export interface VisualDNA {
@@ -68,8 +69,8 @@ const initialData: ListingData = {
   photoUrls: [],
   identification: { name: "", category: "", characteristics: [], extras: "" },
   ads: {
-    mercadoLivre: { title: "", description: "" },
-    shopee: { title: "", description: "" },
+    mercadoLivre: { title: "", description: "", tags: [] },
+    shopee: { title: "", description: "", tags: [] },
   },
   prompts: defaultPrompts,
   visualDNA: undefined,
