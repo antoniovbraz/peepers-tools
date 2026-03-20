@@ -8,6 +8,8 @@ serve(async (req) => {
   try {
     const auth = await authenticate(req, cors);
     if (auth instanceof Response) return auth;
+    const log = createRequestLogger("generate-overlay-copy", (auth as { userId: string }).userId);
+    log.info("start", { imageIndex: undefined });
 
     const { productName, characteristics, imageRole, imageIndex } = await req.json();
     if (!productName || typeof productName !== "string") {

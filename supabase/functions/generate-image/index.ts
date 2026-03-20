@@ -9,6 +9,8 @@ serve(async (req) => {
   try {
     const auth = await authenticate(req, cors);
     if (auth instanceof Response) return auth;
+    const log = createRequestLogger("generate-image", (auth as { userId: string }).userId);
+    log.info("start");
 
     const { prompt, referencePhotos, feedback } = await req.json();
     if (!prompt || typeof prompt !== "string" || prompt.length > 5000) {

@@ -8,6 +8,8 @@ serve(async (req) => {
   try {
     const auth = await authenticate(req, cors);
     if (auth instanceof Response) return auth;
+    const log = createRequestLogger("generate-prompts", (auth as { userId: string }).userId);
+    log.info("start");
 
     const { productName, category, characteristics, extras, adTitle } = await req.json();
     if (!productName || typeof productName !== "string" || productName.length > 500) {
