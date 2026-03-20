@@ -24,6 +24,21 @@ export interface VisualDNA {
   headlineColor: string;
 }
 
+export interface OverlayElementData {
+  id: string;
+  type: "headline" | "subheadline" | "bullet" | "badge" | "arrow" | "circle";
+  text?: string;
+  x: number;
+  y: number;
+  width?: number;
+  fontSize?: number;
+  color?: string;
+  bgColor?: string;
+  bold?: boolean;
+  rotation?: number;
+  icon?: string;
+}
+
 export interface ListingData {
   photos: File[];
   photoUrls: string[];
@@ -39,7 +54,8 @@ export interface ListingData {
   };
   prompts: PromptCard[];
   visualDNA?: VisualDNA;
-  overlayUrls: Record<number, string>; // promptId -> overlay image URL
+  overlayUrls: Record<number, string>;
+  overlayElements: Record<number, OverlayElementData[]>;
 }
 
 interface CreateListingContextType {
@@ -54,6 +70,9 @@ interface CreateListingContextType {
   updatePrompts: (prompts: PromptCard[]) => void;
   updateVisualDNA: (dna: VisualDNA) => void;
   updateOverlayUrl: (promptId: number, url: string) => void;
+  updateOverlayElements: (imageIndex: number, elements: OverlayElementData[]) => void;
+  getOverlayElements: (imageIndex: number) => OverlayElementData[] | undefined;
+  getAllOverlayCopies: () => string[];
   goNext: () => void;
   goBack: () => void;
   reset: () => void;
@@ -77,6 +96,7 @@ const initialData: ListingData = {
   prompts: defaultPrompts,
   visualDNA: undefined,
   overlayUrls: {},
+  overlayElements: {},
 };
 
 const DRAFT_KEY = "draft_listing_v1";
@@ -99,6 +119,7 @@ function saveDraft(step: number, completed: boolean[], data: ListingData) {
         prompts: data.prompts,
         visualDNA: data.visualDNA,
         overlayUrls: data.overlayUrls,
+        overlayElements: data.overlayElements,
       },
     };
     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
@@ -158,13 +179,14 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
                 setCurrentStep(draft.currentStep);
                 setCompletedSteps(draft.completedSteps);
                 setData({
-                  photos: [], // Files can't be restored
+                  photos: [],
                   photoUrls: draft.data.photoUrls || [],
                   identification: draft.data.identification,
                   ads: draft.data.ads,
                   prompts: draft.data.prompts,
                   visualDNA: draft.data.visualDNA,
                   overlayUrls: draft.data.overlayUrls || {},
+                  overlayElements: draft.data.overlayElements || {},
                 });
                 toast({ title: "Rascunho restaurado ✓" });
               }}
@@ -232,6 +254,29 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
     }));
   }, []);
 
+  const updateOverlayElements = useCallback((imageIndex: number, elements: OverlayElementData[]) => {
+    setData(prev => ({
+      ...prev,
+      overlayElements: { ...prev.overlayElements, [imageIndex]: elements },
+    }));
+  }, []);
+
+  const getOverlayElements = useCallback((imageIndex: number): OverlayElementData[] | undefined => {
+    return data.overlayElements[imageIndex];
+  }, [data.overlayElements]);
+
+  const getAllOverlayCopies = useCallback((): string[] => {
+    const copies: string[] = [];
+    for (const elements of Object.values(data.overlayElements)) {
+      for (const el of elements) {
+        if (el.text && (el.type === "headline" || el.type === "bullet" || el.type === "badge")) {
+          copies.push(el.text);
+        }
+      }
+    }
+    return copies;
+  }, [data.overlayElements]);
+
   const goNext = useCallback(() => {
     setCurrentStep(prev => Math.min(prev + 1, 4));
   }, []);
@@ -247,7 +292,7 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
   const reset = useCallback(() => {
     setCurrentStep(0);
     setCompletedSteps([false, false, false, false, false]);
-    setData({ ...initialData, prompts: defaultPrompts.map(p => ({ ...p })), overlayUrls: {} });
+    setData({ ...initialData, prompts: defaultPrompts.map(p => ({ ...p })), overlayUrls: {}, overlayElements: {} });
     clearDraftStorage();
   }, []);
 
@@ -257,7 +302,8 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
         currentStep, completedSteps, data,
         setCurrentStep, completeStep,
         updatePhotos, updateIdentification, updateAds, updatePrompts,
-        updateVisualDNA, updateOverlayUrl,
+        updateVisualDNA, updateOverlayUrl, updateOverlayElements,
+        getOverlayElements, getAllOverlayCopies,
         goNext, goBack, reset, clearDraft,
       }}
     >
