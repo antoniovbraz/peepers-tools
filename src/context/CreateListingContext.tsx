@@ -98,13 +98,6 @@ const initialData: ListingData = {
   overlayUrls: {},
   overlayElements: {},
 };
-    mercadoLivre: { title: "", description: "" },
-    shopee: { title: "", description: "" },
-  },
-  prompts: defaultPrompts,
-  visualDNA: undefined,
-  overlayUrls: {},
-};
 
 const DRAFT_KEY = "draft_listing_v1";
 
