@@ -95,8 +95,7 @@ export default function StepIdentify() {
           <label htmlFor="product-category" className="text-xs font-semibold text-muted-foreground uppercase">Categoria</label>
           <Input id="product-category" value={category} onChange={e => setCategory(e.target.value)} disabled={!editing} />
         </div>
-        <div className="space-y-2">
-          <label className="text-xs font-semibold text-muted-foreground uppercase">Características</label>
+        <div className="space-y-2 md:col-span-2">
           <div className="flex flex-wrap gap-2">
             {characteristics.map((c, i) => (
               <Badge key={i} variant="secondary" className="text-xs">
