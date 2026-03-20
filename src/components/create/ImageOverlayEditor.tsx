@@ -1460,7 +1460,7 @@ export default function ImageOverlayEditor({
             Editor de Overlay — {role?.label || `Imagem #${imageIndex}`}
           </DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-[1fr_320px] gap-4 min-h-0">
+        <div className="grid grid-cols-[1fr_360px] gap-4 min-h-0">
           {/* Left: Canvas */}
           <div className="min-h-0 flex flex-col">
             {canvasElement}
