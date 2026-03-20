@@ -43,7 +43,7 @@ const App = () => (
                   path="/*"
                   element={
                     <ProtectedRoute>
-                      <MobileLayout>
+                      <AppLayout>
                         <Routes>
                           <Route path="/" element={<Navigate to="/create" replace />} />
                           <Route path="/create" element={<CreateListing />} />
