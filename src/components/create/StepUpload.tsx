@@ -111,7 +111,7 @@ export default function StepUpload() {
       />
 
       {data.photoUrls.length > 0 && (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
           {data.photoUrls.map((url, i) => (
             <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-muted">
               <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
