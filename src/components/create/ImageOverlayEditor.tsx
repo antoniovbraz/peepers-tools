@@ -1200,9 +1200,9 @@ export default function ImageOverlayEditor({
         />
       )}
 
-      {/* Bold + Alignment + Text Style row */}
-      {(canBold || canAlign || canTextStyle) && (
-        <div className="flex items-center gap-1 flex-wrap">
+      {/* Bold + Alignment row */}
+      {(canBold || canAlign) && (
+        <div className="flex items-center gap-1">
           {canBold && (
             <Button
               type="button"
@@ -1216,6 +1216,7 @@ export default function ImageOverlayEditor({
           )}
           {canAlign && (
             <>
+              <div className="w-px h-6 bg-border mx-1" />
               <Button type="button" size="sm" className="h-9 w-9 p-0"
                 variant={(!selectedElement.textAlign || selectedElement.textAlign === "left") ? "default" : "outline"}
                 onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { textAlign: "left" }); }}>
@@ -1233,26 +1234,27 @@ export default function ImageOverlayEditor({
               </Button>
             </>
           )}
-          {canTextStyle && (
-            <>
-              <div className="w-px h-6 bg-border mx-1" />
-              <Button type="button" size="sm" className="h-9 text-xs px-2"
-                variant={(!selectedElement.textStyle || selectedElement.textStyle === "none") ? "outline" : "ghost"}
-                onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { textStyle: "none" }); }}>
-                Normal
-              </Button>
-              <Button type="button" size="sm" className="h-9 text-xs px-2"
-                variant={selectedElement.textStyle === "shadow" ? "default" : "outline"}
-                onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { textStyle: "shadow" }); }}>
-                Sombra
-              </Button>
-              <Button type="button" size="sm" className="h-9 text-xs px-2"
-                variant={selectedElement.textStyle === "stroke" ? "default" : "outline"}
-                onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { textStyle: "stroke" }); }}>
-                Contorno
-              </Button>
-            </>
-          )}
+        </div>
+      )}
+
+      {/* Text style row */}
+      {canTextStyle && (
+        <div className="flex items-center gap-1">
+          <Button type="button" size="sm" className="h-9 text-xs px-2"
+            variant={(!selectedElement.textStyle || selectedElement.textStyle === "none") ? "outline" : "ghost"}
+            onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { textStyle: "none" }); }}>
+            Normal
+          </Button>
+          <Button type="button" size="sm" className="h-9 text-xs px-2"
+            variant={selectedElement.textStyle === "shadow" ? "default" : "outline"}
+            onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { textStyle: "shadow" }); }}>
+            Sombra
+          </Button>
+          <Button type="button" size="sm" className="h-9 text-xs px-2"
+            variant={selectedElement.textStyle === "stroke" ? "default" : "outline"}
+            onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { textStyle: "stroke" }); }}>
+            Contorno
+          </Button>
         </div>
       )}
 
