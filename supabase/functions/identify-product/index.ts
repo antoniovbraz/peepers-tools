@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { getCorsHeaders, authenticate, errorResponse, handleAIError, LLM_SAFETY_INSTRUCTION } from "../_shared/helpers.ts";
+import { getCorsHeaders, authenticate, errorResponse, handleAIError, LLM_SAFETY_INSTRUCTION, createRequestLogger } from "../_shared/helpers.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -8,6 +8,8 @@ serve(async (req) => {
   try {
     const auth = await authenticate(req, cors);
     if (auth instanceof Response) return auth;
+    const log = createRequestLogger("identify-product", (auth as { userId: string }).userId);
+    log.info("start", { photos: 0 });
 
     const { photoUrls } = await req.json();
     if (!Array.isArray(photoUrls) || photoUrls.length === 0 || photoUrls.length > 4) {
@@ -89,6 +91,7 @@ Responda APENAS em português brasileiro.`,
       try { result = JSON.parse(toolCall.function.arguments); } catch { throw new Error("Resposta da IA inválida"); }
     }
 
+    log.info("done", { product: result?.name });
     return new Response(JSON.stringify(result), {
       headers: { ...cors, "Content-Type": "application/json" },
     });

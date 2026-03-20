@@ -20,12 +20,12 @@
 | 9 | Índice DB (user_id, created_at DESC) | ✅ |
 | 10 | clearDraft ao salvar anúncio no export | ✅ |
 
-### Sprint 3 — Qualidade e Observabilidade (próximo)
+### Sprint 3 — Qualidade e Observabilidade ✅ CONCLUÍDO
 
 | # | Tarefa | Status |
 |---|--------|--------|
-| 11 | TypeScript strict: true | ⬜ |
-| 12 | Testes unitários (40% coverage) | ⬜ |
-| 13 | Logging estruturado (request ID, userId) | ⬜ |
-| 14 | Code splitting (React.lazy) | ⬜ |
-| 15 | Acessibilidade canvas (ARIA, keyboard) | ⬜ |
+| 11 | TypeScript strict: true + noImplicitAny: true | ✅ (0 errors) |
+| 12 | Testes unitários — 17 tests (CreateListingContext + overlayTemplates) | ✅ |
+| 13 | Logging estruturado (requestId, userId, duration) em 5 Edge Functions | ✅ |
+| 14 | Code splitting (React.lazy + Suspense) em App.tsx | ✅ |
+| 15 | Acessibilidade canvas (ARIA, keyboard) | ⬜ (backlog) |

@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, sanitizeArrayForLLM, LLM_SAFETY_INSTRUCTION } from "../_shared/helpers.ts";
+import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, sanitizeArrayForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger } from "../_shared/helpers.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -8,6 +8,8 @@ serve(async (req) => {
   try {
     const auth = await authenticate(req, cors);
     if (auth instanceof Response) return auth;
+    const log = createRequestLogger("generate-ads", (auth as { userId: string }).userId);
+    log.info("start");
 
     const { productName, category, characteristics, extras } = await req.json();
     if (!productName || typeof productName !== "string" || productName.length > 500) {
