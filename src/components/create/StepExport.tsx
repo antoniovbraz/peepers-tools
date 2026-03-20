@@ -40,6 +40,7 @@ export default function StepExport() {
       if (error) throw error;
 
       completeStep(4);
+      setSaved(true);
       toast({ title: "🎉 Anúncio salvo!", description: "Seu anúncio foi salvo com sucesso." });
     } catch (err: any) {
       console.error("Save error:", err);
