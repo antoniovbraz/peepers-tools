@@ -71,7 +71,10 @@ export default function StepIdentify() {
         </div>
         <h2 className="font-display text-lg font-bold">Analisando produto...</h2>
         <p className="text-sm text-muted-foreground text-center">A IA está identificando seu produto pelas fotos</p>
-        <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        <div className="w-48 h-1.5 rounded-full bg-muted overflow-hidden">
+          <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: "60%" }} />
+        </div>
+        <p className="text-xs text-muted-foreground">Estimativa: ~5 segundos</p>
       </div>
     );
   }

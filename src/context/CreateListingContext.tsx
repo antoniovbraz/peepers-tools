@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
+import { toast } from "@/hooks/use-toast";
 
 
 export interface PromptCard {
@@ -56,6 +57,7 @@ interface CreateListingContextType {
   goNext: () => void;
   goBack: () => void;
   reset: () => void;
+  clearDraft: () => void;
 }
 
 const defaultPrompts: PromptCard[] = Array.from({ length: 7 }, (_, i) => ({
@@ -77,12 +79,123 @@ const initialData: ListingData = {
   overlayUrls: {},
 };
 
+const DRAFT_KEY = "draft_listing_v1";
+
+interface DraftState {
+  currentStep: number;
+  completedSteps: boolean[];
+  data: Omit<ListingData, "photos">; // Files are not serializable
+}
+
+function saveDraft(step: number, completed: boolean[], data: ListingData) {
+  try {
+    const draft: DraftState = {
+      currentStep: step,
+      completedSteps: completed,
+      data: {
+        photoUrls: data.photoUrls,
+        identification: data.identification,
+        ads: data.ads,
+        prompts: data.prompts,
+        visualDNA: data.visualDNA,
+        overlayUrls: data.overlayUrls,
+      },
+    };
+    localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+  } catch {
+    // localStorage full or unavailable — silently ignore
+  }
+}
+
+function loadDraft(): DraftState | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const draft = JSON.parse(raw) as DraftState;
+    // Basic validation: must have photoUrls array and identification
+    if (!draft?.data?.photoUrls || !draft?.data?.identification) return null;
+    // Only restore if there's meaningful data (at least photos uploaded)
+    if (draft.data.photoUrls.length === 0 && !draft.data.identification.name) return null;
+    return draft;
+  } catch {
+    return null;
+  }
+}
+
+function clearDraftStorage() {
+  try {
+    localStorage.removeItem(DRAFT_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 const CreateListingContext = createContext<CreateListingContextType | null>(null);
 
 export function CreateListingProvider({ children }: { children: React.ReactNode }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<boolean[]>([false, false, false, false, false]);
   const [data, setData] = useState<ListingData>({ ...initialData, prompts: defaultPrompts.map(p => ({ ...p })) });
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const draftChecked = useRef(false);
+
+  // Check for draft on mount
+  useEffect(() => {
+    if (draftChecked.current) return;
+    draftChecked.current = true;
+
+    const draft = loadDraft();
+    if (draft) {
+      toast({
+        title: "📝 Rascunho encontrado",
+        description: `Continuar editando "${draft.data.identification?.name || "seu produto"}"?`,
+        duration: 10000,
+        action: (
+          <div className="flex gap-2 mt-2">
+            <button
+              className="px-3 py-1.5 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
+              onClick={() => {
+                setCurrentStep(draft.currentStep);
+                setCompletedSteps(draft.completedSteps);
+                setData({
+                  photos: [], // Files can't be restored
+                  photoUrls: draft.data.photoUrls || [],
+                  identification: draft.data.identification,
+                  ads: draft.data.ads,
+                  prompts: draft.data.prompts,
+                  visualDNA: draft.data.visualDNA,
+                  overlayUrls: draft.data.overlayUrls || {},
+                });
+                toast({ title: "Rascunho restaurado ✓" });
+              }}
+            >
+              Continuar
+            </button>
+            <button
+              className="px-3 py-1.5 text-xs font-semibold rounded-md border border-border text-foreground hover:bg-muted"
+              onClick={() => {
+                clearDraftStorage();
+                toast({ title: "Rascunho descartado" });
+              }}
+            >
+              Descartar
+            </button>
+          </div>
+        ),
+      });
+    }
+  }, []);
+
+  // Auto-save draft with debounce
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      saveDraft(currentStep, completedSteps, data);
+    }, 2000);
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, [currentStep, completedSteps, data]);
 
   const completeStep = useCallback((step: number) => {
     setCompletedSteps(prev => {
@@ -127,10 +240,15 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
     setCurrentStep(prev => Math.max(prev - 1, 0));
   }, []);
 
+  const clearDraft = useCallback(() => {
+    clearDraftStorage();
+  }, []);
+
   const reset = useCallback(() => {
     setCurrentStep(0);
     setCompletedSteps([false, false, false, false, false]);
     setData({ ...initialData, prompts: defaultPrompts.map(p => ({ ...p })), overlayUrls: {} });
+    clearDraftStorage();
   }, []);
 
   return (
@@ -140,7 +258,7 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
         setCurrentStep, completeStep,
         updatePhotos, updateIdentification, updateAds, updatePrompts,
         updateVisualDNA, updateOverlayUrl,
-        goNext, goBack, reset,
+        goNext, goBack, reset, clearDraft,
       }}
     >
       {children}

@@ -209,6 +209,18 @@ export default function History() {
         ))}
       </div>
 
+      {hasMore && (
+        <Button
+          variant="outline"
+          className="w-full h-11 gap-2 text-sm"
+          onClick={loadMore}
+          disabled={loadingMore}
+        >
+          {loadingMore ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+          {loadingMore ? "Carregando..." : "Carregar mais"}
+        </Button>
+      )}
+
       <Dialog open={!!selected} onOpenChange={() => setSelected(null)}>
         <DialogContent className="max-h-[80vh] overflow-y-auto">
           <DialogHeader>
