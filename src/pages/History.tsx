@@ -222,7 +222,7 @@ export default function History() {
       )}
 
       <Dialog open={!!selected} onOpenChange={() => setSelected(null)}>
-        <DialogContent className="max-h-[80vh] overflow-y-auto">
+        <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg md:max-w-2xl">
           <DialogHeader>
             <DialogTitle>{selected?.product_name}</DialogTitle>
           </DialogHeader>

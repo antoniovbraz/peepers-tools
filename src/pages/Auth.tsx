@@ -143,6 +143,8 @@ export default function Auth() {
           {isLogin ? "Criar conta" : "Fazer login"}
         </button>
       </p>
+        </div>
+      </div>
     </div>
   );
 }
