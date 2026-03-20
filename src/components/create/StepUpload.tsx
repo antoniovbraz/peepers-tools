@@ -95,7 +95,8 @@ export default function StepUpload() {
             <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
               <Camera className="w-7 h-7 text-primary" />
             </div>
-            <span className="text-sm font-medium text-primary">Toque para adicionar fotos</span>
+            <span className="text-sm font-medium text-primary hidden md:inline">Clique para adicionar fotos</span>
+            <span className="text-sm font-medium text-primary md:hidden">Toque para adicionar fotos</span>
           </>
         )}
         <span className="text-xs text-muted-foreground">{data.photos.length}/{MAX_FILES} fotos · máx 10MB cada</span>
