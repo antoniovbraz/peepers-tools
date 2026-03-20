@@ -2,10 +2,13 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useCreateListing, PromptCard } from "@/context/CreateListingContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, ArrowLeft, RefreshCw, ClipboardList, Loader2, ThumbsUp, Sparkles, XCircle } from "lucide-react";
+import { ArrowRight, ArrowLeft, RefreshCw, ClipboardList, Loader2, ThumbsUp, Sparkles, XCircle, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import PromptCardItem from "./PromptCardItem";
+
+const MAX_PROMPTS = 7;
+const INITIAL_PROMPTS = 3;
 
 export default function StepPrompts() {
   const { data, updatePrompts, updateVisualDNA, updateOverlayUrl, completeStep, goNext, goBack } = useCreateListing();
@@ -13,12 +16,21 @@ export default function StepPrompts() {
   const [loading, setLoading] = useState(false);
   const [generated, setGenerated] = useState(prompts.some(p => p.prompt && p.prompt.length > 20));
 
+  // All 7 prompts from AI stored here; we slice to show only `visibleCount`
+  const allPromptsRef = useRef<PromptCard[]>([]);
+  const [visibleCount, setVisibleCount] = useState(() => {
+    // If restoring from draft, show however many were saved
+    const saved = data.prompts.filter(p => p.prompt && p.prompt.length > 20).length;
+    return saved > INITIAL_PROMPTS ? saved : INITIAL_PROMPTS;
+  });
+
   // Batch generation state
   const [batchGenerating, setBatchGenerating] = useState(false);
   const [batchProgress, setBatchProgress] = useState(0);
   const cancelRef = useRef(false);
 
   const approvedCount = prompts.filter(p => p.approved).length;
+  const totalVisible = prompts.length;
 
   const generatePrompts = async () => {
     setLoading(true);
@@ -35,21 +47,24 @@ export default function StepPrompts() {
       if (error) throw error;
       if (result?.error) throw new Error(result.error);
 
-      // Save visualDNA if returned
       if (result?.visualDNA) {
         updateVisualDNA(result.visualDNA);
       }
 
       const promptsList = result?.prompts || [];
-      const newPrompts = promptsList.slice(0, 7).map((text: string, i: number) => ({
+      const all7 = promptsList.slice(0, MAX_PROMPTS).map((text: string, i: number) => ({
         id: i + 1,
         prompt: text,
         approved: false,
         imageUrl: undefined,
         feedback: undefined,
       }));
-      setPrompts(newPrompts);
-      updatePrompts(newPrompts);
+      allPromptsRef.current = all7;
+
+      // Show only first `visibleCount`
+      const visible = all7.slice(0, visibleCount);
+      setPrompts(visible);
+      updatePrompts(visible);
       setGenerated(true);
     } catch (err: any) {
       console.error("Generate prompts error:", err);
@@ -64,6 +79,28 @@ export default function StepPrompts() {
       generatePrompts();
     }
   }, []);
+
+  const addMorePrompts = () => {
+    const newCount = Math.min(visibleCount + 1, MAX_PROMPTS);
+    setVisibleCount(newCount);
+
+    // If we have pre-generated prompts from the AI, add the next one
+    if (allPromptsRef.current.length >= newCount) {
+      const visible = allPromptsRef.current.slice(0, newCount);
+      setPrompts(visible);
+      updatePrompts(visible);
+    } else {
+      // Fallback: add empty prompt card
+      const newPrompt: PromptCard = {
+        id: newCount,
+        prompt: "",
+        approved: false,
+      };
+      const next = [...prompts, newPrompt];
+      setPrompts(next);
+      updatePrompts(next);
+    }
+  };
 
   const copyAll = () => {
     const allText = prompts.map((p, i) => `#${i + 1}\n${p.prompt}`).join("\n\n");
@@ -131,7 +168,7 @@ export default function StepPrompts() {
           <Sparkles className="w-8 h-8 text-primary" />
         </div>
         <h2 className="font-display text-lg font-bold">Gerando prompts...</h2>
-        <p className="text-sm text-muted-foreground text-center">Criando 7 prompts de imagem com Visual DNA para seu produto</p>
+        <p className="text-sm text-muted-foreground text-center">Criando {MAX_PROMPTS} prompts de imagem com Visual DNA para seu produto</p>
         <div className="w-48 h-1.5 rounded-full bg-muted overflow-hidden">
           <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: "40%" }} />
         </div>
@@ -141,6 +178,7 @@ export default function StepPrompts() {
   }
 
   const pendingCount = prompts.filter(p => !p.imageUrl && !p.approved).length;
+  const canAddMore = visibleCount < MAX_PROMPTS;
 
   return (
     <div className="px-4 py-6 space-y-5">
@@ -151,7 +189,7 @@ export default function StepPrompts() {
 
       <div className="flex items-center justify-between">
         <Badge variant="secondary" className="text-xs gap-1">
-          <ThumbsUp className="w-3 h-3" /> {approvedCount}/7 aprovadas
+          <ThumbsUp className="w-3 h-3" /> {approvedCount}/{totalVisible} aprovadas
         </Badge>
         <div className="flex gap-2">
           <Button variant="ghost" size="sm" className="gap-1 text-xs" onClick={generatePrompts}>
@@ -202,16 +240,27 @@ export default function StepPrompts() {
         ))}
       </div>
 
+      {/* Add more prompts */}
+      {canAddMore && (
+        <Button
+          variant="ghost"
+          className="w-full h-12 border border-dashed border-border gap-2 text-sm text-muted-foreground hover:text-foreground hover:border-primary/50"
+          onClick={addMorePrompts}
+        >
+          <Plus className="w-4 h-4" /> Adicionar mais imagem ({visibleCount}/{MAX_PROMPTS})
+        </Button>
+      )}
+
       <div className="flex gap-3">
         <Button variant="outline" onClick={goBack} className="h-12 px-4">
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <Button
           onClick={handleNext}
-          disabled={approvedCount < 7}
+          disabled={approvedCount < totalVisible}
           className="flex-1 h-12 text-base font-semibold gap-2"
         >
-          {approvedCount < 7 ? `${approvedCount}/7 aprovadas` : "Próximo"} <ArrowRight className="w-5 h-5" />
+          {approvedCount < totalVisible ? `${approvedCount}/${totalVisible} aprovadas` : "Próximo"} <ArrowRight className="w-5 h-5" />
         </Button>
       </div>
     </div>
