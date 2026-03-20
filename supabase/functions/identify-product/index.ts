@@ -8,6 +8,8 @@ serve(async (req) => {
   try {
     const auth = await authenticate(req, cors);
     if (auth instanceof Response) return auth;
+    const log = createRequestLogger("identify-product", (auth as { userId: string }).userId);
+    log.info("start", { photos: 0 });
 
     const { photoUrls } = await req.json();
     if (!Array.isArray(photoUrls) || photoUrls.length === 0 || photoUrls.length > 4) {
