@@ -181,9 +181,9 @@ export default function StepPrompts() {
   const canAddMore = visibleCount < MAX_PROMPTS;
 
   return (
-    <div className="px-4 py-6 space-y-5">
+    <div className="px-4 sm:px-6 py-6 space-y-5">
       <div className="text-center space-y-1">
-        <h2 className="font-display text-xl font-bold text-foreground">Prompts de Imagem</h2>
+        <h2 className="font-display text-xl md:text-2xl font-bold text-foreground">Prompts de Imagem</h2>
         <p className="text-sm text-muted-foreground">Gere imagens com IA ou faça upload manual</p>
       </div>
 
