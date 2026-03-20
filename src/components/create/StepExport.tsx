@@ -13,6 +13,7 @@ export default function StepExport() {
   const { data, completeStep, goBack } = useCreateListing();
   const { user } = useAuth();
   const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [downloading, setDownloading] = useState(false);
 
   const approvedImages = data.prompts.filter(p => p.approved && p.imageUrl);
