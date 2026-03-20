@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getCorsHeaders, authenticate, errorResponse, handleAIError } from "../_shared/helpers.ts";
+import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, LLM_SAFETY_INSTRUCTION } from "../_shared/helpers.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -26,7 +26,7 @@ serve(async (req) => {
     if (photos.length > 0) {
       contentParts.push({
         type: "text",
-        text: `Here are reference photos of the ACTUAL product.
+        text: `${LLM_SAFETY_INSTRUCTION}\n\nHere are reference photos of the ACTUAL product.
 
 FIDELITY RULES (MANDATORY — NEVER VIOLATE):
 - Use the EXACT product from these reference photos
@@ -58,7 +58,7 @@ Ensure the product looks IDENTICAL to the reference and NOT reinterpreted.`,
       : prompt;
 
     if (feedback && typeof feedback === "string" && feedback.trim().length > 0) {
-      finalPrompt += `\n\nIMPORTANT CORRECTION FROM PREVIOUS ATTEMPT:\nThe previous image had these problems that MUST be fixed: ${feedback.trim().slice(0, 500)}\nMake sure to address these issues while maintaining full product fidelity.`;
+      finalPrompt += `\n\nIMPORTANT CORRECTION FROM PREVIOUS ATTEMPT:\nThe previous image had these problems that MUST be fixed: ${sanitizeForLLM(feedback.trim(), 500)}\nMake sure to address these issues while maintaining full product fidelity.`;
     }
 
     contentParts.push({

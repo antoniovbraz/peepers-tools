@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes, Navigate } from "react-router-dom";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 import MobileLayout from "@/components/layout/MobileLayout";
 import CreateListing from "./pages/CreateListing";
 import History from "./pages/History";
@@ -30,24 +31,26 @@ const App = () => (
       <Toaster />
       <BrowserRouter>
         <AuthProvider>
-          <Routes>
-            <Route path="/auth" element={<Auth />} />
-            <Route
-              path="/*"
-              element={
-                <ProtectedRoute>
-                  <MobileLayout>
-                    <Routes>
-                      <Route path="/" element={<Navigate to="/create" replace />} />
-                      <Route path="/create" element={<CreateListing />} />
-                      <Route path="/history" element={<History />} />
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
-                  </MobileLayout>
-                </ProtectedRoute>
-              }
-            />
-          </Routes>
+          <ErrorBoundary>
+            <Routes>
+              <Route path="/auth" element={<Auth />} />
+              <Route
+                path="/*"
+                element={
+                  <ProtectedRoute>
+                    <MobileLayout>
+                      <Routes>
+                        <Route path="/" element={<Navigate to="/create" replace />} />
+                        <Route path="/create" element={<CreateListing />} />
+                        <Route path="/history" element={<History />} />
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </MobileLayout>
+                  </ProtectedRoute>
+                }
+              />
+            </Routes>
+          </ErrorBoundary>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

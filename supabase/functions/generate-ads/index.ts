@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { getCorsHeaders, authenticate, errorResponse, handleAIError } from "../_shared/helpers.ts";
+import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, sanitizeArrayForLLM, LLM_SAFETY_INSTRUCTION } from "../_shared/helpers.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -20,7 +20,7 @@ serve(async (req) => {
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
-    const productInfo = `Produto: ${productName.slice(0, 500)}\nCategoria: ${(category || "").slice(0, 200)}\nCaracterísticas: ${(characteristics || []).slice(0, 20).join(", ").slice(0, 1000)}\nInformações extras: ${(extras || "nenhuma").slice(0, 1000)}`;
+    const productInfo = `Produto: ${sanitizeForLLM(productName, 500)}\nCategoria: ${sanitizeForLLM(category || "", 200)}\nCaracterísticas: ${sanitizeArrayForLLM(characteristics || [], 20, 200)}\nInformações extras: ${sanitizeForLLM(extras || "nenhuma", 1000)}`;
 
     const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
@@ -33,7 +33,7 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `Você é um copywriter especialista em marketplaces brasileiros.
+            content: `${LLM_SAFETY_INSTRUCTION}\n\nVocê é um copywriter especialista em marketplaces brasileiros.
 Crie títulos e descrições otimizados para Mercado Livre e Shopee.
 - Mercado Livre: título até 60 caracteres, descrição detalhada e profissional
 - Shopee: título até 120 caracteres com palavras-chave, descrição mais casual e com emojis

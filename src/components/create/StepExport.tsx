@@ -60,52 +60,64 @@ export default function StepExport() {
       zip.file("anuncio_mercadolivre.txt", mlText);
       zip.file("anuncio_shopee.txt", shopeeText);
 
+      // Helper: fetch blob with error tolerance
+      const fetchBlob = async (url: string): Promise<Blob | null> => {
+        try {
+          const resp = await fetch(url);
+          return await resp.blob();
+        } catch {
+          return null;
+        }
+      };
+
+      // Parallel fetch: product photos
       const photosFolder = zip.folder("fotos_produto");
-      for (let i = 0; i < data.photoUrls.length; i++) {
-        try {
-          const resp = await fetch(data.photoUrls[i]);
-          const blob = await resp.blob();
-          const ext = blob.type.includes("png") ? "png" : "jpg";
-          photosFolder?.file(`foto_${i + 1}.${ext}`, blob);
-        } catch { /* skip failed photos */ }
-      }
+      const photoBlobs = await Promise.all(data.photoUrls.map(fetchBlob));
+      photoBlobs.forEach((blob, i) => {
+        if (!blob) return;
+        const ext = blob.type.includes("png") ? "png" : "jpg";
+        photosFolder?.file(`foto_${i + 1}.${ext}`, blob);
+      });
 
-      // Clean AI images folder
+      // Parallel fetch: clean AI images
       const cleanFolder = zip.folder("imagens_limpas");
-      for (let i = 0; i < approvedImages.length; i++) {
-        const img = approvedImages[i];
-        if (!img.imageUrl) continue;
-        try {
-          if (img.imageUrl.startsWith("data:")) {
-            const parts = img.imageUrl.split(",");
-            const mime = parts[0].match(/:(.*?);/)?.[1] || "image/png";
-            const ext = mime.includes("png") ? "png" : "jpg";
-            const binary = atob(parts[1]);
-            const arr = new Uint8Array(binary.length);
-            for (let j = 0; j < binary.length; j++) arr[j] = binary.charCodeAt(j);
-            cleanFolder?.file(`imagem_${i + 1}.${ext}`, arr);
-          } else {
-            const resp = await fetch(img.imageUrl);
-            const blob = await resp.blob();
-            const ext = blob.type.includes("png") ? "png" : "jpg";
-            cleanFolder?.file(`imagem_${i + 1}.${ext}`, blob);
+      const aiUrls = approvedImages.map((img) => img.imageUrl || "");
+      const aiBlobs = await Promise.all(
+        aiUrls.map((url) => {
+          if (!url) return Promise.resolve(null);
+          if (url.startsWith("data:")) {
+            try {
+              const parts = url.split(",");
+              const mime = parts[0].match(/:(.*?);/)?.[1] || "image/png";
+              const binary = atob(parts[1]);
+              const arr = new Uint8Array(binary.length);
+              for (let j = 0; j < binary.length; j++) arr[j] = binary.charCodeAt(j);
+              return Promise.resolve(new Blob([arr], { type: mime }));
+            } catch {
+              return Promise.resolve(null);
+            }
           }
-        } catch { /* skip failed images */ }
-      }
+          return fetchBlob(url);
+        })
+      );
+      aiBlobs.forEach((blob, i) => {
+        if (!blob) return;
+        const ext = blob.type.includes("png") ? "png" : "jpg";
+        cleanFolder?.file(`imagem_${i + 1}.${ext}`, blob);
+      });
 
-      // Overlay images folder (final designed versions)
+      // Parallel fetch: overlay images
       const overlayEntries = Object.entries(data.overlayUrls || {});
       if (overlayEntries.length > 0) {
         const finalFolder = zip.folder("imagens_finais");
-        for (const [promptId, url] of overlayEntries) {
-          if (!url) continue;
-          try {
-            const resp = await fetch(url);
-            const blob = await resp.blob();
-            const ext = blob.type.includes("png") ? "png" : "jpg";
-            finalFolder?.file(`imagem_final_${promptId}.${ext}`, blob);
-          } catch { /* skip */ }
-        }
+        const overlayBlobs = await Promise.all(
+          overlayEntries.map(([, url]) => (url ? fetchBlob(url) : Promise.resolve(null)))
+        );
+        overlayBlobs.forEach((blob, i) => {
+          if (!blob) return;
+          const ext = blob.type.includes("png") ? "png" : "jpg";
+          finalFolder?.file(`imagem_final_${overlayEntries[i][0]}.${ext}`, blob);
+        });
       }
 
       const promptsText = data.prompts.map((p, i) => `#${i + 1}\n${p.prompt}`).join("\n\n---\n\n");

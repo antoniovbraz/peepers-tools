@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { getCorsHeaders, authenticate, errorResponse, handleAIError } from "../_shared/helpers.ts";
+import { getCorsHeaders, authenticate, errorResponse, handleAIError, LLM_SAFETY_INSTRUCTION } from "../_shared/helpers.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -38,7 +38,7 @@ serve(async (req) => {
         messages: [
           {
             role: "system",
-            content: `Você é um especialista em identificação de produtos para e-commerce brasileiro.
+            content: `${LLM_SAFETY_INSTRUCTION}\n\nVocê é um especialista em identificação de produtos para e-commerce brasileiro.
 Analise as fotos do produto e retorne informações detalhadas.
 Responda APENAS em português brasileiro.`,
           },
