@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -9,7 +11,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Type, Plus, Trash2, Download, Loader2, Sparkles, Move,
   ArrowRight, Circle, RotateCw, X, Minus, Tag, ListChecks,
-  Bold, ChevronUp, ChevronDown, Undo2, Redo2,
+  Bold, ChevronUp, ChevronDown, Undo2, Redo2, Copy,
+  AlignLeft, AlignCenter, AlignRight, ChevronsDown,
 } from "lucide-react";
 import { OverlayElement, getDefaultTemplate, IMAGE_ROLES } from "@/lib/overlayTemplates";
 import { supabase } from "@/integrations/supabase/client";
@@ -56,6 +59,20 @@ function LayerIcon({ type }: { type: OverlayElement["type"] }) {
   }
 }
 
+/* ── Color Swatch ── */
+function ColorSwatch({ color, active, onClick }: { color: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className={`w-8 h-8 rounded-full border-2 transition-all active:scale-95 ${
+        active ? "border-primary ring-2 ring-primary/30 scale-110" : "border-border hover:scale-105"
+      }`}
+      style={{ backgroundColor: color }}
+      onClick={onClick}
+    />
+  );
+}
+
 /* ── Props ── */
 interface ImageOverlayEditorProps {
   open: boolean;
@@ -69,7 +86,7 @@ interface ImageOverlayEditorProps {
   onSaveOverlay: (overlayUrl: string) => void;
 }
 
-/* ── Undo/Redo hook ── */
+/* ── Undo/Redo hook with debounced text snapshots ── */
 const MAX_HISTORY = 20;
 
 function useUndoRedo(elements: OverlayElement[], setElements: React.Dispatch<React.SetStateAction<OverlayElement[]>>) {
@@ -112,7 +129,7 @@ function getElementBounds(
   el: OverlayElement,
   ctx: CanvasRenderingContext2D,
   W: number, H: number,
-  headlineColor: string,
+  _headlineColor: string,
 ): { x1: number; y1: number; x2: number; y2: number } {
   const px = (el.x / 100) * W;
   const py = (el.y / 100) * H;
@@ -161,6 +178,21 @@ function getElementBounds(
   }
 }
 
+/* ── Snap guide helpers ── */
+const SNAP_THRESHOLD = 2; // percent
+const SNAP_LINES = [5, 50, 95]; // margins + center
+
+function getSnappedPos(x: number, y: number): { x: number; y: number; guidesX: number[]; guidesY: number[] } {
+  let sx = x, sy = y;
+  const guidesX: number[] = [];
+  const guidesY: number[] = [];
+  for (const line of SNAP_LINES) {
+    if (Math.abs(x - line) < SNAP_THRESHOLD) { sx = line; guidesX.push(line); }
+    if (Math.abs(y - line) < SNAP_THRESHOLD) { sy = line; guidesY.push(line); }
+  }
+  return { x: sx, y: sy, guidesX, guidesY };
+}
+
 export default function ImageOverlayEditor({
   open, onClose, imageUrl, imageIndex,
   headlineColor, accentColor, productName, characteristics, onSaveOverlay,
@@ -176,6 +208,11 @@ export default function ImageOverlayEditor({
   const [checkedIds, setCheckedIds] = useState<Set<string>>(new Set());
   const [fontsReady, setFontsReady] = useState(false);
   const [canvasSize, setCanvasSize] = useState(400);
+  const [hoveredId, setHoveredId] = useState<string | null>(null);
+  const [activeGuides, setActiveGuides] = useState<{ x: number[]; y: number[] }>({ x: [], y: [] });
+  const [showDragBadge, setShowDragBadge] = useState(true);
+  const [layersOpen, setLayersOpen] = useState(false); // collapsed by default on mobile
+  const [sheetOpen, setSheetOpen] = useState(false);
   const isMobile = useIsMobile();
 
   const { updateOverlayElements, getOverlayElements, getAllOverlayCopies } = useCreateListing();
@@ -186,32 +223,45 @@ export default function ImageOverlayEditor({
   const dragOffsetRef = useRef({ x: 0, y: 0 });
   const dragPosRef = useRef<{ x: number; y: number } | null>(null);
   const rafRef = useRef<number | null>(null);
-  const touchActionRef = useRef<"pan-y" | "none">("pan-y");
   const prevElementsRef = useRef<OverlayElement[]>([]);
+  // Sprint 1.2: Debounced undo for text edits
+  const textDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const preTextSnapshotRef = useRef<OverlayElement[] | null>(null);
+  // Sprint 4: double-click
+  const lastTapRef = useRef<{ time: number; id: string | null }>({ time: 0, id: null });
+  const textInputRef = useRef<HTMLInputElement>(null);
 
   const role = IMAGE_ROLES[imageIndex - 1];
 
-  // Phase 3.4: Font loading
+  // Font loading
   useEffect(() => {
     document.fonts.ready.then(() => setFontsReady(true));
   }, []);
 
-  // Phase 1.1: Dynamic canvas sizing
+  // Dynamic canvas sizing
   useEffect(() => {
     if (!open) return;
     const update = () => {
       if (isMobile) {
-        const vw = window.innerWidth - 24; // px-3 padding
-        const vh = window.innerHeight * 0.5;
+        const vw = window.innerWidth - 24;
+        const vh = window.innerHeight * 0.45;
         setCanvasSize(Math.floor(Math.min(vw, vh)));
       } else {
-        setCanvasSize(0); // desktop uses flex sizing
+        setCanvasSize(0);
       }
     };
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
   }, [open, isMobile]);
+
+  // Badge fade-out after 3s
+  useEffect(() => {
+    if (!open) return;
+    setShowDragBadge(true);
+    const t = setTimeout(() => setShowDragBadge(false), 3000);
+    return () => clearTimeout(t);
+  }, [open]);
 
   // Load template or persisted elements on open
   useEffect(() => {
@@ -224,6 +274,7 @@ export default function ImageOverlayEditor({
     }
     setSelectedId(null);
     setCheckedIds(new Set());
+    setSheetOpen(false);
   }, [open, imageIndex, headlineColor, accentColor, getOverlayElements]);
 
   // Persist elements to context on change
@@ -233,12 +284,34 @@ export default function ImageOverlayEditor({
     }
   }, [elements, open, imageIndex, updateOverlayElements]);
 
-  // Push undo snapshots when elements change meaningfully
-  useEffect(() => {
-    if (prevElementsRef.current.length > 0 && elements !== prevElementsRef.current) {
-      pushSnapshot(prevElementsRef.current);
+  // Sprint 1.2: Smart undo — only push snapshots for structural changes, debounce text
+  const pushStructuralSnapshot = useCallback(() => {
+    // Cancel pending text debounce
+    if (textDebounceRef.current) {
+      clearTimeout(textDebounceRef.current);
+      textDebounceRef.current = null;
     }
-    prevElementsRef.current = elements;
+    if (preTextSnapshotRef.current) {
+      pushSnapshot(preTextSnapshotRef.current);
+      preTextSnapshotRef.current = null;
+    } else {
+      pushSnapshot([...elements]);
+    }
+  }, [elements, pushSnapshot]);
+
+  const pushTextSnapshot = useCallback(() => {
+    // Save the "before" state on first keystroke, debounce commit
+    if (!preTextSnapshotRef.current) {
+      preTextSnapshotRef.current = [...elements];
+    }
+    if (textDebounceRef.current) clearTimeout(textDebounceRef.current);
+    textDebounceRef.current = setTimeout(() => {
+      if (preTextSnapshotRef.current) {
+        pushSnapshot(preTextSnapshotRef.current);
+        preTextSnapshotRef.current = null;
+      }
+      textDebounceRef.current = null;
+    }, 500);
   }, [elements, pushSnapshot]);
 
   // Load base image
@@ -251,34 +324,29 @@ export default function ImageOverlayEditor({
     img.src = imageUrl;
   }, [imageUrl, open]);
 
-  // Phase 2.2: Keyboard shortcuts
+  // Keyboard shortcuts
   useEffect(() => {
     if (!open) return;
     const handler = (e: KeyboardEvent) => {
-      // Don't intercept if typing in input
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA") return;
 
-      // Undo/Redo
       if ((e.metaKey || e.ctrlKey) && e.key === "z" && !e.shiftKey) {
         e.preventDefault(); undo(); return;
       }
       if ((e.metaKey || e.ctrlKey) && e.key === "z" && e.shiftKey) {
         e.preventDefault(); redo(); return;
       }
-
-      // Delete
       if ((e.key === "Delete" || e.key === "Backspace") && selectedId) {
         e.preventDefault();
+        pushStructuralSnapshot();
         setElements(prev => prev.filter(el => el.id !== selectedId));
         setSelectedId(null);
         return;
       }
-      // Escape
       if (e.key === "Escape") {
-        setSelectedId(null); return;
+        setSelectedId(null); setSheetOpen(false); return;
       }
-      // Arrow keys: move selected element
       if (selectedId && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
         e.preventDefault();
         const delta = e.shiftKey ? 5 : 1;
@@ -293,7 +361,7 @@ export default function ImageOverlayEditor({
     };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
-  }, [open, selectedId, undo, redo]);
+  }, [open, selectedId, undo, redo, pushStructuralSnapshot]);
 
   // Render canvas
   const renderCanvas = useCallback(() => {
@@ -307,17 +375,39 @@ export default function ImageOverlayEditor({
     canvas.height = H;
     ctx.drawImage(loadedImage, 0, 0, W, H);
 
+    // Draw snap guides
+    if (activeGuides.x.length > 0 || activeGuides.y.length > 0) {
+      ctx.save();
+      ctx.strokeStyle = "hsl(0 84% 60%)"; // destructive color
+      ctx.lineWidth = 2;
+      ctx.setLineDash([8, 6]);
+      for (const gx of activeGuides.x) {
+        const px = (gx / 100) * W;
+        ctx.beginPath(); ctx.moveTo(px, 0); ctx.lineTo(px, H); ctx.stroke();
+      }
+      for (const gy of activeGuides.y) {
+        const py = (gy / 100) * H;
+        ctx.beginPath(); ctx.moveTo(0, py); ctx.lineTo(W, py); ctx.stroke();
+      }
+      ctx.setLineDash([]);
+      ctx.restore();
+    }
+
     for (const el of elements) {
       const px = (el.x / 100) * W;
       const py = (el.y / 100) * H;
       const fontSize = el.fontSize || 16;
+      const opacity = (el.opacity ?? 100) / 100;
       ctx.save();
+      ctx.globalAlpha = opacity;
 
       if (el.rotation) {
         ctx.translate(px, py);
         ctx.rotate((el.rotation * Math.PI) / 180);
         ctx.translate(-px, -py);
       }
+
+      const textAlignVal = el.textAlign || "left";
 
       switch (el.type) {
         case "headline":
@@ -327,29 +417,62 @@ export default function ImageOverlayEditor({
           ctx.fillStyle = el.color || headlineColor;
           ctx.textBaseline = "top";
           const maxWidth = el.width ? (el.width / 100) * W : W - px - 20;
+
+          // Text style setup
+          const hasTextShadow = el.textStyle === "shadow";
+          const hasTextStroke = el.textStyle === "stroke";
+
           const words = (el.text || "").split(" ");
           let line = "";
           let lineY = py;
           const lineHeight = fontSize * 1.3;
+
+          const drawTextLine = (text: string, x: number, y: number) => {
+            const lineW = ctx.measureText(text).width;
+            let drawX = x;
+            if (textAlignVal === "center") drawX = x + (maxWidth - lineW) / 2;
+            else if (textAlignVal === "right") drawX = x + maxWidth - lineW;
+
+            // Background
+            ctx.fillStyle = "rgba(255,255,255,0.7)";
+            ctx.fillRect(drawX - 4, y - 2, lineW + 8, lineHeight);
+
+            // Text style effects
+            if (hasTextShadow) {
+              ctx.shadowColor = "rgba(0,0,0,0.5)";
+              ctx.shadowBlur = 6;
+              ctx.shadowOffsetX = 2;
+              ctx.shadowOffsetY = 2;
+            }
+            if (hasTextStroke) {
+              ctx.strokeStyle = "rgba(0,0,0,0.8)";
+              ctx.lineWidth = fontSize / 8;
+              ctx.strokeText(text, drawX, y);
+            }
+
+            ctx.fillStyle = el.color || headlineColor;
+            ctx.fillText(text, drawX, y);
+
+            // Reset shadow
+            if (hasTextShadow) {
+              ctx.shadowColor = "transparent";
+              ctx.shadowBlur = 0;
+              ctx.shadowOffsetX = 0;
+              ctx.shadowOffsetY = 0;
+            }
+          };
+
           for (const word of words) {
             const test = line + (line ? " " : "") + word;
             if (ctx.measureText(test).width > maxWidth && line) {
-              ctx.fillStyle = "rgba(255,255,255,0.7)";
-              ctx.fillRect(px - 4, lineY - 2, ctx.measureText(line).width + 8, lineHeight);
-              ctx.fillStyle = el.color || headlineColor;
-              ctx.fillText(line, px, lineY);
+              drawTextLine(line, px, lineY);
               line = word;
               lineY += lineHeight;
             } else {
               line = test;
             }
           }
-          if (line) {
-            ctx.fillStyle = "rgba(255,255,255,0.7)";
-            ctx.fillRect(px - 4, lineY - 2, ctx.measureText(line).width + 8, lineHeight);
-            ctx.fillStyle = el.color || headlineColor;
-            ctx.fillText(line, px, lineY);
-          }
+          if (line) drawTextLine(line, px, lineY);
           break;
         }
         case "badge": {
@@ -403,7 +526,19 @@ export default function ImageOverlayEditor({
         }
       }
 
-      // Phase 1.5: Real bounding box selection indicator
+      ctx.globalAlpha = 1;
+
+      // Hover indicator (subtle)
+      if (el.id === hoveredId && el.id !== selectedId) {
+        const bounds = getElementBounds(el, ctx, W, H, headlineColor);
+        ctx.strokeStyle = "hsl(215 20% 65%)";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(bounds.x1 - 2, bounds.y1 - 2, bounds.x2 - bounds.x1 + 4, bounds.y2 - bounds.y1 + 4);
+        ctx.setLineDash([]);
+      }
+
+      // Selection indicator
       if (el.id === selectedId) {
         const bounds = getElementBounds(el, ctx, W, H, headlineColor);
         ctx.strokeStyle = "hsl(217.2 91.2% 59.8%)";
@@ -414,18 +549,20 @@ export default function ImageOverlayEditor({
       }
       ctx.restore();
     }
-  }, [elements, loadedImage, selectedId, headlineColor, accentColor, fontsReady]);
+  }, [elements, loadedImage, selectedId, hoveredId, headlineColor, accentColor, fontsReady, activeGuides]);
 
   useEffect(() => { renderCanvas(); }, [renderCanvas]);
 
-  // ── rAF drag loop ──
+  // ── rAF drag loop with snap ──
   const dragLoop = useCallback(() => {
     const pos = dragPosRef.current;
     const id = draggingRef.current;
     if (!pos || !id) return;
 
+    const snapped = getSnappedPos(pos.x, pos.y);
+    setActiveGuides({ x: snapped.guidesX, y: snapped.guidesY });
     setElements(prev =>
-      prev.map(el => el.id === id ? { ...el, x: pos.x, y: pos.y } : el)
+      prev.map(el => el.id === id ? { ...el, x: snapped.x, y: snapped.y } : el)
     );
     dragPosRef.current = null;
     rafRef.current = null;
@@ -446,18 +583,15 @@ export default function ImageOverlayEditor({
     return { mx: (clientX - rect.left) * scaleX, my: (clientY - rect.top) * scaleY, canvas };
   };
 
-  // Phase 3.1: Bounding box hit test
   const hitTest = (mx: number, my: number, canvas: HTMLCanvasElement) => {
     const ctx = canvas.getContext("2d");
     if (!ctx) return null;
     const W = canvas.width, H = canvas.height;
-    // Phase 1.2: Scale threshold for mobile
     const threshold = isMobile ? 120 : 50;
 
     for (let i = elements.length - 1; i >= 0; i--) {
       const el = elements[i];
       const bounds = getElementBounds(el, ctx, W, H, headlineColor);
-      // Expand bounds by threshold for easier touch
       const pad = threshold / 2;
       if (
         mx >= bounds.x1 - pad && mx <= bounds.x2 + pad &&
@@ -475,11 +609,15 @@ export default function ImageOverlayEditor({
     const el = hitTest(c.mx, c.my, c.canvas);
     if (el) {
       setSelectedId(el.id);
+      if (isMobile) setSheetOpen(true);
       draggingRef.current = el.id;
       dragOffsetRef.current = { x: c.mx - (el.x / 100) * c.canvas.width, y: c.my - (el.y / 100) * c.canvas.height };
+      // Save snapshot before drag
+      pushStructuralSnapshot();
       return true;
     } else {
       setSelectedId(null);
+      if (isMobile) setSheetOpen(false);
       return false;
     }
   };
@@ -501,25 +639,70 @@ export default function ImageOverlayEditor({
     const pos = dragPosRef.current;
     const id = draggingRef.current;
     if (pos && id) {
-      setElements(prev => prev.map(el => el.id === id ? { ...el, x: pos.x, y: pos.y } : el));
+      const snapped = getSnappedPos(pos.x, pos.y);
+      setElements(prev => prev.map(el => el.id === id ? { ...el, x: snapped.x, y: snapped.y } : el));
     }
     draggingRef.current = null;
     dragPosRef.current = null;
-    // Phase 1.3: restore touchAction
-    touchActionRef.current = "pan-y";
+    setActiveGuides({ x: [], y: [] });
   };
 
-  // Mouse/touch handlers
-  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => startDrag(e.clientX, e.clientY);
-  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => moveDrag(e.clientX, e.clientY);
+  // Mouse handlers
+  const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    // Sprint 4: double-click detection
+    const now = Date.now();
+    const c = getCanvasCoords(e.clientX, e.clientY);
+    if (c) {
+      const el = hitTest(c.mx, c.my, c.canvas);
+      if (el && lastTapRef.current.id === el.id && now - lastTapRef.current.time < 400) {
+        // Double-click: focus text input
+        setTimeout(() => textInputRef.current?.focus(), 50);
+        lastTapRef.current = { time: 0, id: null };
+        return;
+      }
+      lastTapRef.current = { time: now, id: el?.id || null };
+    }
+    startDrag(e.clientX, e.clientY);
+  };
+
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (draggingRef.current) {
+      moveDrag(e.clientX, e.clientY);
+    } else {
+      // Sprint 3: hover detection (desktop only)
+      if (!isMobile) {
+        const c = getCanvasCoords(e.clientX, e.clientY);
+        if (c) {
+          const el = hitTest(c.mx, c.my, c.canvas);
+          setHoveredId(el?.id || null);
+        }
+      }
+    }
+  };
+
   const handleCanvasMouseUp = () => endDrag();
+
+  // Sprint 1.1: Fix touchAction — use e.preventDefault() only, keep touchAction: "pan-y" always
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     const t = e.touches[0]; if (!t) return;
+
+    // Sprint 4: double-tap detection
+    const now = Date.now();
+    const c = getCanvasCoords(t.clientX, t.clientY);
+    if (c) {
+      const el = hitTest(c.mx, c.my, c.canvas);
+      if (el && lastTapRef.current.id === el.id && now - lastTapRef.current.time < 400) {
+        setTimeout(() => textInputRef.current?.focus(), 50);
+        lastTapRef.current = { time: 0, id: null };
+        e.preventDefault();
+        return;
+      }
+      lastTapRef.current = { time: now, id: el?.id || null };
+    }
+
     const hit = startDrag(t.clientX, t.clientY);
     if (hit) {
-      // Phase 1.3: Only prevent scroll when dragging an element
-      touchActionRef.current = "none";
-      e.preventDefault();
+      e.preventDefault(); // prevent scroll only when dragging
     }
   };
   const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
@@ -532,6 +715,7 @@ export default function ImageOverlayEditor({
 
   // ── Element CRUD ──
   const addElement = (type: OverlayElement["type"]) => {
+    pushStructuralSnapshot();
     const id = `${type}-${Date.now()}`;
     const defaults: Record<string, Partial<OverlayElement>> = {
       headline: { text: "Título", fontSize: 28, color: headlineColor, bold: true, x: 10, y: 10, width: 40 },
@@ -543,16 +727,37 @@ export default function ImageOverlayEditor({
     };
     setElements(prev => [...prev, { id, type, ...defaults[type] } as OverlayElement]);
     setSelectedId(id);
+    if (isMobile) setSheetOpen(true);
   };
 
   const deleteElement = (id: string) => {
+    pushStructuralSnapshot();
     setElements(prev => prev.filter(el => el.id !== id));
     setCheckedIds(prev => { const n = new Set(prev); n.delete(id); return n; });
-    if (selectedId === id) setSelectedId(null);
+    if (selectedId === id) { setSelectedId(null); setSheetOpen(false); }
   };
 
   const updateElement = (id: string, updates: Partial<OverlayElement>) => {
     setElements(prev => prev.map(el => (el.id === id ? { ...el, ...updates } : el)));
+  };
+
+  const updateElementText = (id: string, text: string) => {
+    pushTextSnapshot();
+    setElements(prev => prev.map(el => (el.id === id ? { ...el, text } : el)));
+  };
+
+  const duplicateElement = (id: string) => {
+    pushStructuralSnapshot();
+    const el = elements.find(e => e.id === id);
+    if (!el) return;
+    const newEl: OverlayElement = {
+      ...el,
+      id: `${el.type}-${Date.now()}`,
+      x: Math.min(95, el.x + 5),
+      y: Math.min(95, el.y + 5),
+    };
+    setElements(prev => [...prev, newEl]);
+    setSelectedId(newEl.id);
   };
 
   const toggleCheck = (id: string) => {
@@ -563,8 +768,8 @@ export default function ImageOverlayEditor({
     });
   };
 
-  // Phase 4.2: Z-index reorder
   const moveLayer = (id: string, direction: "up" | "down") => {
+    pushStructuralSnapshot();
     setElements(prev => {
       const idx = prev.findIndex(el => el.id === id);
       if (idx < 0) return prev;
@@ -578,7 +783,7 @@ export default function ImageOverlayEditor({
 
   const selectedElement = elements.find(el => el.id === selectedId);
 
-  // ── AI copy — full or selective ──
+  // ── AI copy ──
   const generateCopy = async (targetIds?: string[]) => {
     setGeneratingCopy(true);
     try {
@@ -598,9 +803,9 @@ export default function ImageOverlayEditor({
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
 
-      const idsToUpdate = targetIds && targetIds.length > 0
-        ? new Set(targetIds)
-        : null;
+      pushStructuralSnapshot();
+
+      const idsToUpdate = targetIds && targetIds.length > 0 ? new Set(targetIds) : null;
 
       if (data?.headline) {
         setElements(prev =>
@@ -679,7 +884,15 @@ export default function ImageOverlayEditor({
     if (!canvas) return;
     setExporting(true);
     try {
+      // Clear hover/guides for clean export
+      setHoveredId(null);
+      setActiveGuides({ x: [], y: [] });
+      const savedSelected = selectedId;
+      setSelectedId(null);
+      // Wait for re-render
+      await new Promise(r => setTimeout(r, 50));
       renderCanvas();
+
       const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, "image/png", 1.0));
       if (!blob) throw new Error("Failed to create image blob");
 
@@ -702,14 +915,16 @@ export default function ImageOverlayEditor({
     }
   };
 
-  // ── Count checked with text ──
+  // ── Counts ──
   const textTypes = new Set(["headline", "subheadline", "bullet", "badge", "arrow"]);
   const checkedTextElements = elements.filter(el => checkedIds.has(el.id) && textTypes.has(el.type));
   const checkedCount = checkedTextElements.length;
 
+  // ── Color presets ──
+  const colorPresets = [headlineColor, accentColor, "#000000", "#FFFFFF", "#6B7280"];
+
   // ── UI Pieces ──
 
-  // Phase 1.1: Canvas with proper aspect ratio
   const canvasElement = (
     <div
       ref={containerRef}
@@ -719,16 +934,18 @@ export default function ImageOverlayEditor({
       <canvas
         ref={canvasRef}
         className="w-full h-full cursor-move"
-        style={{ touchAction: touchActionRef.current }}
+        style={{ touchAction: "pan-y" }}
         onMouseDown={handleCanvasMouseDown}
         onMouseMove={handleCanvasMouseMove}
         onMouseUp={handleCanvasMouseUp}
-        onMouseLeave={handleCanvasMouseUp}
+        onMouseLeave={() => { handleCanvasMouseUp(); setHoveredId(null); }}
         onTouchStart={handleTouchStart}
         onTouchMove={handleTouchMove}
         onTouchEnd={handleTouchEnd}
       />
-      <div className="absolute top-2 left-2">
+      <div
+        className={`absolute top-2 left-2 transition-opacity duration-500 ${showDragBadge ? "opacity-100" : "opacity-0 pointer-events-none"}`}
+      >
         <Badge variant="secondary" className="text-xs">
           <Move className="w-3 h-3 mr-1" /> Arraste para mover
         </Badge>
@@ -759,7 +976,6 @@ export default function ImageOverlayEditor({
     </div>
   );
 
-  // Phase 3.3: Undo/Redo toolbar
   const undoRedoBar = (
     <div className="flex items-center gap-1">
       <Button type="button" variant="ghost" size="icon" className="h-9 w-9" disabled={!canUndo} onClick={undo} title="Desfazer (Ctrl+Z)">
@@ -771,7 +987,7 @@ export default function ImageOverlayEditor({
     </div>
   );
 
-  // ── Layer List (Phase 4.1: bigger touch targets) ──
+  // ── Layer List — simplified on mobile (Sprint 2.6) ──
   const layerList = (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
@@ -796,7 +1012,10 @@ export default function ImageOverlayEditor({
                     ? "bg-primary/10 ring-1 ring-primary/30"
                     : "hover:bg-muted/80"
                 }`}
-                onClick={() => setSelectedId(el.id)}
+                onClick={() => {
+                  setSelectedId(el.id);
+                  if (isMobile) setSheetOpen(true);
+                }}
               >
                 {hasTextContent && (
                   <Checkbox
@@ -814,40 +1033,51 @@ export default function ImageOverlayEditor({
                   {el.text ? `"${el.text}"` : el.type}
                 </span>
 
-                {/* Phase 4.2: Z-index controls */}
-                <Button
-                  type="button" variant="ghost" size="icon"
-                  className="h-9 w-9 shrink-0"
-                  disabled={idx >= elements.length - 1}
-                  onClick={e => { e.stopPropagation(); moveLayer(el.id, "up"); }}
-                  title="Mover para cima"
-                >
-                  <ChevronUp className="w-3.5 h-3.5" />
-                </Button>
-                <Button
-                  type="button" variant="ghost" size="icon"
-                  className="h-9 w-9 shrink-0"
-                  disabled={idx <= 0}
-                  onClick={e => { e.stopPropagation(); moveLayer(el.id, "down"); }}
-                  title="Mover para baixo"
-                >
-                  <ChevronDown className="w-3.5 h-3.5" />
-                </Button>
-
-                {hasTextContent && (
-                  <Button
-                    type="button" variant="ghost" size="icon"
-                    className="h-9 w-9 shrink-0"
-                    disabled={isGenerating || generatingCopy}
-                    onClick={e => { e.stopPropagation(); generateSingleCopy(el.id); }}
-                    title="Regenerar texto com IA"
-                  >
-                    {isGenerating ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      <Sparkles className="w-3.5 h-3.5" />
+                {/* Desktop: show all controls. Mobile: only delete */}
+                {!isMobile && (
+                  <>
+                    <Button
+                      type="button" variant="ghost" size="icon"
+                      className="h-9 w-9 shrink-0"
+                      disabled={idx >= elements.length - 1}
+                      onClick={e => { e.stopPropagation(); moveLayer(el.id, "up"); }}
+                      title="Mover para cima"
+                    >
+                      <ChevronUp className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      type="button" variant="ghost" size="icon"
+                      className="h-9 w-9 shrink-0"
+                      disabled={idx <= 0}
+                      onClick={e => { e.stopPropagation(); moveLayer(el.id, "down"); }}
+                      title="Mover para baixo"
+                    >
+                      <ChevronDown className="w-3.5 h-3.5" />
+                    </Button>
+                    {hasTextContent && (
+                      <Button
+                        type="button" variant="ghost" size="icon"
+                        className="h-9 w-9 shrink-0"
+                        disabled={isGenerating || generatingCopy}
+                        onClick={e => { e.stopPropagation(); generateSingleCopy(el.id); }}
+                        title="Regenerar texto com IA"
+                      >
+                        {isGenerating ? (
+                          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        ) : (
+                          <Sparkles className="w-3.5 h-3.5" />
+                        )}
+                      </Button>
                     )}
-                  </Button>
+                    <Button
+                      type="button" variant="ghost" size="icon"
+                      className="h-9 w-9 shrink-0"
+                      onClick={e => { e.stopPropagation(); duplicateElement(el.id); }}
+                      title="Duplicar"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </Button>
+                  </>
                 )}
 
                 <Button
@@ -905,19 +1135,49 @@ export default function ImageOverlayEditor({
     selectedElement.type === "subheadline" ||
     selectedElement.type === "bullet"
   );
+  const canAlign = canBold; // same types support alignment
+  const canTextStyle = canBold;
 
   const elementEditor = selectedElement ? (
     <div className="bg-muted/50 rounded-lg p-3 space-y-3 border">
-      <p className="text-xs font-semibold text-muted-foreground uppercase">
-        Propriedades: {selectedElement.type}
-      </p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-muted-foreground uppercase">
+          {selectedElement.type}
+        </p>
+        {/* Mobile: extra actions inside sheet */}
+        {isMobile && (
+          <div className="flex items-center gap-1">
+            <Button type="button" variant="ghost" size="icon" className="h-9 w-9"
+              onClick={() => duplicateElement(selectedElement.id)} title="Duplicar">
+              <Copy className="w-3.5 h-3.5" />
+            </Button>
+            {textTypes.has(selectedElement.type) && (
+              <Button type="button" variant="ghost" size="icon" className="h-9 w-9"
+                disabled={generatingElementId === selectedElement.id || generatingCopy}
+                onClick={() => generateSingleCopy(selectedElement.id)} title="IA">
+                {generatingElementId === selectedElement.id
+                  ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  : <Sparkles className="w-3.5 h-3.5" />}
+              </Button>
+            )}
+            <Button type="button" variant="ghost" size="icon" className="h-9 w-9"
+              onClick={() => moveLayer(selectedElement.id, "up")} title="↑ z-index">
+              <ChevronUp className="w-3.5 h-3.5" />
+            </Button>
+            <Button type="button" variant="ghost" size="icon" className="h-9 w-9"
+              onClick={() => moveLayer(selectedElement.id, "down")} title="↓ z-index">
+              <ChevronDown className="w-3.5 h-3.5" />
+            </Button>
+          </div>
+        )}
+      </div>
 
       {hasText && (
         <Input
+          ref={textInputRef}
           value={selectedElement.text || ""}
-          onChange={e => updateElement(selectedElement.id, { text: e.target.value })}
+          onChange={e => updateElementText(selectedElement.id, e.target.value)}
           onFocus={e => {
-            // Phase 1.4: scroll input into view on mobile
             if (isMobile) {
               setTimeout(() => e.target.scrollIntoView({ behavior: "smooth", block: "center" }), 300);
             }
@@ -927,25 +1187,67 @@ export default function ImageOverlayEditor({
         />
       )}
 
-      {/* Phase 3.2: Bold toggle */}
-      {canBold && (
-        <Button
-          type="button"
-          variant={selectedElement.bold ? "default" : "outline"}
-          size="sm"
-          className="h-10 gap-1.5 text-xs"
-          onClick={() => updateElement(selectedElement.id, { bold: !selectedElement.bold })}
-        >
-          <Bold className="w-3.5 h-3.5" />
-          {selectedElement.bold ? "Bold ativo" : "Bold"}
-        </Button>
+      {/* Bold + Alignment + Text Style row */}
+      {(canBold || canAlign || canTextStyle) && (
+        <div className="flex items-center gap-1 flex-wrap">
+          {canBold && (
+            <Button
+              type="button"
+              variant={selectedElement.bold ? "default" : "outline"}
+              size="sm"
+              className="h-9 gap-1 text-xs"
+              onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { bold: !selectedElement.bold }); }}
+            >
+              <Bold className="w-3.5 h-3.5" />
+            </Button>
+          )}
+          {canAlign && (
+            <>
+              <Button type="button" size="sm" className="h-9 w-9 p-0"
+                variant={(!selectedElement.textAlign || selectedElement.textAlign === "left") ? "default" : "outline"}
+                onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { textAlign: "left" }); }}>
+                <AlignLeft className="w-3.5 h-3.5" />
+              </Button>
+              <Button type="button" size="sm" className="h-9 w-9 p-0"
+                variant={selectedElement.textAlign === "center" ? "default" : "outline"}
+                onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { textAlign: "center" }); }}>
+                <AlignCenter className="w-3.5 h-3.5" />
+              </Button>
+              <Button type="button" size="sm" className="h-9 w-9 p-0"
+                variant={selectedElement.textAlign === "right" ? "default" : "outline"}
+                onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { textAlign: "right" }); }}>
+                <AlignRight className="w-3.5 h-3.5" />
+              </Button>
+            </>
+          )}
+          {canTextStyle && (
+            <>
+              <div className="w-px h-6 bg-border mx-1" />
+              <Button type="button" size="sm" className="h-9 text-xs px-2"
+                variant={(!selectedElement.textStyle || selectedElement.textStyle === "none") ? "outline" : "ghost"}
+                onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { textStyle: "none" }); }}>
+                Normal
+              </Button>
+              <Button type="button" size="sm" className="h-9 text-xs px-2"
+                variant={selectedElement.textStyle === "shadow" ? "default" : "outline"}
+                onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { textStyle: "shadow" }); }}>
+                Sombra
+              </Button>
+              <Button type="button" size="sm" className="h-9 text-xs px-2"
+                variant={selectedElement.textStyle === "stroke" ? "default" : "outline"}
+                onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { textStyle: "stroke" }); }}>
+                Contorno
+              </Button>
+            </>
+          )}
+        </div>
       )}
 
       <div className="space-y-2">
         <NumberStepper
           label="Tamanho"
           value={selectedElement.fontSize || 16}
-          onChange={v => updateElement(selectedElement.id, { fontSize: v })}
+          onChange={v => { pushStructuralSnapshot(); updateElement(selectedElement.id, { fontSize: v }); }}
           min={8} max={72} step={2}
         />
         <Slider
@@ -955,7 +1257,6 @@ export default function ImageOverlayEditor({
         />
       </div>
 
-      {/* Phase 2.3: X/Y position steppers */}
       <div className="grid grid-cols-2 gap-2">
         <NumberStepper
           label="X (%)"
@@ -982,46 +1283,76 @@ export default function ImageOverlayEditor({
         </div>
       )}
 
-      <div className="flex gap-2">
-        <div className="flex-1">
-          <label className="text-xs text-muted-foreground">Cor</label>
+      {/* Opacity */}
+      <div className="space-y-1">
+        <span className="text-xs text-muted-foreground">Opacidade: {selectedElement.opacity ?? 100}%</span>
+        <Slider
+          value={[selectedElement.opacity ?? 100]}
+          onValueChange={([v]) => updateElement(selectedElement.id, { opacity: v })}
+          min={0} max={100} step={5} className="w-full"
+        />
+      </div>
+
+      {/* Color with presets */}
+      <div className="space-y-2">
+        <label className="text-xs text-muted-foreground">Cor</label>
+        <div className="flex items-center gap-2">
+          {colorPresets.map((c, i) => (
+            <ColorSwatch
+              key={i}
+              color={c}
+              active={(selectedElement.color || headlineColor) === c}
+              onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { color: c }); }}
+            />
+          ))}
           <Input
             type="color"
             value={selectedElement.color || headlineColor}
             onChange={e => updateElement(selectedElement.id, { color: e.target.value })}
-            className="h-11"
+            className="h-8 w-8 p-0 border-0 cursor-pointer"
           />
         </div>
-        {selectedElement.type === "badge" && (
-          <div className="flex-1">
-            <label className="text-xs text-muted-foreground">Fundo</label>
+      </div>
+
+      {selectedElement.type === "badge" && (
+        <div className="space-y-2">
+          <label className="text-xs text-muted-foreground">Cor do fundo</label>
+          <div className="flex items-center gap-2">
+            {colorPresets.map((c, i) => (
+              <ColorSwatch
+                key={i}
+                color={c}
+                active={(selectedElement.bgColor || accentColor) === c}
+                onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { bgColor: c }); }}
+              />
+            ))}
             <Input
               type="color"
               value={selectedElement.bgColor || accentColor}
               onChange={e => updateElement(selectedElement.id, { bgColor: e.target.value })}
-              className="h-11"
+              className="h-8 w-8 p-0 border-0 cursor-pointer"
             />
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {hasRotation && (
         <div className="space-y-1">
           <span className="text-xs text-muted-foreground">Rotação</span>
           <div className="flex items-center gap-2">
             <Button type="button" variant="outline" size="sm" className="h-11 px-3 text-xs"
-              onClick={() => updateElement(selectedElement.id, { rotation: Math.max(-180, (selectedElement.rotation || 0) - 15) })}>
+              onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { rotation: Math.max(-180, (selectedElement.rotation || 0) - 15) }); }}>
               −15°
             </Button>
             <span className="min-w-[4ch] text-center font-mono text-sm tabular-nums">
               {selectedElement.rotation || 0}°
             </span>
             <Button type="button" variant="outline" size="sm" className="h-11 px-3 text-xs"
-              onClick={() => updateElement(selectedElement.id, { rotation: Math.min(180, (selectedElement.rotation || 0) + 15) })}>
+              onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { rotation: Math.min(180, (selectedElement.rotation || 0) + 15) }); }}>
               +15°
             </Button>
             <Button type="button" variant="ghost" size="icon" className="h-11 w-11"
-              onClick={() => updateElement(selectedElement.id, { rotation: 0 })} title="Resetar rotação">
+              onClick={() => { pushStructuralSnapshot(); updateElement(selectedElement.id, { rotation: 0 }); }} title="Resetar rotação">
               <RotateCw className="w-4 h-4" />
             </Button>
           </div>
@@ -1037,11 +1368,12 @@ export default function ImageOverlayEditor({
     </Button>
   );
 
-  // ── MOBILE: fullscreen layout ──
+  // ── MOBILE: fullscreen layout with bottom sheet ──
   if (isMobile) {
     if (!open) return null;
     return (
       <div className="fixed inset-0 z-50 bg-background flex flex-col">
+        {/* Header — fixed */}
         <div className="flex items-center justify-between px-3 py-2 border-b shrink-0">
           <h2 className="text-sm font-bold flex items-center gap-2 truncate">
             <Type className="w-4 h-4 shrink-0" />
@@ -1051,21 +1383,58 @@ export default function ImageOverlayEditor({
             <X className="w-5 h-5" />
           </Button>
         </div>
-        <div className="flex-1 overflow-y-auto px-3 py-3 space-y-3 pb-24">
+
+        {/* Canvas — fixed */}
+        <div className="shrink-0 px-3 pt-3">
           {canvasElement}
-          {toolbarElement}
-          {layerList}
-          {aiCopyButton}
-          {elementEditor}
         </div>
+
+        {/* Toolbar — sticky below canvas */}
+        <div className="shrink-0 px-3 py-2">
+          {toolbarElement}
+        </div>
+
+        {/* Scrollable area: layers + AI */}
+        <div className="flex-1 overflow-y-auto px-3 pb-24 space-y-3">
+          <Collapsible open={layersOpen} onOpenChange={setLayersOpen}>
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="w-full justify-between text-xs h-10">
+                <span className="flex items-center gap-1.5">
+                  <ListChecks className="w-3.5 h-3.5" />
+                  Elementos
+                  <Badge variant="secondary" className="text-[10px] px-1.5 py-0">{elements.length}</Badge>
+                </span>
+                <ChevronsDown className={`w-3.5 h-3.5 transition-transform ${layersOpen ? "rotate-180" : ""}`} />
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              {layerList}
+            </CollapsibleContent>
+          </Collapsible>
+          {aiCopyButton}
+        </div>
+
+        {/* Export — fixed bottom */}
         <div className="shrink-0 px-3 py-2 border-t bg-background">
           {exportButton}
         </div>
+
+        {/* Bottom Sheet for element properties */}
+        <Sheet open={sheetOpen && !!selectedElement} onOpenChange={setSheetOpen}>
+          <SheetContent side="bottom" className="max-h-[60vh] overflow-y-auto">
+            <SheetHeader>
+              <SheetTitle className="text-sm">Propriedades</SheetTitle>
+            </SheetHeader>
+            <div className="pt-2">
+              {elementEditor}
+            </div>
+          </SheetContent>
+        </Sheet>
       </div>
     );
   }
 
-  // ── DESKTOP: Dialog with 2-column layout (Phase 2.1) ──
+  // ── DESKTOP: Dialog with 2-column layout ──
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
       <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden p-6">
