@@ -13,6 +13,9 @@ import {
   ArrowRight, Circle, RotateCw, X, Minus, Tag, ListChecks,
   Bold, ChevronUp, ChevronDown, Undo2, Redo2, Copy,
   AlignLeft, AlignCenter, AlignRight, ChevronsDown,
+  AlignVerticalJustifyStart, AlignVerticalJustifyCenter, AlignVerticalJustifyEnd,
+  AlignHorizontalJustifyStart, AlignHorizontalJustifyCenter, AlignHorizontalJustifyEnd,
+  AlignHorizontalSpaceBetween, AlignVerticalSpaceBetween,
 } from "lucide-react";
 import { OverlayElement, getDefaultTemplate, IMAGE_ROLES } from "@/lib/overlayTemplates";
 import { supabase } from "@/integrations/supabase/client";
@@ -178,18 +181,70 @@ function getElementBounds(
   }
 }
 
-/* ── Snap guide helpers ── */
-const SNAP_THRESHOLD = 2; // percent
-const SNAP_LINES = [5, 50, 95]; // margins + center
+/* ── Element size in percent ── */
+function getElementSizePercent(
+  el: OverlayElement,
+  ctx: CanvasRenderingContext2D,
+  W: number, H: number,
+  headlineColor: string,
+): { w: number; h: number } {
+  const bounds = getElementBounds(el, ctx, W, H, headlineColor);
+  return {
+    w: ((bounds.x2 - bounds.x1) / W) * 100,
+    h: ((bounds.y2 - bounds.y1) / H) * 100,
+  };
+}
 
-function getSnappedPos(x: number, y: number): { x: number; y: number; guidesX: number[]; guidesY: number[] } {
+/* ── Snap guide helpers (Fix 4: smart snap with element bounds) ── */
+const SNAP_THRESHOLD = 2;
+const SNAP_LINES = [5, 50, 95];
+
+function getSnappedPos(
+  x: number, y: number,
+  elW: number = 0, elH: number = 0,
+): { x: number; y: number; guidesX: number[]; guidesY: number[] } {
   let sx = x, sy = y;
   const guidesX: number[] = [];
   const guidesY: number[] = [];
-  for (const line of SNAP_LINES) {
-    if (Math.abs(x - line) < SNAP_THRESHOLD) { sx = line; guidesX.push(line); }
-    if (Math.abs(y - line) < SNAP_THRESHOLD) { sy = line; guidesY.push(line); }
+
+  // Test 3 anchor points per axis: left/center/right
+  const xAnchors = [
+    { edge: x, adjust: 0 },
+    { edge: x + elW / 2, adjust: -elW / 2 },
+    { edge: x + elW, adjust: -elW },
+  ];
+  const yAnchors = [
+    { edge: y, adjust: 0 },
+    { edge: y + elH / 2, adjust: -elH / 2 },
+    { edge: y + elH, adjust: -elH },
+  ];
+
+  let bestXDist = SNAP_THRESHOLD;
+  for (const a of xAnchors) {
+    for (const line of SNAP_LINES) {
+      const dist = Math.abs(a.edge - line);
+      if (dist < bestXDist) {
+        bestXDist = dist;
+        sx = line + a.adjust;
+        guidesX.length = 0;
+        guidesX.push(line);
+      }
+    }
   }
+
+  let bestYDist = SNAP_THRESHOLD;
+  for (const a of yAnchors) {
+    for (const line of SNAP_LINES) {
+      const dist = Math.abs(a.edge - line);
+      if (dist < bestYDist) {
+        bestYDist = dist;
+        sy = line + a.adjust;
+        guidesY.length = 0;
+        guidesY.push(line);
+      }
+    }
+  }
+
   return { x: sx, y: sy, guidesX, guidesY };
 }
 
@@ -211,7 +266,7 @@ export default function ImageOverlayEditor({
   const [hoveredId, setHoveredId] = useState<string | null>(null);
   const [activeGuides, setActiveGuides] = useState<{ x: number[]; y: number[] }>({ x: [], y: [] });
   const [showDragBadge, setShowDragBadge] = useState(true);
-  const [layersOpen, setLayersOpen] = useState(false); // collapsed by default on mobile
+  const [layersOpen, setLayersOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
   const isMobile = useIsMobile();
 
@@ -224,12 +279,14 @@ export default function ImageOverlayEditor({
   const dragPosRef = useRef<{ x: number; y: number } | null>(null);
   const rafRef = useRef<number | null>(null);
   const prevElementsRef = useRef<OverlayElement[]>([]);
-  // Sprint 1.2: Debounced undo for text edits
   const textDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const preTextSnapshotRef = useRef<OverlayElement[] | null>(null);
-  // Sprint 4: double-click
   const lastTapRef = useRef<{ time: number; id: string | null }>({ time: 0, id: null });
   const textInputRef = useRef<HTMLInputElement>(null);
+  // Fix 1: track whether drag moved
+  const dragMovedRef = useRef(false);
+  // Fix 4: store dragged element for size calc during rAF
+  const dragElementRef = useRef<OverlayElement | null>(null);
 
   const role = IMAGE_ROLES[imageIndex - 1];
 
@@ -263,7 +320,7 @@ export default function ImageOverlayEditor({
     return () => clearTimeout(t);
   }, [open]);
 
-  // Load template or persisted elements on open (ref-gated to avoid re-running on context changes)
+  // Load template or persisted elements on open
   const loadedForRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -272,7 +329,7 @@ export default function ImageOverlayEditor({
       return;
     }
     const key = `${imageIndex}`;
-    if (loadedForRef.current === key) return; // already loaded for this session
+    if (loadedForRef.current === key) return;
     loadedForRef.current = key;
 
     const saved = getOverlayElements(imageIndex);
@@ -294,9 +351,8 @@ export default function ImageOverlayEditor({
     }
   }, [elements, open, imageIndex, updateOverlayElements]);
 
-  // Sprint 1.2: Smart undo — only push snapshots for structural changes, debounce text
+  // Smart undo
   const pushStructuralSnapshot = useCallback(() => {
-    // Cancel pending text debounce
     if (textDebounceRef.current) {
       clearTimeout(textDebounceRef.current);
       textDebounceRef.current = null;
@@ -310,7 +366,6 @@ export default function ImageOverlayEditor({
   }, [elements, pushSnapshot]);
 
   const pushTextSnapshot = useCallback(() => {
-    // Save the "before" state on first keystroke, debounce commit
     if (!preTextSnapshotRef.current) {
       preTextSnapshotRef.current = [...elements];
     }
@@ -388,7 +443,7 @@ export default function ImageOverlayEditor({
     // Draw snap guides
     if (activeGuides.x.length > 0 || activeGuides.y.length > 0) {
       ctx.save();
-      ctx.strokeStyle = "hsl(0 84% 60%)"; // destructive color
+      ctx.strokeStyle = "hsl(0 84% 60%)";
       ctx.lineWidth = 2;
       ctx.setLineDash([8, 6]);
       for (const gx of activeGuides.x) {
@@ -428,7 +483,6 @@ export default function ImageOverlayEditor({
           ctx.textBaseline = "top";
           const maxWidth = el.width ? (el.width / 100) * W : W - px - 20;
 
-          // Text style setup
           const hasTextShadow = el.textStyle === "shadow";
           const hasTextStroke = el.textStyle === "stroke";
 
@@ -443,11 +497,9 @@ export default function ImageOverlayEditor({
             if (textAlignVal === "center") drawX = x + (maxWidth - lineW) / 2;
             else if (textAlignVal === "right") drawX = x + maxWidth - lineW;
 
-            // Background
             ctx.fillStyle = "rgba(255,255,255,0.7)";
             ctx.fillRect(drawX - 4, y - 2, lineW + 8, lineHeight);
 
-            // Text style effects
             if (hasTextShadow) {
               ctx.shadowColor = "rgba(0,0,0,0.5)";
               ctx.shadowBlur = 6;
@@ -463,7 +515,6 @@ export default function ImageOverlayEditor({
             ctx.fillStyle = el.color || headlineColor;
             ctx.fillText(text, drawX, y);
 
-            // Reset shadow
             if (hasTextShadow) {
               ctx.shadowColor = "transparent";
               ctx.shadowBlur = 0;
@@ -538,7 +589,6 @@ export default function ImageOverlayEditor({
 
       ctx.globalAlpha = 1;
 
-      // Hover indicator (subtle)
       if (el.id === hoveredId && el.id !== selectedId) {
         const bounds = getElementBounds(el, ctx, W, H, headlineColor);
         ctx.strokeStyle = "hsl(215 20% 65%)";
@@ -548,7 +598,6 @@ export default function ImageOverlayEditor({
         ctx.setLineDash([]);
       }
 
-      // Selection indicator
       if (el.id === selectedId) {
         const bounds = getElementBounds(el, ctx, W, H, headlineColor);
         ctx.strokeStyle = "hsl(217.2 91.2% 59.8%)";
@@ -563,20 +612,45 @@ export default function ImageOverlayEditor({
 
   useEffect(() => { renderCanvas(); }, [renderCanvas]);
 
-  // ── rAF drag loop with snap ──
+  // ── Helper: get element size in % using canvas ctx ──
+  const getElSize = useCallback((el: OverlayElement) => {
+    const canvas = canvasRef.current;
+    if (!canvas) return { w: 0, h: 0 };
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return { w: 0, h: 0 };
+    return getElementSizePercent(el, ctx, canvas.width, canvas.height, headlineColor);
+  }, [headlineColor]);
+
+  // ── rAF drag loop with smart snap (Fix 4) ──
   const dragLoop = useCallback(() => {
     const pos = dragPosRef.current;
     const id = draggingRef.current;
     if (!pos || !id) return;
 
-    const snapped = getSnappedPos(pos.x, pos.y);
+    const el = dragElementRef.current;
+    let elW = 0, elH = 0;
+    if (el) {
+      const size = getElSize(el);
+      elW = size.w;
+      elH = size.h;
+    }
+
+    // Fix 6: clamp to canvas bounds
+    const clampedX = Math.max(0, Math.min(100 - elW, pos.x));
+    const clampedY = Math.max(0, Math.min(100 - elH, pos.y));
+
+    const snapped = getSnappedPos(clampedX, clampedY, elW, elH);
     setActiveGuides({ x: snapped.guidesX, y: snapped.guidesY });
-    setElements(prev =>
-      prev.map(el => el.id === id ? { ...el, x: snapped.x, y: snapped.y } : el)
-    );
+    setElements(prev => {
+      const updated = prev.map(e => e.id === id ? { ...e, x: snapped.x, y: snapped.y } : e);
+      // Keep dragElementRef in sync
+      const updatedEl = updated.find(e => e.id === id);
+      if (updatedEl) dragElementRef.current = updatedEl;
+      return updated;
+    });
     dragPosRef.current = null;
     rafRef.current = null;
-  }, []);
+  }, [getElSize]);
 
   const scheduleRaf = useCallback(() => {
     if (rafRef.current) return;
@@ -613,16 +687,17 @@ export default function ImageOverlayEditor({
     return null;
   };
 
+  // Fix 1: Don't open sheet on startDrag, only select
   const startDrag = (clientX: number, clientY: number) => {
     const c = getCanvasCoords(clientX, clientY);
     if (!c) return false;
     const el = hitTest(c.mx, c.my, c.canvas);
     if (el) {
       setSelectedId(el.id);
-      if (isMobile) setSheetOpen(true);
+      dragMovedRef.current = false; // Fix 1: reset
       draggingRef.current = el.id;
+      dragElementRef.current = el; // Fix 4: store for size calc
       dragOffsetRef.current = { x: c.mx - (el.x / 100) * c.canvas.width, y: c.my - (el.y / 100) * c.canvas.height };
-      // Save snapshot before drag
       pushStructuralSnapshot();
       return true;
     } else {
@@ -634,38 +709,57 @@ export default function ImageOverlayEditor({
 
   const moveDrag = (clientX: number, clientY: number) => {
     if (!draggingRef.current) return;
+    dragMovedRef.current = true; // Fix 1: mark as drag
     const c = getCanvasCoords(clientX, clientY);
     if (!c) return;
     dragPosRef.current = {
-      x: Math.max(0, Math.min(100, ((c.mx - dragOffsetRef.current.x) / c.canvas.width) * 100)),
-      y: Math.max(0, Math.min(100, ((c.my - dragOffsetRef.current.y) / c.canvas.height) * 100)),
+      x: ((c.mx - dragOffsetRef.current.x) / c.canvas.width) * 100,
+      y: ((c.my - dragOffsetRef.current.y) / c.canvas.height) * 100,
     };
     scheduleRaf();
   };
 
+  // Fix 1: Open sheet only if tap (no movement)
   const endDrag = () => {
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = null;
     const pos = dragPosRef.current;
     const id = draggingRef.current;
+
     if (pos && id) {
-      const snapped = getSnappedPos(pos.x, pos.y);
-      setElements(prev => prev.map(el => el.id === id ? { ...el, x: snapped.x, y: snapped.y } : el));
+      const el = dragElementRef.current;
+      let elW = 0, elH = 0;
+      if (el) {
+        const size = getElSize(el);
+        elW = size.w;
+        elH = size.h;
+      }
+      // Fix 6: clamp
+      const clampedX = Math.max(0, Math.min(100 - elW, pos.x));
+      const clampedY = Math.max(0, Math.min(100 - elH, pos.y));
+      const snapped = getSnappedPos(clampedX, clampedY, elW, elH);
+      setElements(prev => prev.map(e => e.id === id ? { ...e, x: snapped.x, y: snapped.y } : e));
     }
+
+    // Fix 1: only open sheet on tap (no movement) on mobile
+    if (isMobile && !dragMovedRef.current && (id || draggingRef.current)) {
+      setSheetOpen(true);
+    }
+
     draggingRef.current = null;
     dragPosRef.current = null;
+    dragElementRef.current = null;
+    dragMovedRef.current = false;
     setActiveGuides({ x: [], y: [] });
   };
 
   // Mouse handlers
   const handleCanvasMouseDown = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    // Sprint 4: double-click detection
     const now = Date.now();
     const c = getCanvasCoords(e.clientX, e.clientY);
     if (c) {
       const el = hitTest(c.mx, c.my, c.canvas);
       if (el && lastTapRef.current.id === el.id && now - lastTapRef.current.time < 400) {
-        // Double-click: focus text input
         setTimeout(() => textInputRef.current?.focus(), 50);
         lastTapRef.current = { time: 0, id: null };
         return;
@@ -679,7 +773,6 @@ export default function ImageOverlayEditor({
     if (draggingRef.current) {
       moveDrag(e.clientX, e.clientY);
     } else {
-      // Sprint 3: hover detection (desktop only)
       if (!isMobile) {
         const c = getCanvasCoords(e.clientX, e.clientY);
         if (c) {
@@ -692,11 +785,8 @@ export default function ImageOverlayEditor({
 
   const handleCanvasMouseUp = () => endDrag();
 
-  // Sprint 1.1: Fix touchAction — use e.preventDefault() only, keep touchAction: "pan-y" always
   const handleTouchStart = (e: React.TouchEvent<HTMLCanvasElement>) => {
     const t = e.touches[0]; if (!t) return;
-
-    // Sprint 4: double-tap detection
     const now = Date.now();
     const c = getCanvasCoords(t.clientX, t.clientY);
     if (c) {
@@ -709,10 +799,9 @@ export default function ImageOverlayEditor({
       }
       lastTapRef.current = { time: now, id: el?.id || null };
     }
-
     const hit = startDrag(t.clientX, t.clientY);
     if (hit) {
-      e.preventDefault(); // prevent scroll only when dragging
+      e.preventDefault();
     }
   };
   const handleTouchMove = (e: React.TouchEvent<HTMLCanvasElement>) => {
@@ -793,7 +882,109 @@ export default function ImageOverlayEditor({
 
   const selectedElement = elements.find(el => el.id === selectedId);
 
-  // ── AI copy ──
+  // ── Fix 5: Alignment & Distribution ──
+  const alignElements = useCallback((axis: "x" | "y", align: "start" | "center" | "end") => {
+    pushStructuralSnapshot();
+    const ids = checkedIds.size >= 2 ? checkedIds : (selectedId ? new Set([selectedId]) : new Set<string>());
+    if (ids.size === 0) return;
+
+    const targets = elements.filter(el => ids.has(el.id));
+    if (targets.length === 0) return;
+
+    if (targets.length === 1) {
+      // Align to canvas
+      const el = targets[0];
+      const size = getElSize(el);
+      let val: number;
+      if (axis === "x") {
+        val = align === "start" ? 2 : align === "center" ? 50 - size.w / 2 : 98 - size.w;
+      } else {
+        val = align === "start" ? 2 : align === "center" ? 50 - size.h / 2 : 98 - size.h;
+      }
+      setElements(prev => prev.map(e => e.id === el.id ? { ...e, [axis]: Math.max(0, Math.min(100, val)) } : e));
+    } else {
+      // Align to group bounding box
+      const sized = targets.map(el => ({ el, size: getElSize(el) }));
+      if (axis === "x") {
+        const minX = Math.min(...sized.map(s => s.el.x));
+        const maxX = Math.max(...sized.map(s => s.el.x + s.size.w));
+        setElements(prev => prev.map(e => {
+          if (!ids.has(e.id)) return e;
+          const s = sized.find(ss => ss.el.id === e.id);
+          if (!s) return e;
+          let newX: number;
+          if (align === "start") newX = minX;
+          else if (align === "center") newX = (minX + maxX) / 2 - s.size.w / 2;
+          else newX = maxX - s.size.w;
+          return { ...e, x: Math.max(0, Math.min(100 - s.size.w, newX)) };
+        }));
+      } else {
+        const minY = Math.min(...sized.map(s => s.el.y));
+        const maxY = Math.max(...sized.map(s => s.el.y + s.size.h));
+        setElements(prev => prev.map(e => {
+          if (!ids.has(e.id)) return e;
+          const s = sized.find(ss => ss.el.id === e.id);
+          if (!s) return e;
+          let newY: number;
+          if (align === "start") newY = minY;
+          else if (align === "center") newY = (minY + maxY) / 2 - s.size.h / 2;
+          else newY = maxY - s.size.h;
+          return { ...e, y: Math.max(0, Math.min(100 - s.size.h, newY)) };
+        }));
+      }
+    }
+  }, [checkedIds, selectedId, elements, getElSize, pushStructuralSnapshot]);
+
+  const distributeElements = useCallback((axis: "x" | "y") => {
+    if (checkedIds.size < 3) return;
+    pushStructuralSnapshot();
+    const targets = elements.filter(el => checkedIds.has(el.id));
+    const sized = targets.map(el => ({ el, size: getElSize(el) }));
+
+    if (axis === "x") {
+      sized.sort((a, b) => a.el.x - b.el.x);
+      const minX = sized[0].el.x;
+      const maxX = sized[sized.length - 1].el.x + sized[sized.length - 1].size.w;
+      const totalW = sized.reduce((sum, s) => sum + s.size.w, 0);
+      const gap = (maxX - minX - totalW) / (sized.length - 1);
+      let currentX = minX;
+      const updates: Record<string, number> = {};
+      for (const s of sized) {
+        updates[s.el.id] = currentX;
+        currentX += s.size.w + gap;
+      }
+      setElements(prev => prev.map(e => updates[e.id] !== undefined ? { ...e, x: Math.max(0, Math.min(100, updates[e.id])) } : e));
+    } else {
+      sized.sort((a, b) => a.el.y - b.el.y);
+      const minY = sized[0].el.y;
+      const maxY = sized[sized.length - 1].el.y + sized[sized.length - 1].size.h;
+      const totalH = sized.reduce((sum, s) => sum + s.size.h, 0);
+      const gap = (maxY - minY - totalH) / (sized.length - 1);
+      let currentY = minY;
+      const updates: Record<string, number> = {};
+      for (const s of sized) {
+        updates[s.el.id] = currentY;
+        currentY += s.size.h + gap;
+      }
+      setElements(prev => prev.map(e => updates[e.id] !== undefined ? { ...e, y: Math.max(0, Math.min(100, updates[e.id])) } : e));
+    }
+  }, [checkedIds, elements, getElSize, pushStructuralSnapshot]);
+
+  // ── Fix 2: Group property update ──
+  const updateCheckedElements = useCallback((updates: Partial<OverlayElement>) => {
+    pushStructuralSnapshot();
+    setElements(prev => prev.map(el => checkedIds.has(el.id) ? { ...el, ...updates } : el));
+  }, [checkedIds, pushStructuralSnapshot]);
+
+  const deleteCheckedElements = useCallback(() => {
+    pushStructuralSnapshot();
+    setElements(prev => prev.filter(el => !checkedIds.has(el.id)));
+    setCheckedIds(new Set());
+    setSelectedId(null);
+    setSheetOpen(false);
+  }, [checkedIds, pushStructuralSnapshot]);
+
+  // ── AI copy (Fix 3: badge mapping) ──
   const generateCopy = async (targetIds?: string[]) => {
     setGeneratingCopy(true);
     try {
@@ -826,14 +1017,35 @@ export default function ImageOverlayEditor({
           })
         );
       }
+      // Fix 3: subheadline only maps to subheadline (not badge)
       if (data?.subheadline) {
         setElements(prev =>
           prev.map(el => {
-            if (el.type !== "subheadline" && el.type !== "badge") return el;
+            if (el.type !== "subheadline") return el;
             if (idsToUpdate && !idsToUpdate.has(el.id)) return el;
             return { ...el, text: data.subheadline };
           })
         );
+      }
+      // Fix 3: badges get their own mapping
+      if (data?.badges && Array.isArray(data.badges)) {
+        setElements(prev => {
+          const badgeEls = prev.filter(el => el.type === "badge");
+          const targetBadges = idsToUpdate
+            ? badgeEls.filter(el => idsToUpdate.has(el.id))
+            : badgeEls;
+
+          const badgeTexts = data.badges.slice(0, targetBadges.length || 5) as string[];
+          return prev.map(el => {
+            if (el.type !== "badge") return el;
+            if (idsToUpdate && !idsToUpdate.has(el.id)) return el;
+            const idx = targetBadges.indexOf(el);
+            if (idx >= 0 && idx < badgeTexts.length) {
+              return { ...el, text: badgeTexts[idx] };
+            }
+            return el;
+          });
+        });
       }
       if (data?.bullets && Array.isArray(data.bullets)) {
         setElements(prev => {
@@ -853,16 +1065,22 @@ export default function ImageOverlayEditor({
             return el;
           });
 
+          // Only create new bullets if there are no badge-only templates
           if (!idsToUpdate) {
-            const existingBulletCount = bulletEls.length;
-            for (let i = existingBulletCount; i < bulletTexts.length && i < 5; i++) {
-              updated.push({
-                id: `bullet-gen-${Date.now()}-${i}`,
-                type: "bullet",
-                text: bulletTexts[i],
-                x: 5, y: 35 + i * 10, width: 40,
-                fontSize: 16, color: headlineColor,
-              });
+            const hasBadges = prev.some(el => el.type === "badge");
+            const hasBullets = bulletEls.length > 0;
+            // Don't create new bullets if the template only has badges
+            if (hasBullets || !hasBadges) {
+              const existingBulletCount = bulletEls.length;
+              for (let i = existingBulletCount; i < bulletTexts.length && i < 5; i++) {
+                updated.push({
+                  id: `bullet-gen-${Date.now()}-${i}`,
+                  type: "bullet",
+                  text: bulletTexts[i],
+                  x: 5, y: 35 + i * 10, width: 40,
+                  fontSize: 16, color: headlineColor,
+                });
+              }
             }
           }
           return updated;
@@ -894,12 +1112,10 @@ export default function ImageOverlayEditor({
     if (!canvas) return;
     setExporting(true);
     try {
-      // Clear hover/guides for clean export
       setHoveredId(null);
       setActiveGuides({ x: [], y: [] });
       const savedSelected = selectedId;
       setSelectedId(null);
-      // Wait for re-render
       await new Promise(r => setTimeout(r, 50));
       renderCanvas();
 
@@ -932,6 +1148,7 @@ export default function ImageOverlayEditor({
   const textTypes = new Set(["headline", "subheadline", "bullet", "badge", "arrow"]);
   const checkedTextElements = elements.filter(el => checkedIds.has(el.id) && textTypes.has(el.type));
   const checkedCount = checkedTextElements.length;
+  const checkedAnyCount = checkedIds.size;
 
   // ── Color presets ──
   const colorPresets = [headlineColor, accentColor, "#000000", "#FFFFFF", "#6B7280"];
@@ -1000,7 +1217,124 @@ export default function ImageOverlayEditor({
     </div>
   );
 
-  // ── Layer List — simplified on mobile (Sprint 2.6) ──
+  // ── Fix 5: Alignment Toolbar ──
+  const showAlignTools = selectedId || checkedIds.size >= 2;
+  const alignmentToolbar = showAlignTools ? (
+    <div className="bg-muted/50 rounded-lg p-2 border space-y-2">
+      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide">
+        {checkedIds.size >= 2 ? `Alinhar grupo (${checkedIds.size})` : "Alinhar ao canvas"}
+      </p>
+      <div className="flex items-center gap-1 flex-wrap">
+        <Button type="button" variant="outline" size="icon" className="h-8 w-8" title="Esquerda"
+          onClick={() => alignElements("x", "start")}>
+          <AlignHorizontalJustifyStart className="w-3.5 h-3.5" />
+        </Button>
+        <Button type="button" variant="outline" size="icon" className="h-8 w-8" title="Centro H"
+          onClick={() => alignElements("x", "center")}>
+          <AlignHorizontalJustifyCenter className="w-3.5 h-3.5" />
+        </Button>
+        <Button type="button" variant="outline" size="icon" className="h-8 w-8" title="Direita"
+          onClick={() => alignElements("x", "end")}>
+          <AlignHorizontalJustifyEnd className="w-3.5 h-3.5" />
+        </Button>
+        <div className="w-px h-6 bg-border mx-0.5" />
+        <Button type="button" variant="outline" size="icon" className="h-8 w-8" title="Topo"
+          onClick={() => alignElements("y", "start")}>
+          <AlignVerticalJustifyStart className="w-3.5 h-3.5" />
+        </Button>
+        <Button type="button" variant="outline" size="icon" className="h-8 w-8" title="Centro V"
+          onClick={() => alignElements("y", "center")}>
+          <AlignVerticalJustifyCenter className="w-3.5 h-3.5" />
+        </Button>
+        <Button type="button" variant="outline" size="icon" className="h-8 w-8" title="Embaixo"
+          onClick={() => alignElements("y", "end")}>
+          <AlignVerticalJustifyEnd className="w-3.5 h-3.5" />
+        </Button>
+        {checkedIds.size >= 3 && (
+          <>
+            <div className="w-px h-6 bg-border mx-0.5" />
+            <Button type="button" variant="outline" size="icon" className="h-8 w-8" title="Distribuir H"
+              onClick={() => distributeElements("x")}>
+              <AlignHorizontalSpaceBetween className="w-3.5 h-3.5" />
+            </Button>
+            <Button type="button" variant="outline" size="icon" className="h-8 w-8" title="Distribuir V"
+              onClick={() => distributeElements("y")}>
+              <AlignVerticalSpaceBetween className="w-3.5 h-3.5" />
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
+  ) : null;
+
+  // ── Fix 2: Group Edit Panel ──
+  const groupEditPanel = checkedAnyCount >= 2 ? (
+    <div className="bg-muted/50 rounded-lg p-3 border space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-muted-foreground uppercase">
+          Edição em grupo ({checkedAnyCount})
+        </p>
+        <Button type="button" variant="ghost" size="sm" className="h-8 text-xs text-destructive hover:text-destructive"
+          onClick={deleteCheckedElements}>
+          <Trash2 className="w-3.5 h-3.5 mr-1" /> Deletar todos
+        </Button>
+      </div>
+
+      {/* Color */}
+      <div className="space-y-1.5">
+        <label className="text-xs text-muted-foreground">Cor</label>
+        <div className="flex items-center gap-2">
+          {colorPresets.map((c, i) => (
+            <ColorSwatch key={i} color={c} active={false}
+              onClick={() => updateCheckedElements({ color: c })} />
+          ))}
+          <Input type="color" value={headlineColor}
+            onChange={e => updateCheckedElements({ color: e.target.value })}
+            className="h-8 w-8 p-0 border-0 cursor-pointer" />
+        </div>
+      </div>
+
+      {/* Font Size */}
+      <div className="space-y-1.5">
+        <label className="text-xs text-muted-foreground">Tamanho</label>
+        <Slider
+          value={[16]}
+          onValueChange={([v]) => {
+            setElements(prev => prev.map(el => checkedIds.has(el.id) ? { ...el, fontSize: v } : el));
+          }}
+          onValueCommit={() => pushStructuralSnapshot()}
+          min={8} max={72} step={1} className="w-full"
+        />
+      </div>
+
+      {/* Bold */}
+      <div className="flex items-center gap-2">
+        <Button type="button" variant="outline" size="sm" className="h-9 gap-1 text-xs"
+          onClick={() => updateCheckedElements({ bold: true })}>
+          <Bold className="w-3.5 h-3.5" /> Bold On
+        </Button>
+        <Button type="button" variant="outline" size="sm" className="h-9 gap-1 text-xs"
+          onClick={() => updateCheckedElements({ bold: false })}>
+          Bold Off
+        </Button>
+      </div>
+
+      {/* Opacity */}
+      <div className="space-y-1.5">
+        <label className="text-xs text-muted-foreground">Opacidade</label>
+        <Slider
+          value={[100]}
+          onValueChange={([v]) => {
+            setElements(prev => prev.map(el => checkedIds.has(el.id) ? { ...el, opacity: v } : el));
+          }}
+          onValueCommit={() => pushStructuralSnapshot()}
+          min={0} max={100} step={5} className="w-full"
+        />
+      </div>
+    </div>
+  ) : null;
+
+  // ── Layer List ──
   const layerList = (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
@@ -1030,15 +1364,12 @@ export default function ImageOverlayEditor({
                   if (isMobile) setSheetOpen(true);
                 }}
               >
-                {hasTextContent && (
-                  <Checkbox
-                    checked={isChecked}
-                    onCheckedChange={() => toggleCheck(el.id)}
-                    onClick={e => e.stopPropagation()}
-                    className="shrink-0"
-                  />
-                )}
-                {!hasTextContent && <div className="w-4 shrink-0" />}
+                <Checkbox
+                  checked={isChecked}
+                  onCheckedChange={() => toggleCheck(el.id)}
+                  onClick={e => e.stopPropagation()}
+                  className="shrink-0"
+                />
 
                 <LayerIcon type={el.type} />
 
@@ -1046,7 +1377,6 @@ export default function ImageOverlayEditor({
                   {el.text ? `"${el.text}"` : el.type}
                 </span>
 
-                {/* Desktop: show all controls. Mobile: only delete */}
                 {!isMobile && (
                   <>
                     <Button
@@ -1148,7 +1478,7 @@ export default function ImageOverlayEditor({
     selectedElement.type === "subheadline" ||
     selectedElement.type === "bullet"
   );
-  const canAlign = canBold; // same types support alignment
+  const canAlign = canBold;
   const canTextStyle = canBold;
 
   const elementEditor = selectedElement ? (
@@ -1157,7 +1487,6 @@ export default function ImageOverlayEditor({
         <p className="text-xs font-semibold text-muted-foreground uppercase">
           {selectedElement.type}
         </p>
-        {/* Mobile: extra actions inside sheet */}
         {isMobile && (
           <div className="flex items-center gap-1">
             <Button type="button" variant="ghost" size="icon" className="h-9 w-9"
@@ -1200,7 +1529,6 @@ export default function ImageOverlayEditor({
         />
       )}
 
-      {/* Bold + Alignment row */}
       {(canBold || canAlign) && (
         <div className="flex items-center gap-1">
           {canBold && (
@@ -1237,7 +1565,6 @@ export default function ImageOverlayEditor({
         </div>
       )}
 
-      {/* Text style row */}
       {canTextStyle && (
         <div className="flex items-center gap-1">
           <Button type="button" size="sm" className="h-9 text-xs px-2"
@@ -1299,7 +1626,6 @@ export default function ImageOverlayEditor({
         </div>
       )}
 
-      {/* Opacity */}
       <div className="space-y-1">
         <span className="text-xs text-muted-foreground">Opacidade: {selectedElement.opacity ?? 100}%</span>
         <Slider
@@ -1309,7 +1635,6 @@ export default function ImageOverlayEditor({
         />
       </div>
 
-      {/* Color with presets */}
       <div className="space-y-2">
         <label className="text-xs text-muted-foreground">Cor</label>
         <div className="flex items-center gap-2">
@@ -1389,7 +1714,6 @@ export default function ImageOverlayEditor({
     if (!open) return null;
     return (
       <div className="fixed inset-0 z-50 bg-background flex flex-col">
-        {/* Header — fixed */}
         <div className="flex items-center justify-between px-3 py-2 border-b shrink-0">
           <h2 className="text-sm font-bold flex items-center gap-2 truncate">
             <Type className="w-4 h-4 shrink-0" />
@@ -1400,17 +1724,14 @@ export default function ImageOverlayEditor({
           </Button>
         </div>
 
-        {/* Canvas — fixed */}
         <div className="shrink-0 px-3 pt-3">
           {canvasElement}
         </div>
 
-        {/* Toolbar — sticky below canvas */}
         <div className="shrink-0 px-3 py-2">
           {toolbarElement}
         </div>
 
-        {/* Scrollable area: layers + AI */}
         <div className="flex-1 overflow-y-auto px-3 pb-24 space-y-3">
           <Collapsible open={layersOpen} onOpenChange={setLayersOpen}>
             <CollapsibleTrigger asChild>
@@ -1427,15 +1748,15 @@ export default function ImageOverlayEditor({
               {layerList}
             </CollapsibleContent>
           </Collapsible>
+          {alignmentToolbar}
+          {groupEditPanel}
           {aiCopyButton}
         </div>
 
-        {/* Export — fixed bottom */}
         <div className="shrink-0 px-3 py-2 border-t bg-background">
           {exportButton}
         </div>
 
-        {/* Bottom Sheet for element properties */}
         <Sheet open={sheetOpen && !!selectedElement} onOpenChange={setSheetOpen}>
           <SheetContent side="bottom" className="max-h-[60vh] overflow-y-auto">
             <SheetHeader>
@@ -1461,15 +1782,15 @@ export default function ImageOverlayEditor({
           </DialogTitle>
         </DialogHeader>
         <div className="grid grid-cols-[1fr_360px] gap-4 min-h-0">
-          {/* Left: Canvas */}
           <div className="min-h-0 flex flex-col">
             {canvasElement}
           </div>
-          {/* Right: Controls */}
           <ScrollArea className="max-h-[calc(95vh-120px)]">
             <div className="space-y-3 pr-2">
               {toolbarElement}
               {layerList}
+              {alignmentToolbar}
+              {groupEditPanel}
               {aiCopyButton}
               {elementEditor}
               {exportButton}
