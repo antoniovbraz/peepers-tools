@@ -31,12 +31,10 @@ serve(async (req) => {
 
     const roleDesc = roleDescriptions[imageRole] || "Product image that needs marketing text";
 
-    // Build anti-repetition context
     const previousContext = Array.isArray(previousCopies) && previousCopies.length > 0
       ? `\n\nALREADY USED (do NOT repeat, paraphrase, or use similar angles):\n${previousCopies.map((c: string) => `- ${c}`).join("\n")}`
       : "";
 
-    // Build target elements instruction
     const targetInstruction = Array.isArray(targetElements) && targetElements.length > 0
       ? `\nOnly generate copy for these element types: ${targetElements.join(", ")}. Leave other fields empty or omit them.`
       : "";
@@ -49,6 +47,7 @@ Rules:
 - ALL text must be in Brazilian Portuguese
 - Headlines: max 5 words, bold benefit-driven
 - Bullets/labels: max 8 words each, clear and simple
+- Badges: max 3 words each, short punchy labels for badge overlays
 - Use action words and emotional triggers
 - Focus on what the customer GAINS, not technical specs
 - Use ✓ prefix for bullet items
@@ -86,8 +85,13 @@ Rules:
                     items: { type: "string" },
                     description: "Lista de bullets/labels (max 5 itens, max 8 palavras cada)",
                   },
+                  badges: {
+                    type: "array",
+                    items: { type: "string" },
+                    description: "Labels curtos para badges (max 5 itens, max 3 palavras cada)",
+                  },
                 },
-                required: ["headline", "bullets"],
+                required: ["headline", "bullets", "badges"],
                 additionalProperties: false,
               },
             },
