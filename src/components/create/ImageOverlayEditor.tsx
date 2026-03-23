@@ -1732,7 +1732,7 @@ export default function ImageOverlayEditor({
           {toolbarElement}
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 pb-24 space-y-3">
+        <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-3">
           <Collapsible open={layersOpen} onOpenChange={setLayersOpen}>
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="sm" className="w-full justify-between text-xs h-10">
@@ -1753,7 +1753,7 @@ export default function ImageOverlayEditor({
           {aiCopyButton}
         </div>
 
-        <div className="shrink-0 px-3 py-2 border-t bg-background">
+        <div className="shrink-0 px-3 py-2 border-t bg-background pb-[env(safe-area-inset-bottom)]">
           {exportButton}
         </div>
 
@@ -1774,28 +1774,30 @@ export default function ImageOverlayEditor({
   // ── DESKTOP: Dialog with 2-column layout ──
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden p-6">
-        <DialogHeader>
+      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col overflow-hidden p-6">
+        <DialogHeader className="shrink-0">
           <DialogTitle className="text-base font-bold flex items-center gap-2">
             <Type className="w-4 h-4" />
             Editor de Overlay — {role?.label || `Imagem #${imageIndex}`}
           </DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-[1fr_360px] gap-4 min-h-0">
+        <div className="grid grid-cols-[1fr_360px] gap-4 flex-1 min-h-0 overflow-hidden">
           <div className="min-h-0 flex flex-col">
             {canvasElement}
           </div>
-          <ScrollArea className="max-h-[calc(95vh-120px)]">
-            <div className="space-y-3 pr-2">
-              {toolbarElement}
-              {layerList}
-              {alignmentToolbar}
-              {groupEditPanel}
-              {aiCopyButton}
-              {elementEditor}
-              {exportButton}
-            </div>
-          </ScrollArea>
+          <div className="min-h-0 flex flex-col overflow-hidden">
+            <ScrollArea className="h-full">
+              <div className="space-y-3 pr-2">
+                {toolbarElement}
+                {layerList}
+                {alignmentToolbar}
+                {groupEditPanel}
+                {aiCopyButton}
+                {elementEditor}
+                {exportButton}
+              </div>
+            </ScrollArea>
+          </div>
         </div>
       </DialogContent>
     </Dialog>
