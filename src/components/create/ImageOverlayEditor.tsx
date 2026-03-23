@@ -1753,7 +1753,7 @@ export default function ImageOverlayEditor({
           {aiCopyButton}
         </div>
 
-        <div className="shrink-0 px-3 py-2 border-t bg-background">
+        <div className="shrink-0 px-3 py-2 border-t bg-background pb-[env(safe-area-inset-bottom)]">
           {exportButton}
         </div>
 
