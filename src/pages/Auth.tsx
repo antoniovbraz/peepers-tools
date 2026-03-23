@@ -15,6 +15,7 @@ export default function Auth() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
+  const [resettingPassword, setResettingPassword] = useState(false);
 
   if (loading) {
     return (
@@ -50,6 +51,25 @@ export default function Auth() {
       toast({ title: "Erro", description: msg, variant: "destructive" });
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleForgotPassword = async () => {
+    if (!email) {
+      toast({ title: "Informe seu email", description: "Digite seu email acima para redefinir a senha.", variant: "destructive" });
+      return;
+    }
+    setResettingPassword(true);
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: window.location.origin,
+      });
+      if (error) throw error;
+      toast({ title: "Email enviado!", description: "Verifique sua caixa de entrada para redefinir a senha." });
+    } catch (err: any) {
+      toast({ title: "Erro", description: err.message || "Não foi possível enviar o email.", variant: "destructive" });
+    } finally {
+      setResettingPassword(false);
     }
   };
 
@@ -131,6 +151,18 @@ export default function Auth() {
             minLength={6}
           />
         </div>
+        {isLogin && (
+          <div className="text-right">
+            <button
+              type="button"
+              onClick={handleForgotPassword}
+              disabled={resettingPassword}
+              className="text-xs text-primary hover:underline"
+            >
+              {resettingPassword ? "Enviando..." : "Esqueceu a senha?"}
+            </button>
+          </div>
+        )}
         <Button type="submit" disabled={submitting} className="w-full h-12 gap-2 font-semibold">
           <LogIn className="w-4 h-4" />
           {submitting ? "Aguarde..." : isLogin ? "Entrar" : "Criar conta"}

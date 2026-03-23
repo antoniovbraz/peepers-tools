@@ -133,3 +133,65 @@ export function handleAIError(
   console.error("AI error:", status, body);
   throw new Error(`AI gateway error: ${status}`);
 }
+
+/* ── Fetch with Retry + Timeout ── */
+
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+
+export async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  config: { maxRetries?: number; timeoutMs?: number; initialDelayMs?: number } = {},
+): Promise<Response> {
+  const { maxRetries = 3, timeoutMs = 30_000, initialDelayMs = 1000 } = config;
+
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+
+    try {
+      const response = await fetch(url, { ...options, signal: controller.signal });
+      clearTimeout(timer);
+
+      if (response.ok || !RETRYABLE_STATUSES.has(response.status) || attempt === maxRetries) {
+        return response;
+      }
+
+      const delay = initialDelayMs * Math.pow(2, attempt);
+      console.warn(`Retry ${attempt + 1}/${maxRetries} after ${response.status}, waiting ${delay}ms`);
+      await new Promise((r) => setTimeout(r, delay));
+    } catch (err) {
+      clearTimeout(timer);
+      if (attempt === maxRetries) throw err;
+      const delay = initialDelayMs * Math.pow(2, attempt);
+      const reason = (err as Error).name === "AbortError" ? "timeout" : (err as Error).message;
+      console.warn(`Retry ${attempt + 1}/${maxRetries} after ${reason}, waiting ${delay}ms`);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+
+  throw new Error("fetchWithRetry: exhausted retries");
+}
+
+/**
+ * Parse a tool call result from an AI gateway response.
+ * Returns the parsed object or a descriptive error Response.
+ */
+export function parseToolCallResult(
+  data: Record<string, unknown>,
+  corsHeaders: Record<string, string>,
+): { result: Record<string, unknown> } | Response {
+  const toolCall = (data as any).choices?.[0]?.message?.tool_calls?.[0];
+  if (!toolCall) {
+    return errorResponse(
+      "A IA não gerou um resultado válido. Tente novamente.",
+      502,
+      corsHeaders,
+    );
+  }
+  try {
+    return { result: JSON.parse(toolCall.function.arguments) };
+  } catch {
+    return errorResponse("Resposta da IA inválida", 502, corsHeaders);
+  }
+}

@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger } from "../_shared/helpers.ts";
+import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger, fetchWithRetry } from "../_shared/helpers.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -68,7 +68,7 @@ Ensure the product looks IDENTICAL to the reference and NOT reinterpreted.`,
       text: finalPrompt,
     });
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetchWithRetry("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,

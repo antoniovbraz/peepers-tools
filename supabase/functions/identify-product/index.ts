@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { getCorsHeaders, authenticate, errorResponse, handleAIError, LLM_SAFETY_INSTRUCTION, createRequestLogger } from "../_shared/helpers.ts";
+import { getCorsHeaders, authenticate, errorResponse, handleAIError, LLM_SAFETY_INSTRUCTION, createRequestLogger, fetchWithRetry, parseToolCallResult } from "../_shared/helpers.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -29,7 +29,7 @@ serve(async (req) => {
       image_url: { url },
     }));
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetchWithRetry("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
@@ -85,13 +85,11 @@ Responda APENAS em português brasileiro.`,
     }
 
     const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    let result = null;
-    if (toolCall) {
-      try { result = JSON.parse(toolCall.function.arguments); } catch { throw new Error("Resposta da IA inválida"); }
-    }
+    const parsed = parseToolCallResult(data, cors);
+    if (parsed instanceof Response) return parsed;
+    const result = parsed.result;
 
-    log.info("done", { product: result?.name });
+    log.info("done", { product: (result as any)?.name });
     return new Response(JSON.stringify(result), {
       headers: { ...cors, "Content-Type": "application/json" },
     });

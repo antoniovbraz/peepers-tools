@@ -25,7 +25,7 @@ describe("CreateListingContext", () => {
     expect(ctx!.currentStep).toBe(0);
     expect(ctx!.data.photos).toEqual([]);
     expect(ctx!.data.photoUrls).toEqual([]);
-    expect(ctx!.data.prompts).toHaveLength(7);
+    expect(ctx!.data.prompts).toHaveLength(3);
     expect(ctx!.completedSteps).toEqual([false, false, false, false, false]);
   });
 

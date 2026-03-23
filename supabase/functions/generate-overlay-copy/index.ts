@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, sanitizeArrayForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger } from "../_shared/helpers.ts";
+import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, sanitizeArrayForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger, fetchWithRetry, parseToolCallResult } from "../_shared/helpers.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -54,7 +54,7 @@ Rules:
 - CRITICAL: Each image MUST highlight a COMPLETELY DIFFERENT angle/benefit. NEVER repeat or paraphrase headlines or bullets from other images.
 - If previous copies exist, find a FRESH angle not yet covered.${targetInstruction}`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetchWithRetry("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
@@ -107,18 +107,11 @@ Rules:
     }
 
     const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    let result = null;
-    if (toolCall) {
-      try {
-        result = JSON.parse(toolCall.function.arguments);
-      } catch {
-        throw new Error("Resposta da IA inválida");
-      }
-    }
+    const parsed = parseToolCallResult(data, cors);
+    if (parsed instanceof Response) return parsed;
 
-    log.info("done", { hasResult: !!result });
-    return new Response(JSON.stringify(result), {
+    log.info("done", { hasResult: true });
+    return new Response(JSON.stringify(parsed.result), {
       headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (e) {

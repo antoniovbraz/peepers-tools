@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, sanitizeArrayForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger } from "../_shared/helpers.ts";
+import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, sanitizeArrayForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger, fetchWithRetry, parseToolCallResult } from "../_shared/helpers.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -118,7 +118,7 @@ Every prompt must END with:
 
 Each prompt should be 150-250 words, highly detailed and specific. Do NOT use vague instructions.`;
 
-    const response = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
+    const response = await fetchWithRetry("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
         Authorization: `Bearer ${LOVABLE_API_KEY}`,
@@ -173,13 +173,10 @@ Each prompt should be 150-250 words, highly detailed and specific. Do NOT use va
     }
 
     const data = await response.json();
-    const toolCall = data.choices?.[0]?.message?.tool_calls?.[0];
-    let result = null;
-    if (toolCall) {
-      try { result = JSON.parse(toolCall.function.arguments); } catch { throw new Error("Resposta da IA inválida"); }
-    }
+    const parsed = parseToolCallResult(data, cors);
+    if (parsed instanceof Response) return parsed;
 
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify(parsed.result), {
       headers: { ...cors, "Content-Type": "application/json" },
     });
   } catch (e) {

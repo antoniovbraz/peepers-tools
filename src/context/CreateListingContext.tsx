@@ -37,6 +37,9 @@ export interface OverlayElementData {
   bold?: boolean;
   rotation?: number;
   icon?: string;
+  opacity?: number;
+  textAlign?: "left" | "center" | "right";
+  textStyle?: "none" | "shadow" | "stroke";
 }
 
 export interface ListingData {
