@@ -301,7 +301,7 @@ export default function ImageOverlayEditor({
     const update = () => {
       if (isMobile) {
         const vw = window.innerWidth - 24;
-        const vh = window.innerHeight * 0.45;
+        const vh = window.innerHeight * 0.35;
         setCanvasSize(Math.floor(Math.min(vw, vh)));
       } else {
         setCanvasSize(0);
@@ -1158,7 +1158,7 @@ export default function ImageOverlayEditor({
   const canvasElement = (
     <div
       ref={containerRef}
-      className="relative border rounded-lg overflow-hidden bg-muted aspect-square"
+      className={`relative border rounded-lg overflow-hidden bg-muted aspect-square${!isMobile ? " max-h-full max-w-full" : ""}`}
       style={isMobile && canvasSize > 0 ? { width: canvasSize, height: canvasSize, margin: "0 auto" } : undefined}
     >
       <canvas
@@ -1753,7 +1753,7 @@ export default function ImageOverlayEditor({
           {aiCopyButton}
         </div>
 
-        <div className="shrink-0 px-3 py-2 border-t bg-background pb-[env(safe-area-inset-bottom)]">
+        <div className="shrink-0 px-3 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] border-t bg-background">
           {exportButton}
         </div>
 
@@ -1774,15 +1774,15 @@ export default function ImageOverlayEditor({
   // ── DESKTOP: Dialog with 2-column layout ──
   return (
     <Dialog open={open} onOpenChange={v => !v && onClose()}>
-      <DialogContent className="max-w-5xl max-h-[90vh] flex flex-col overflow-hidden p-6">
+      <DialogContent className="max-w-5xl h-[90vh] flex flex-col overflow-hidden p-6">
         <DialogHeader className="shrink-0">
           <DialogTitle className="text-base font-bold flex items-center gap-2">
             <Type className="w-4 h-4" />
             Editor de Overlay — {role?.label || `Imagem #${imageIndex}`}
           </DialogTitle>
         </DialogHeader>
-        <div className="grid grid-cols-[1fr_360px] gap-4 flex-1 min-h-0 overflow-hidden">
-          <div className="min-h-0 flex flex-col">
+        <div className="grid grid-cols-[1fr_340px] gap-4 flex-1 min-h-0 overflow-hidden">
+          <div className="min-h-0 overflow-hidden flex items-center justify-center">
             {canvasElement}
           </div>
           <div className="min-h-0 flex flex-col overflow-hidden">
