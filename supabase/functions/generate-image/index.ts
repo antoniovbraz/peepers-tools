@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger, fetchWithRetry } from "../_shared/helpers.ts";
+import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger, fetchWithRetry, checkRateLimit } from "../_shared/helpers.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -9,7 +9,10 @@ serve(async (req) => {
   try {
     const auth = await authenticate(req, cors);
     if (auth instanceof Response) return auth;
-    const log = createRequestLogger("generate-image", (auth as { userId: string }).userId);
+    const { userId } = auth as { userId: string };
+    const rateLimited = await checkRateLimit(userId, "generate-image", cors);
+    if (rateLimited) return rateLimited;
+    const log = createRequestLogger("generate-image", userId);
     log.info("start");
 
     const { prompt, referencePhotos, feedback } = await req.json();
@@ -76,6 +79,7 @@ Ensure the product looks IDENTICAL to the reference and NOT reinterpreted.`,
       },
       body: JSON.stringify({
         model: "google/gemini-3.1-flash-image-preview",
+        temperature: 0.9,
         messages: [
           {
             role: "user",
@@ -116,7 +120,7 @@ Ensure the product looks IDENTICAL to the reference and NOT reinterpreted.`,
         const mimeMatch = base64Url.match(/data:(.*?);/);
         const mime = mimeMatch?.[1] || "image/png";
         const ext = mime.includes("png") ? "png" : "jpg";
-        const path = `${(auth as { userId: string }).userId}/${crypto.randomUUID()}.${ext}`;
+        const path = `${userId}/${crypto.randomUUID()}.${ext}`;
 
         const { error: uploadErr } = await supabaseAdmin.storage
           .from("generated-images")

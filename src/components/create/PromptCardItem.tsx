@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { PromptCard } from "@/context/CreateListingContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -39,6 +39,16 @@ export default function PromptCardItem({
   const [feedbackText, setFeedbackText] = useState("");
   const [overlayOpen, setOverlayOpen] = useState(false);
   const uploadRef = useRef<HTMLInputElement | null>(null);
+  const blobUrlRef = useRef<string | null>(null);
+
+  // Revoke blob URLs on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+      }
+    };
+  }, []);
 
   const copyPrompt = () => {
     navigator.clipboard.writeText(p.prompt);
@@ -75,7 +85,11 @@ export default function PromptCardItem({
     if (p.imageUrl?.startsWith("blob:")) {
       URL.revokeObjectURL(p.imageUrl);
     }
+    if (blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+    }
     const blobUrl = URL.createObjectURL(file);
+    blobUrlRef.current = blobUrl;
     onUpdate(p.id, { imageUrl: blobUrl });
 
     // Upload to Storage for persistence
@@ -92,6 +106,7 @@ export default function PromptCardItem({
         .from("generated-images")
         .getPublicUrl(path);
       URL.revokeObjectURL(blobUrl);
+      blobUrlRef.current = null;
       onUpdate(p.id, { imageUrl: urlData.publicUrl });
     } catch (err: any) {
       console.error("Upload to storage failed:", err);

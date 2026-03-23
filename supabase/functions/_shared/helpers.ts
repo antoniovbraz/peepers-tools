@@ -134,6 +134,70 @@ export function handleAIError(
   throw new Error(`AI gateway error: ${status}`);
 }
 
+/* ── Per-User Rate Limiting ── */
+
+const RATE_LIMIT_DEFAULTS: Record<string, number> = {
+  "identify-product": 20,
+  "generate-ads": 30,
+  "generate-prompts": 20,
+  "generate-image": 50,
+  "generate-overlay-copy": 50,
+};
+
+/**
+ * Check per-user rate limit using Supabase. Returns null if allowed,
+ * or an error Response if the user has exceeded their hourly quota.
+ */
+export async function checkRateLimit(
+  userId: string,
+  functionName: string,
+  corsHeaders: Record<string, string>,
+  maxPerHour?: number,
+): Promise<Response | null> {
+  const limit = maxPerHour ?? RATE_LIMIT_DEFAULTS[functionName] ?? 30;
+
+  try {
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+
+    const windowStart = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+
+    const { count, error } = await supabaseAdmin
+      .from("rate_limits")
+      .select("*", { count: "exact", head: true })
+      .eq("user_id", userId)
+      .eq("function_name", functionName)
+      .gte("created_at", windowStart);
+
+    if (error) {
+      // If table doesn't exist or query fails, allow the request (fail-open)
+      console.warn("Rate limit check failed:", error.message);
+      return null;
+    }
+
+    if ((count ?? 0) >= limit) {
+      return errorResponse(
+        `Limite de requisições atingido (${limit}/hora). Tente novamente em alguns minutos.`,
+        429,
+        corsHeaders,
+      );
+    }
+
+    // Record this request
+    await supabaseAdmin
+      .from("rate_limits")
+      .insert({ user_id: userId, function_name: functionName });
+
+    return null;
+  } catch (err) {
+    // Fail-open: if rate limiting breaks, don't block the user
+    console.warn("Rate limit error:", (err as Error).message);
+    return null;
+  }
+}
+
 /* ── Fetch with Retry + Timeout ── */
 
 const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);

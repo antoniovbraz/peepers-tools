@@ -62,9 +62,31 @@ export default function StepAds() {
         <h2 className="font-display text-lg font-bold">Gerando anúncios...</h2>
         <p className="text-sm text-muted-foreground text-center">Criando textos otimizados para Mercado Livre e Shopee</p>
         <div className="w-48 h-1.5 rounded-full bg-muted overflow-hidden">
-          <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: "50%" }} />
+          <div className="h-full bg-primary rounded-full animate-[pulse_2s_ease-in-out_infinite]" style={{ width: "50%" }} />
         </div>
         <p className="text-xs text-muted-foreground">Estimativa: ~8 segundos</p>
+
+        {/* Skeleton preview of expected result */}
+        <div className="w-full max-w-md space-y-3 mt-4">
+          <div className="bg-card rounded-xl border p-4 space-y-3">
+            <div className="h-5 w-28 bg-muted rounded animate-pulse" />
+            <div className="h-8 w-full bg-muted rounded animate-pulse" />
+            <div className="space-y-1.5">
+              <div className="h-4 w-full bg-muted/60 rounded animate-pulse" />
+              <div className="h-4 w-5/6 bg-muted/60 rounded animate-pulse" />
+              <div className="h-4 w-4/6 bg-muted/60 rounded animate-pulse" />
+            </div>
+          </div>
+          <div className="bg-card rounded-xl border p-4 space-y-3">
+            <div className="h-5 w-20 bg-muted rounded animate-pulse" />
+            <div className="h-8 w-full bg-muted rounded animate-pulse" />
+            <div className="space-y-1.5">
+              <div className="h-4 w-full bg-muted/60 rounded animate-pulse" />
+              <div className="h-4 w-3/4 bg-muted/60 rounded animate-pulse" />
+            </div>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground/60 italic mt-2">💡 Dica: você poderá editar todos os textos depois</p>
       </div>
     );
   }

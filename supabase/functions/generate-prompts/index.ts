@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, sanitizeArrayForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger, fetchWithRetry, parseToolCallResult } from "../_shared/helpers.ts";
+import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, sanitizeArrayForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger, fetchWithRetry, parseToolCallResult, checkRateLimit } from "../_shared/helpers.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -8,7 +8,10 @@ serve(async (req) => {
   try {
     const auth = await authenticate(req, cors);
     if (auth instanceof Response) return auth;
-    const log = createRequestLogger("generate-prompts", (auth as { userId: string }).userId);
+    const { userId } = auth as { userId: string };
+    const rateLimited = await checkRateLimit(userId, "generate-prompts", cors);
+    if (rateLimited) return rateLimited;
+    const log = createRequestLogger("generate-prompts", userId);
     log.info("start");
 
     const { productName, category, characteristics, extras, adTitle } = await req.json();
@@ -126,6 +129,7 @@ Each prompt should be 150-250 words, highly detailed and specific. Do NOT use va
       },
       body: JSON.stringify({
         model: "google/gemini-2.5-flash",
+        temperature: 0.7,
         messages: [
           { role: "system", content: systemPrompt },
           { role: "user", content: `Crie o Visual DNA e 7 prompts de imagem para este produto:\n\n${productInfo}` },

@@ -170,9 +170,28 @@ export default function StepPrompts() {
         <h2 className="font-display text-lg font-bold">Gerando prompts...</h2>
         <p className="text-sm text-muted-foreground text-center">Criando {MAX_PROMPTS} prompts de imagem com Visual DNA para seu produto</p>
         <div className="w-48 h-1.5 rounded-full bg-muted overflow-hidden">
-          <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: "40%" }} />
+          <div className="h-full bg-primary rounded-full animate-[pulse_2s_ease-in-out_infinite]" style={{ width: "40%" }} />
         </div>
         <p className="text-xs text-muted-foreground">Estimativa: ~10 segundos</p>
+
+        {/* Skeleton preview of prompt cards */}
+        <div className="w-full max-w-lg space-y-3 mt-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="bg-card rounded-xl border p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="h-4 w-20 bg-muted rounded animate-pulse" />
+                <div className="h-5 w-16 bg-muted rounded animate-pulse" />
+              </div>
+              <div className="space-y-1.5">
+                <div className="h-4 w-full bg-muted/60 rounded animate-pulse" />
+                <div className="h-4 w-5/6 bg-muted/60 rounded animate-pulse" />
+                <div className="h-4 w-3/4 bg-muted/60 rounded animate-pulse" />
+              </div>
+              <div className="h-9 w-full bg-muted/40 rounded animate-pulse" />
+            </div>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground/60 italic mt-2">💡 Dica: a IA analisa seu produto para criar composições visuais únicas</p>
       </div>
     );
   }

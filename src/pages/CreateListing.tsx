@@ -6,12 +6,17 @@ import StepIdentify from "@/components/create/StepIdentify";
 import StepAds from "@/components/create/StepAds";
 import StepPrompts from "@/components/create/StepPrompts";
 import StepExport from "@/components/create/StepExport";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const steps = [StepUpload, StepIdentify, StepAds, StepPrompts, StepExport];
 
 function CreateListingInner() {
   const { currentStep } = useCreateListing();
   const StepComponent = steps[currentStep];
+
+  // Wrap image-heavy steps (Prompts=3, Export=4) with dedicated ErrorBoundary
+  // so canvas/image crashes don't lose the entire wizard state
+  const needsBoundary = currentStep >= 3;
 
   return (
     <div className="max-w-3xl mx-auto">
@@ -24,7 +29,13 @@ function CreateListingInner() {
           exit={{ opacity: 0, x: -20 }}
           transition={{ duration: 0.2, ease: "easeInOut" }}
         >
-          <StepComponent />
+          {needsBoundary ? (
+            <ErrorBoundary key={`boundary-${currentStep}`}>
+              <StepComponent />
+            </ErrorBoundary>
+          ) : (
+            <StepComponent />
+          )}
         </motion.div>
       </AnimatePresence>
     </div>

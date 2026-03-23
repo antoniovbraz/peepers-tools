@@ -1,6 +1,9 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { toast } from "@/hooks/use-toast";
+import type { OverlayElement } from "@/lib/overlayTemplates";
 
+/** @deprecated Use OverlayElement from overlayTemplates instead. Kept as alias for backwards compatibility. */
+export type OverlayElementData = OverlayElement;
 
 export interface PromptCard {
   id: number;
@@ -22,24 +25,6 @@ export interface VisualDNA {
   tone: string;
   accentColor: string;
   headlineColor: string;
-}
-
-export interface OverlayElementData {
-  id: string;
-  type: "headline" | "subheadline" | "bullet" | "badge" | "arrow" | "circle";
-  text?: string;
-  x: number;
-  y: number;
-  width?: number;
-  fontSize?: number;
-  color?: string;
-  bgColor?: string;
-  bold?: boolean;
-  rotation?: number;
-  icon?: string;
-  opacity?: number;
-  textAlign?: "left" | "center" | "right";
-  textStyle?: "none" | "shadow" | "stroke";
 }
 
 export interface ListingData {
