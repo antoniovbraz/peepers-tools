@@ -1732,7 +1732,7 @@ export default function ImageOverlayEditor({
           {toolbarElement}
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 pb-24 space-y-3">
+        <div className="flex-1 overflow-y-auto px-3 pb-4 space-y-3">
           <Collapsible open={layersOpen} onOpenChange={setLayersOpen}>
             <CollapsibleTrigger asChild>
               <Button variant="ghost" size="sm" className="w-full justify-between text-xs h-10">
