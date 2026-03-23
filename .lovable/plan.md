@@ -1,45 +1,35 @@
 
 
-## Gerar AUDIT_PROMPT atualizado como Markdown para download
+## Fix: Modal content clipping and save button visibility
 
-Vou gerar o arquivo `/mnt/documents/AUDIT_PROMPT_v2.md` com o conteúdo original do audit prompt + as seguintes adições/correções:
+### Problem
+1. **Mobile**: The save button at the bottom may be hidden behind system UI or not visible due to layout issues.
+2. **Desktop**: The `DialogContent` with `max-h-[95vh] overflow-hidden` clips content. The `ScrollArea` uses `max-h-[calc(95vh-120px)]` which may not account for the full header + padding, causing the export button at the bottom of the scroll area to be cut off.
 
-### Correções
-- **localStorage está correto** — confirmei no código que `CreateListingContext.tsx` usa `localStorage` (não sessionStorage). Nenhuma correção necessária aqui.
+### Root Cause
+- **Desktop**: `overflow-hidden` on `DialogContent` + insufficient height calculation in `ScrollArea`. The `120px` offset doesn't account for DialogHeader + padding + gap accurately.
+- **Mobile**: `pb-24` on the scrollable area is meant to prevent overlap with the fixed bottom bar, but the bottom bar itself (`shrink-0 px-3 py-2 border-t`) may be pushed off-screen if the layout doesn't constrain properly.
 
-### Adições
+### Solution
 
-**1. Nova seção "MUDANÇAS RECENTES" (após "O QUE NÃO QUEBRAR")**
+**File: `src/components/create/ImageOverlayEditor.tsx`**
 
-Documenta os 6 fixes implementados para que os auditores não reproponham soluções já existentes:
+**Desktop (line ~1777):**
+- Change `DialogContent` to use flex column layout with `overflow-hidden` and proper height constraints
+- Replace `ScrollArea max-h-[calc(95vh-120px)]` with flex-based overflow that naturally fills remaining space
+- Make the grid use `min-h-0` and `overflow-hidden` so the scroll area can shrink properly
 
-- **Fix 1 — dragMovedRef**: Mobile tap vs drag disambiguation. `dragMovedRef` em `ImageOverlayEditor.tsx:287`. Sheet só abre em `endDrag` se `!dragMovedRef.current`.
-- **Fix 2 — Edição em grupo**: Painel bulk edit para 2+ elementos checked. Cor, fontSize, bold, opacidade, delete. `updateCheckedElements()` linha ~974.
-- **Fix 3 — Badges na IA**: `generate-overlay-copy/index.ts` agora tem campo `badges` no schema da tool. Client mapeia `data.badges` → elementos tipo `badge`.
-- **Fix 4 — Snap inteligente**: `getSnappedPos()` testa 3 âncoras por eixo (left/center/right, top/center/bottom). Helper `getElementSizePercent()` linha ~185.
-- **Fix 5 — Toolbar de alinhamento/distribuição**: `alignElements()` e `distributeElements()` com lógica canvas (1 elemento) vs grupo (2+). 8 botões. Linhas ~886-971.
-- **Fix 6 — Clamp geral**: Posições clampadas entre 0 e 100-elSize em moveDrag e alinhamento.
+```
+DialogContent: "max-w-5xl max-h-[90vh] flex flex-col overflow-hidden p-6"
+Grid: "grid grid-cols-[1fr_360px] gap-4 flex-1 min-h-0 overflow-hidden"
+ScrollArea: "h-full" (instead of calc-based max-h)
+Right column: "min-h-0 flex flex-col overflow-hidden"
+```
 
-**2. Atualizar seção "COMPONENTE CRÍTICO" (item 4)**
+**Mobile (lines ~1716-1770):**
+- Ensure the fixed bottom export button uses safe area insets: `pb-[env(safe-area-inset-bottom)]`
+- Reduce `pb-24` to `pb-4` on scroll area since the bottom bar is already a separate `shrink-0` element outside the scroll
 
-Mudar de "Snap em linhas-guia (5%, 50%, 95%)" para: "Snap inteligente com 3 âncoras por eixo (left/center/right) nas linhas-guia (5%, 50%, 95%) via `getElementSizePercent()` + clamp de bounds."
-
-**3. Atualizar tabela de Edge Functions**
-
-Adicionar nota no `generate-overlay-copy`: inclui campo `badges` (array) no schema da tool function.
-
-**4. Nova seção em Etapa 1.3 — Verificação de RLS Policies**
-
-Adicionar item: "RLS policies: verificar se todas as tabelas com dados de usuário têm policies adequadas. Verificar se `user_id` é NOT NULL em tabelas com RLS."
-
-**5. Atualizar "O QUE NÃO QUEBRAR"**
-
-Adicionar:
-- `dragMovedRef` — gate de tap vs drag no mobile, remover quebra UX touch
-- `getElementSizePercent` + snap de 3 âncoras — reverter causa bug de posicionamento original
-- Schema `badges` na edge function — sem ele, IA não popula badges
-
-### Arquivo gerado
-
-`/mnt/documents/AUDIT_PROMPT_v2.md` — versão completa atualizada, pronta para enviar à equipe de auditoria.
+### Changes
+Single file edit: `src/components/create/ImageOverlayEditor.tsx`, lines 1775-1802 (desktop) and 1735, 1756 (mobile).
 
