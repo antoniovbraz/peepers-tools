@@ -1,1 +1,0 @@
-CREATE INDEX IF NOT EXISTS idx_listings_user_created ON public.listings (user_id, created_at DESC);
