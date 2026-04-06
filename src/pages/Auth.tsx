@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import logo from "@/assets/logo.png";
 import { Navigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -7,7 +7,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
-import { Mail, Lock, LogIn } from "lucide-react";
+import { Mail, Lock, LogIn, KeyRound } from "lucide-react";
 
 export default function Auth() {
   const { session, loading } = useAuth();
@@ -16,11 +16,95 @@ export default function Auth() {
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [resettingPassword, setResettingPassword] = useState(false);
+  const [isRecovery, setIsRecovery] = useState(false);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmNewPassword, setConfirmNewPassword] = useState("");
+  const [updatingPassword, setUpdatingPassword] = useState(false);
+
+  // Listen for PASSWORD_RECOVERY auth state — must be above any conditional returns
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setIsRecovery(true);
+      }
+    });
+    return () => subscription.unsubscribe();
+  }, []);
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60dvh]">
         <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
+
+  // Password recovery flow — show new-password form
+  if (isRecovery) {
+    const handleUpdatePassword = async (e: React.FormEvent) => {
+      e.preventDefault();
+      if (newPassword !== confirmNewPassword) {
+        toast({ title: "As senhas não coincidem", variant: "destructive" });
+        return;
+      }
+      if (newPassword.length < 6) {
+        toast({ title: "Senha muito curta", description: "Mínimo 6 caracteres.", variant: "destructive" });
+        return;
+      }
+      setUpdatingPassword(true);
+      try {
+        const { error } = await supabase.auth.updateUser({ password: newPassword });
+        if (error) throw error;
+        toast({ title: "Senha atualizada!", description: "Sua nova senha foi definida com sucesso." });
+        setIsRecovery(false);
+      } catch (err: any) {
+        toast({ title: "Erro", description: err.message || "Não foi possível atualizar a senha.", variant: "destructive" });
+      } finally {
+        setUpdatingPassword(false);
+      }
+    };
+
+    return (
+      <div className="min-h-[100dvh] flex items-center justify-center px-6 py-10">
+        <div className="w-full max-w-sm space-y-6">
+          <div className="text-center space-y-2">
+            <div className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-primary/10 mx-auto">
+              <KeyRound className="w-7 h-7 text-primary" />
+            </div>
+            <h1 className="font-display text-2xl font-bold text-foreground">Redefinir Senha</h1>
+            <p className="text-sm text-muted-foreground">Digite sua nova senha abaixo</p>
+          </div>
+          <form onSubmit={handleUpdatePassword} className="space-y-3">
+            <div className="relative">
+              <Lock className="absolute left-3 top-3.5 w-4 h-4 text-muted-foreground" />
+              <Input
+                type="password"
+                placeholder="Nova senha"
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                className="pl-10 h-12"
+                required
+                minLength={6}
+              />
+            </div>
+            <div className="relative">
+              <Lock className="absolute left-3 top-3.5 w-4 h-4 text-muted-foreground" />
+              <Input
+                type="password"
+                placeholder="Confirmar nova senha"
+                value={confirmNewPassword}
+                onChange={e => setConfirmNewPassword(e.target.value)}
+                className="pl-10 h-12"
+                required
+                minLength={6}
+              />
+            </div>
+            <Button type="submit" disabled={updatingPassword} className="w-full h-12 gap-2 font-semibold">
+              <KeyRound className="w-4 h-4" />
+              {updatingPassword ? "Salvando..." : "Salvar nova senha"}
+            </Button>
+          </form>
+        </div>
       </div>
     );
   }
@@ -62,7 +146,7 @@ export default function Auth() {
     setResettingPassword(true);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: window.location.origin,
+        redirectTo: `${window.location.origin}/auth`,
       });
       if (error) throw error;
       toast({ title: "Email enviado!", description: "Verifique sua caixa de entrada para redefinir a senha." });

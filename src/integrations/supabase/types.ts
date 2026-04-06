@@ -14,6 +14,103 @@ export type Database = {
   }
   public: {
     Tables: {
+      ads: {
+        Row: {
+          created_at: string
+          description: string
+          id: string
+          marketplace: string
+          product_id: string
+          status: string
+          title: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string
+          id?: string
+          marketplace: string
+          product_id: string
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          id?: string
+          marketplace?: string
+          product_id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ads_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      creatives: {
+        Row: {
+          approved: boolean
+          created_at: string
+          feedback: string | null
+          id: string
+          image_url: string | null
+          overlay_elements: Json | null
+          overlay_url: string | null
+          product_id: string
+          prompt: string
+          role: string | null
+          sort_order: number
+          user_id: string
+        }
+        Insert: {
+          approved?: boolean
+          created_at?: string
+          feedback?: string | null
+          id?: string
+          image_url?: string | null
+          overlay_elements?: Json | null
+          overlay_url?: string | null
+          product_id: string
+          prompt?: string
+          role?: string | null
+          sort_order?: number
+          user_id: string
+        }
+        Update: {
+          approved?: boolean
+          created_at?: string
+          feedback?: string | null
+          id?: string
+          image_url?: string | null
+          overlay_elements?: Json | null
+          overlay_url?: string | null
+          product_id?: string
+          prompt?: string
+          role?: string | null
+          sort_order?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "creatives_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       listings: {
         Row: {
           ad_mercadolivre_description: string | null
@@ -64,6 +161,81 @@ export type Database = {
           prompts?: Json | null
           status?: string
           updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      products: {
+        Row: {
+          category: string
+          characteristics: string[] | null
+          created_at: string
+          ean: string | null
+          extras: string | null
+          id: string
+          internal_sku: string | null
+          name: string
+          original_sku: string | null
+          photo_urls: string[] | null
+          sku_mapping_note: string | null
+          status: string
+          updated_at: string
+          user_id: string
+          visual_dna: Json | null
+        }
+        Insert: {
+          category?: string
+          characteristics?: string[] | null
+          created_at?: string
+          ean?: string | null
+          extras?: string | null
+          id?: string
+          internal_sku?: string | null
+          name?: string
+          original_sku?: string | null
+          photo_urls?: string[] | null
+          sku_mapping_note?: string | null
+          status?: string
+          updated_at?: string
+          user_id: string
+          visual_dna?: Json | null
+        }
+        Update: {
+          category?: string
+          characteristics?: string[] | null
+          created_at?: string
+          ean?: string | null
+          extras?: string | null
+          id?: string
+          internal_sku?: string | null
+          name?: string
+          original_sku?: string | null
+          photo_urls?: string[] | null
+          sku_mapping_note?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string
+          visual_dna?: Json | null
+        }
+        Relationships: []
+      }
+      rate_limits: {
+        Row: {
+          created_at: string
+          function_name: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          function_name: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          function_name?: string
+          id?: string
           user_id?: string
         }
         Relationships: []

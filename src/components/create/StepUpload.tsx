@@ -1,7 +1,7 @@
 import { useRef, useCallback, useState } from "react";
 import { useCreateListing } from "@/context/CreateListingContext";
 import { useAuth } from "@/context/AuthContext";
-import { Camera, X, ArrowRight, Loader2 } from "lucide-react";
+import { Camera, X, ArrowRight, Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -14,6 +14,7 @@ export default function StepUpload() {
   const { user } = useAuth();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
 
   const uploadToStorage = useCallback(async (file: File): Promise<string> => {
     if (!user) throw new Error("Não autenticado");
@@ -58,7 +59,18 @@ export default function StepUpload() {
     }
   }, [data.photos, data.photoUrls, updatePhotos, uploadToStorage, user]);
 
-  const removePhoto = useCallback((index: number) => {
+  const removePhoto = useCallback(async (index: number) => {
+    const url = data.photoUrls[index];
+    // Attempt to delete from Supabase Storage (best-effort)
+    if (url) {
+      const marker = "/product-photos/";
+      const markerIdx = url.indexOf(marker);
+      if (markerIdx !== -1) {
+        const path = url.slice(markerIdx + marker.length);
+        // Fire-and-forget — don't block the UI on this
+        supabase.storage.from("product-photos").remove([path]).catch(console.error);
+      }
+    }
     const newFiles = data.photos.filter((_, i) => i !== index);
     const newUrls = data.photoUrls.filter((_, i) => i !== index);
     updatePhotos(newFiles, newUrls);
@@ -80,27 +92,46 @@ export default function StepUpload() {
         </p>
       </div>
 
-      <button
-        onClick={() => inputRef.current?.click()}
-        disabled={uploading}
-        className="w-full border-2 border-dashed border-primary/30 rounded-xl p-8 flex flex-col items-center gap-3 bg-primary/5 hover:bg-primary/10 transition-colors active:scale-[0.98] disabled:opacity-50"
+      <div
+        role="button"
+        tabIndex={0}
+        onClick={() => !uploading && inputRef.current?.click()}
+        onKeyDown={e => { if (e.key === "Enter" || e.key === " ") inputRef.current?.click(); }}
+        onDragOver={e => { e.preventDefault(); if (!isDragging) setIsDragging(true); }}
+        onDragEnter={e => { e.preventDefault(); setIsDragging(true); }}
+        onDragLeave={e => { e.preventDefault(); setIsDragging(false); }}
+        onDrop={e => {
+          e.preventDefault();
+          setIsDragging(false);
+          addFiles(e.dataTransfer.files);
+        }}
+        className={`w-full border-2 border-dashed rounded-xl p-8 flex flex-col items-center gap-3 transition-colors cursor-pointer select-none
+          ${isDragging ? "border-primary bg-primary/15" : "border-primary/30 bg-primary/5 hover:bg-primary/10"}
+          ${uploading ? "opacity-50 pointer-events-none" : ""}`}
       >
         {uploading ? (
           <>
             <Loader2 className="w-7 h-7 text-primary animate-spin" />
             <span className="text-sm font-medium text-primary">Enviando fotos...</span>
           </>
+        ) : isDragging ? (
+          <>
+            <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
+              <Upload className="w-7 h-7 text-primary" />
+            </div>
+            <span className="text-sm font-medium text-primary">Solte as fotos aqui</span>
+          </>
         ) : (
           <>
             <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center">
               <Camera className="w-7 h-7 text-primary" />
             </div>
-            <span className="text-sm font-medium text-primary hidden md:inline">Clique para adicionar fotos</span>
+            <span className="text-sm font-medium text-primary hidden md:inline">Clique ou arraste fotos aqui</span>
             <span className="text-sm font-medium text-primary md:hidden">Toque para adicionar fotos</span>
           </>
         )}
         <span className="text-xs text-muted-foreground">{data.photos.length}/{MAX_FILES} fotos · máx 10MB cada</span>
-      </button>
+      </div>
       <input
         ref={inputRef}
         type="file"

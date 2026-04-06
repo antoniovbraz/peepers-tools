@@ -46,12 +46,13 @@ serve(async (req) => {
             role: "system",
             content: `${LLM_SAFETY_INSTRUCTION}\n\nVocê é um especialista em identificação de produtos para e-commerce brasileiro.
 Analise as fotos do produto e retorne informações detalhadas.
-Responda APENAS em português brasileiro.`,
+Responda APENAS em português brasileiro.
+Se visível na embalagem, extraia o código de barras/EAN/GTIN (13 dígitos) e o SKU do fabricante. Se não visíveis, retorne null para esses campos.`,
           },
           {
             role: "user",
             content: [
-              { type: "text", text: "Identifique este produto com base nas fotos. Retorne: nome do produto, categoria, e uma lista de características principais." },
+              { type: "text", text: "Identifique este produto com base nas fotos. Retorne: nome do produto, categoria, lista de características principais, e se visível na embalagem, o código EAN/GTIN e o SKU do fabricante." },
               ...imageContent,
             ],
           },
@@ -72,9 +73,16 @@ Responda APENAS em português brasileiro.`,
                     items: { type: "string" },
                     description: "Lista de características do produto",
                   },
+                  ean: {
+                    type: ["string", "null"],
+                    description: "Código EAN/GTIN de 13 dígitos visível na embalagem. Null se não visível.",
+                  },
+                  original_sku: {
+                    type: ["string", "null"],
+                    description: "SKU ou código do fabricante impresso na embalagem. Null se não visível.",
+                  },
                 },
                 required: ["name", "category", "characteristics"],
-                additionalProperties: false,
               },
             },
           },

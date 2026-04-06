@@ -1,9 +1,10 @@
 import { useState, useEffect } from "react";
-import { ClipboardList, Trash2, Eye, Copy, Loader2, Package } from "lucide-react";
+import { ClipboardList, Trash2, Eye, Copy, Loader2, Package, Search } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import {
   Dialog,
@@ -23,46 +24,60 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 
-interface PromptData {
-  prompt?: string;
-  approved?: boolean;
-  imageUrl?: string;
-}
-
-interface Listing {
+interface Product {
   id: string;
-  product_name: string;
+  name: string;
   category: string;
   characteristics: string[] | null;
   extras: string | null;
-  ad_mercadolivre_title: string | null;
-  ad_mercadolivre_description: string | null;
-  ad_shopee_title: string | null;
-  ad_shopee_description: string | null;
   photo_urls: string[] | null;
-  prompts: any;
+  ean: string | null;
+  original_sku: string | null;
+  internal_sku: string | null;
   status: string;
   created_at: string;
+}
+
+interface Ad {
+  id: string;
+  marketplace: string;
+  title: string;
+  description: string;
+}
+
+interface Creative {
+  id: string;
+  prompt: string;
+  image_url: string | null;
+  approved: boolean;
+  sort_order: number;
+}
+
+interface ProductDetail extends Product {
+  ads: Ad[];
+  creatives: Creative[];
 }
 
 const PAGE_SIZE = 20;
 
 export default function History() {
   const { user } = useAuth();
-  const [listings, setListings] = useState<Listing[]>([]);
+  const [products, setProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [hasMore, setHasMore] = useState(true);
-  const [selected, setSelected] = useState<Listing | null>(null);
+  const [selected, setSelected] = useState<ProductDetail | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [search, setSearch] = useState("");
 
-  const fetchListings = async (offset = 0, append = false) => {
+  const fetchProducts = async (offset = 0, append = false) => {
     if (!user) return;
     if (!append) setLoading(true);
     else setLoadingMore(true);
 
     const { data, error } = await supabase
-      .from("listings")
-      .select("*")
+      .from("products")
+      .select("id, name, category, characteristics, extras, photo_urls, ean, original_sku, internal_sku, status, created_at")
       .eq("user_id", user.id)
       .order("created_at", { ascending: false })
       .range(offset, offset + PAGE_SIZE - 1);
@@ -71,11 +86,11 @@ export default function History() {
       console.error(error);
       toast({ title: "Erro ao carregar histórico", variant: "destructive" });
     } else {
-      const rows = data || [];
+      const rows = (data || []) as Product[];
       if (append) {
-        setListings(prev => [...prev, ...rows]);
+        setProducts(prev => [...prev, ...rows]);
       } else {
-        setListings(rows);
+        setProducts(rows);
       }
       setHasMore(rows.length === PAGE_SIZE);
     }
@@ -84,51 +99,89 @@ export default function History() {
   };
 
   useEffect(() => {
-    fetchListings();
+    fetchProducts();
   }, [user]);
 
   const loadMore = () => {
-    fetchListings(listings.length, true);
+    fetchProducts(products.length, true);
   };
 
-  const deleteListing = async (id: string) => {
-    const { error } = await supabase.from("listings").delete().eq("id", id);
+  const openDetail = async (product: Product) => {
+    setLoadingDetail(true);
+    setSelected({ ...product, ads: [], creatives: [] });
+
+    const [adsRes, creativesRes] = await Promise.all([
+      supabase.from("ads").select("id, marketplace, title, description").eq("product_id", product.id).order("marketplace"),
+      supabase.from("creatives").select("id, prompt, image_url, approved, sort_order").eq("product_id", product.id).order("sort_order"),
+    ]);
+
+    setSelected({
+      ...product,
+      ads: (adsRes.data || []) as Ad[],
+      creatives: (creativesRes.data || []) as Creative[],
+    });
+    setLoadingDetail(false);
+  };
+
+  const deleteProduct = async (id: string) => {
+    // Cascade deletes ads + creatives automatically
+    const { error } = await supabase.from("products").delete().eq("id", id);
     if (error) {
       toast({ title: "Erro ao deletar", variant: "destructive" });
     } else {
-      setListings(prev => prev.filter(l => l.id !== id));
-      toast({ title: "Anúncio deletado" });
+      setProducts(prev => prev.filter(p => p.id !== id));
+      if (selected?.id === id) setSelected(null);
+      toast({ title: "Produto deletado" });
     }
   };
 
-  const duplicateListing = async (listing: Listing) => {
+  const duplicateProduct = async (product: Product) => {
     if (!user) return;
-    const { error } = await supabase.from("listings").insert({
-      user_id: user.id,
-      product_name: listing.product_name,
-      category: listing.category,
-      characteristics: listing.characteristics,
-      extras: listing.extras,
-      ad_mercadolivre_title: listing.ad_mercadolivre_title,
-      ad_mercadolivre_description: listing.ad_mercadolivre_description,
-      ad_shopee_title: listing.ad_shopee_title,
-      ad_shopee_description: listing.ad_shopee_description,
-      photo_urls: listing.photo_urls,
-      prompts: listing.prompts,
-      status: "draft",
-    });
-    if (error) {
+    // 1. Insert duplicate product
+    const { data: newProduct, error: productError } = await supabase
+      .from("products")
+      .insert({
+        user_id: user.id,
+        name: product.name,
+        category: product.category,
+        characteristics: product.characteristics,
+        extras: product.extras,
+        ean: product.ean,
+        original_sku: product.original_sku,
+        internal_sku: product.internal_sku,
+        photo_urls: product.photo_urls,
+        status: "draft",
+      })
+      .select("id")
+      .single();
+
+    if (productError) {
       toast({ title: "Erro ao duplicar", variant: "destructive" });
-    } else {
-      toast({ title: "Anúncio duplicado!" });
-      fetchListings();
+      return;
     }
+
+    // 2. Copy ads
+    const { data: existingAds } = await supabase.from("ads").select("marketplace, title, description").eq("product_id", product.id);
+    if (existingAds && existingAds.length > 0) {
+      await supabase.from("ads").insert(existingAds.map(a => ({ ...a, product_id: newProduct.id, user_id: user.id, status: "draft" })));
+    }
+
+    // 3. Copy creatives
+    const { data: existingCreatives } = await supabase.from("creatives").select("prompt, image_url, approved, sort_order").eq("product_id", product.id);
+    if (existingCreatives && existingCreatives.length > 0) {
+      await supabase.from("creatives").insert(existingCreatives.map(c => ({ ...c, product_id: newProduct.id, user_id: user.id })));
+    }
+
+    toast({ title: "Produto duplicado!" });
+    fetchProducts();
   };
 
-  const getApprovedImages = (prompts: any): PromptData[] => {
-    if (!Array.isArray(prompts)) return [];
-    return prompts.filter((p: any) => p?.approved && p?.imageUrl);
-  };
+  const filteredProducts = search.trim()
+    ? products.filter(p =>
+        p.name.toLowerCase().includes(search.toLowerCase()) ||
+        p.category.toLowerCase().includes(search.toLowerCase())
+      )
+    : products;
 
   if (loading) {
     return (
@@ -139,7 +192,7 @@ export default function History() {
     );
   }
 
-  if (listings.length === 0) {
+  if (products.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-20 px-4 gap-4">
         <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
@@ -147,7 +200,7 @@ export default function History() {
         </div>
         <div className="text-center space-y-1">
           <h2 className="font-display text-xl font-bold text-foreground">Histórico</h2>
-          <p className="text-sm text-muted-foreground">Seus anúncios criados aparecerão aqui</p>
+          <p className="text-sm text-muted-foreground">Seus produtos criados aparecerão aqui</p>
         </div>
       </div>
     );
@@ -157,34 +210,44 @@ export default function History() {
     <div className="px-4 sm:px-6 py-6 space-y-4 max-w-7xl mx-auto">
       <h2 className="font-display text-xl md:text-2xl font-bold text-foreground">Histórico</h2>
 
+      <div className="relative">
+        <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+        <Input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Buscar por nome ou categoria..."
+          className="pl-9"
+        />
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-        {listings.map(listing => (
-          <div key={listing.id} className="bg-card rounded-xl border p-4 space-y-3 hover:shadow-md transition-shadow">
+        {filteredProducts.map(product => (
+          <div key={product.id} className="bg-card rounded-xl border p-4 space-y-3 hover:shadow-md transition-shadow">
             <div className="flex items-start gap-3">
               <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
-                {listing.photo_urls?.[0] ? (
-                  <img src={listing.photo_urls[0]} alt="" className="w-12 h-12 rounded-lg object-cover" />
+                {product.photo_urls?.[0] ? (
+                  <img src={product.photo_urls[0]} alt="" className="w-12 h-12 rounded-lg object-cover" />
                 ) : (
                   <Package className="w-5 h-5 text-muted-foreground" />
                 )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-semibold text-sm truncate">{listing.product_name || "Sem nome"}</p>
-                <p className="text-xs text-muted-foreground">{listing.category}</p>
+                <p className="font-semibold text-sm truncate">{product.name || "Sem nome"}</p>
+                <p className="text-xs text-muted-foreground">{product.category}</p>
                 <p className="text-xs text-muted-foreground">
-                  {new Date(listing.created_at).toLocaleDateString("pt-BR")}
+                  {new Date(product.created_at).toLocaleDateString("pt-BR")}
                 </p>
               </div>
-              <Badge variant={listing.status === "completed" ? "default" : "secondary"} className="text-xs flex-shrink-0">
-                {listing.status === "completed" ? "Concluído" : "Rascunho"}
+              <Badge variant={product.status === "completed" ? "default" : "secondary"} className="text-xs flex-shrink-0">
+                {product.status === "completed" ? "Concluído" : "Rascunho"}
               </Badge>
             </div>
 
             <div className="flex gap-2">
-              <Button size="sm" variant="outline" className="flex-1 gap-1 text-xs" onClick={() => setSelected(listing)}>
+              <Button size="sm" variant="outline" className="flex-1 gap-1 text-xs" onClick={() => openDetail(product)}>
                 <Eye className="w-3.5 h-3.5" /> Ver
               </Button>
-              <Button size="sm" variant="outline" className="gap-1 text-xs" onClick={() => duplicateListing(listing)}>
+              <Button size="sm" variant="outline" className="gap-1 text-xs" onClick={() => duplicateProduct(product)}>
                 <Copy className="w-3.5 h-3.5" />
               </Button>
               <AlertDialog>
@@ -195,12 +258,12 @@ export default function History() {
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Deletar anúncio?</AlertDialogTitle>
-                    <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
+                    <AlertDialogTitle>Deletar produto?</AlertDialogTitle>
+                    <AlertDialogDescription>Esta ação removerá o produto, anúncios e imagens. Não pode ser desfeita.</AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                    <AlertDialogAction onClick={() => deleteListing(listing.id)}>Deletar</AlertDialogAction>
+                    <AlertDialogAction onClick={() => deleteProduct(product.id)}>Deletar</AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
               </AlertDialog>
@@ -209,7 +272,11 @@ export default function History() {
         ))}
       </div>
 
-      {hasMore && (
+      {filteredProducts.length === 0 && search && (
+        <p className="text-center text-sm text-muted-foreground py-8">Nenhum produto encontrado para "{search}"</p>
+      )}
+
+      {hasMore && !search && (
         <Button
           variant="outline"
           className="w-full h-11 gap-2 text-sm"
@@ -221,13 +288,18 @@ export default function History() {
         </Button>
       )}
 
-      <Dialog open={!!selected} onOpenChange={() => setSelected(null)}>
+      <Dialog open={!!selected} onOpenChange={open => { if (!open) setSelected(null); }}>
         <DialogContent className="max-h-[80vh] overflow-y-auto sm:max-w-lg md:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>{selected?.product_name}</DialogTitle>
+            <DialogTitle>{selected?.name}</DialogTitle>
           </DialogHeader>
           {selected && (
             <div className="space-y-4 text-sm">
+              {loadingDetail && (
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="w-4 h-4 animate-spin" /> Carregando detalhes...
+                </div>
+              )}
               <div>
                 <p className="font-semibold text-muted-foreground text-xs uppercase mb-1">Categoria</p>
                 <p>{selected.category}</p>
@@ -242,20 +314,31 @@ export default function History() {
                   </div>
                 </div>
               )}
-              {selected.ad_mercadolivre_title && (
-                <div>
-                  <p className="font-semibold text-muted-foreground text-xs uppercase mb-1">Mercado Livre</p>
-                  <p className="font-medium">{selected.ad_mercadolivre_title}</p>
-                  <p className="text-muted-foreground mt-1 whitespace-pre-wrap">{selected.ad_mercadolivre_description}</p>
+              {(selected.ean || selected.original_sku) && (
+                <div className="flex gap-4">
+                  {selected.ean && (
+                    <div>
+                      <p className="font-semibold text-muted-foreground text-xs uppercase mb-1">EAN</p>
+                      <p className="font-mono text-xs">{selected.ean}</p>
+                    </div>
+                  )}
+                  {selected.original_sku && (
+                    <div>
+                      <p className="font-semibold text-muted-foreground text-xs uppercase mb-1">SKU Embalagem</p>
+                      <p className="font-mono text-xs">{selected.original_sku}</p>
+                    </div>
+                  )}
                 </div>
               )}
-              {selected.ad_shopee_title && (
-                <div>
-                  <p className="font-semibold text-muted-foreground text-xs uppercase mb-1">Shopee</p>
-                  <p className="font-medium">{selected.ad_shopee_title}</p>
-                  <p className="text-muted-foreground mt-1 whitespace-pre-wrap">{selected.ad_shopee_description}</p>
+              {selected.ads.map(ad => (
+                <div key={ad.id}>
+                  <p className="font-semibold text-muted-foreground text-xs uppercase mb-1">
+                    {ad.marketplace === "mercado_livre" ? "Mercado Livre" : "Shopee"}
+                  </p>
+                  <p className="font-medium">{ad.title}</p>
+                  <p className="text-muted-foreground mt-1 whitespace-pre-wrap">{ad.description}</p>
                 </div>
-              )}
+              ))}
               {selected.photo_urls && selected.photo_urls.length > 0 && (
                 <div>
                   <p className="font-semibold text-muted-foreground text-xs uppercase mb-1">Fotos do Produto</p>
@@ -266,13 +349,12 @@ export default function History() {
                   </div>
                 </div>
               )}
-              {/* AI Generated Images */}
-              {getApprovedImages(selected.prompts).length > 0 && (
+              {selected.creatives.filter(c => c.approved && c.image_url).length > 0 && (
                 <div>
                   <p className="font-semibold text-muted-foreground text-xs uppercase mb-1">Imagens Geradas por IA</p>
-                  <div className="grid grid-cols-2 gap-2 overflow-hidden">
-                    {getApprovedImages(selected.prompts).map((p, i) => (
-                      <img key={i} src={p.imageUrl} alt={`IA ${i + 1}`} className="w-full aspect-square rounded-lg object-cover overflow-hidden" />
+                  <div className="grid grid-cols-2 gap-2">
+                    {selected.creatives.filter(c => c.approved && c.image_url).map(c => (
+                      <img key={c.id} src={c.image_url!} alt="" className="w-full aspect-square rounded-lg object-cover" />
                     ))}
                   </div>
                 </div>

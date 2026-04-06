@@ -4,9 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, ArrowLeft, Check, Edit3, Loader2, Brain, Plus } from "lucide-react";
+import { ArrowRight, ArrowLeft, Check, Edit3, Loader2, Brain, Plus, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 export default function StepIdentify() {
   const { data, updateIdentification, completeStep, goNext, goBack } = useCreateListing();
@@ -16,6 +21,11 @@ export default function StepIdentify() {
   const [category, setCategory] = useState(data.identification.category);
   const [characteristics, setCharacteristics] = useState<string[]>(data.identification.characteristics);
   const [extras, setExtras] = useState(data.identification.extras);
+  const [ean, setEan] = useState(data.identification.ean ?? "");
+  const [originalSku, setOriginalSku] = useState(data.identification.originalSku ?? "");
+  const [internalSku, setInternalSku] = useState(data.identification.internalSku ?? "");
+  const [skuMappingNote, setSkuMappingNote] = useState(data.identification.skuMappingNote ?? "");
+  const [fichaOpen, setFichaOpen] = useState(false);
   const [identified, setIdentified] = useState(!!data.identification.name);
 
   const runAI = async () => {
@@ -36,12 +46,18 @@ export default function StepIdentify() {
       setName(result.name || "");
       setCategory(result.category || "");
       setCharacteristics(result.characteristics || []);
+      if (result.ean) setEan(result.ean);
+      if (result.original_sku) setOriginalSku(result.original_sku);
       setIdentified(true);
       updateIdentification({
         name: result.name || "",
         category: result.category || "",
         characteristics: result.characteristics || [],
         extras,
+        ean: result.ean ?? ean,
+        originalSku: result.original_sku ?? originalSku,
+        internalSku,
+        skuMappingNote,
       });
     } catch (err: any) {
       console.error("AI identify error:", err);
@@ -58,7 +74,7 @@ export default function StepIdentify() {
   }, []);
 
   const handleConfirm = () => {
-    updateIdentification({ name, category, characteristics, extras });
+    updateIdentification({ name, category, characteristics, extras, ean, originalSku, internalSku, skuMappingNote });
     completeStep(1);
     goNext();
   };
@@ -130,6 +146,56 @@ export default function StepIdentify() {
           />
         </div>
       </div>
+
+      <Collapsible open={fichaOpen} onOpenChange={setFichaOpen}>
+        <CollapsibleTrigger asChild>
+          <button className="flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">
+            <ChevronDown className={`w-4 h-4 transition-transform ${fichaOpen ? "rotate-180" : ""}`} />
+            Ficha Técnica (EAN / SKU)
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <div className="mt-3 bg-muted/40 rounded-xl border p-4 space-y-3 md:grid md:grid-cols-2 md:gap-3 md:space-y-0">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground uppercase">EAN / GTIN</label>
+              <Input
+                value={ean}
+                onChange={e => setEan(e.target.value)}
+                placeholder="Ex: 7891234567890"
+                maxLength={14}
+              />
+              <p className="text-xs text-muted-foreground">Preenchido pela IA se visível na embalagem</p>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground uppercase">SKU da Embalagem</label>
+              <Input
+                value={originalSku}
+                onChange={e => setOriginalSku(e.target.value)}
+                placeholder="Ex: ABC-12345"
+              />
+              <p className="text-xs text-muted-foreground">SKU do fabricante (lido da embalagem pela IA)</p>
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-muted-foreground uppercase">SKU Interno</label>
+              <Input
+                value={internalSku}
+                onChange={e => setInternalSku(e.target.value)}
+                placeholder="Ex: PAPE-STABILO-80-AZ"
+              />
+              <p className="text-xs text-muted-foreground">Seu código interno de controle de estoque</p>
+            </div>
+            <div className="space-y-1.5 md:col-span-2">
+              <label className="text-xs font-semibold text-muted-foreground uppercase">Nota de Mapeamento</label>
+              <Textarea
+                value={skuMappingNote}
+                onChange={e => setSkuMappingNote(e.target.value)}
+                placeholder="Ex: variante azul = reorder 001, amarela = reorder 002"
+                rows={2}
+              />
+            </div>
+          </div>
+        </CollapsibleContent>
+      </Collapsible>
 
       <div className="flex gap-3">
         <Button variant="outline" className="gap-2" onClick={() => setEditing(!editing)}>

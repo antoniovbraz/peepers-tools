@@ -35,6 +35,10 @@ export interface ListingData {
     category: string;
     characteristics: string[];
     extras: string;
+    ean?: string;
+    originalSku?: string;
+    internalSku?: string;
+    skuMappingNote?: string;
   };
   ads: {
     mercadoLivre: AdData;
@@ -90,7 +94,8 @@ const initialData: ListingData = {
   overlayElements: {},
 };
 
-const DRAFT_KEY = "draft_listing_v1";
+const DRAFT_KEY = "draft_product_v2";
+const DRAFT_KEY_V1 = "draft_listing_v1";
 
 interface DraftState {
   currentStep: number;
@@ -121,7 +126,7 @@ function saveDraft(step: number, completed: boolean[], data: ListingData) {
 
 function loadDraft(): DraftState | null {
   try {
-    const raw = localStorage.getItem(DRAFT_KEY);
+    const raw = localStorage.getItem(DRAFT_KEY) || localStorage.getItem(DRAFT_KEY_V1);
     if (!raw) return null;
     const draft = JSON.parse(raw) as DraftState;
     // Basic validation: must have photoUrls array and identification
@@ -137,6 +142,7 @@ function loadDraft(): DraftState | null {
 function clearDraftStorage() {
   try {
     localStorage.removeItem(DRAFT_KEY);
+    localStorage.removeItem(DRAFT_KEY_V1);
   } catch {
     // ignore
   }

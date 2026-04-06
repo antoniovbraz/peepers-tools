@@ -103,7 +103,12 @@ export default function StepAds() {
         <Badge className="bg-[hsl(50,95%,55%)] text-black text-xs font-bold">Mercado Livre</Badge>
         <div className="space-y-2">
           <label htmlFor="ml-title" className="text-xs font-semibold text-muted-foreground">Título</label>
-          <Input id="ml-title" value={ml.title} onChange={e => setMl({ ...ml, title: e.target.value })} />
+          <Input id="ml-title" value={ml.title} onChange={e => setMl({ ...ml, title: e.target.value })} maxLength={60} />
+          <div className="flex justify-end">
+            <span className={`text-xs ${ml.title.length > 60 ? "text-destructive" : "text-muted-foreground"}`}>
+              {ml.title.length}/60
+            </span>
+          </div>
         </div>
         <div className="space-y-2">
           <label htmlFor="ml-desc" className="text-xs font-semibold text-muted-foreground">Descrição</label>
@@ -116,7 +121,12 @@ export default function StepAds() {
         <Badge className="bg-[hsl(10,85%,55%)] text-white text-xs font-bold">Shopee</Badge>
         <div className="space-y-2">
           <label htmlFor="shopee-title" className="text-xs font-semibold text-muted-foreground">Título</label>
-          <Input id="shopee-title" value={shopee.title} onChange={e => setShopee({ ...shopee, title: e.target.value })} />
+          <Input id="shopee-title" value={shopee.title} onChange={e => setShopee({ ...shopee, title: e.target.value })} maxLength={120} />
+          <div className="flex justify-end">
+            <span className={`text-xs ${shopee.title.length > 120 ? "text-destructive" : "text-muted-foreground"}`}>
+              {shopee.title.length}/120
+            </span>
+          </div>
         </div>
         <div className="space-y-2">
           <label htmlFor="shopee-desc" className="text-xs font-semibold text-muted-foreground">Descrição</label>
