@@ -111,60 +111,6 @@ export type Database = {
           }
         ]
       }
-      listings: {
-        Row: {
-          ad_mercadolivre_description: string | null
-          ad_mercadolivre_title: string | null
-          ad_shopee_description: string | null
-          ad_shopee_title: string | null
-          category: string
-          characteristics: string[] | null
-          created_at: string
-          extras: string | null
-          id: string
-          photo_urls: string[] | null
-          product_name: string
-          prompts: Json | null
-          status: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          ad_mercadolivre_description?: string | null
-          ad_mercadolivre_title?: string | null
-          ad_shopee_description?: string | null
-          ad_shopee_title?: string | null
-          category?: string
-          characteristics?: string[] | null
-          created_at?: string
-          extras?: string | null
-          id?: string
-          photo_urls?: string[] | null
-          product_name?: string
-          prompts?: Json | null
-          status?: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          ad_mercadolivre_description?: string | null
-          ad_mercadolivre_title?: string | null
-          ad_shopee_description?: string | null
-          ad_shopee_title?: string | null
-          category?: string
-          characteristics?: string[] | null
-          created_at?: string
-          extras?: string | null
-          id?: string
-          photo_urls?: string[] | null
-          product_name?: string
-          prompts?: Json | null
-          status?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       products: {
         Row: {
           category: string
