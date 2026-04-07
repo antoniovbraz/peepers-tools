@@ -4,7 +4,7 @@ const CORS_ALLOW_HEADERS =
   "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
 
 const PRODUCTION_ORIGINS = [
-  "https://item-story-forge.lovable.app",
+  "https://peepers-tools.vercel.app",
 ];
 
 export function getCorsHeaders(req: Request): Record<string, string> {
@@ -14,8 +14,7 @@ export function getCorsHeaders(req: Request): Record<string, string> {
   const isAllowed =
     PRODUCTION_ORIGINS.includes(origin) ||
     (allowedOrigin && origin === allowedOrigin) ||
-    origin.endsWith(".lovable.app") ||
-    origin.endsWith(".lovableproject.com");
+    origin.endsWith(".vercel.app");
 
   return {
     "Access-Control-Allow-Origin": isAllowed ? origin : (allowedOrigin || PRODUCTION_ORIGINS[0]),
