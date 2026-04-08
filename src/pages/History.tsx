@@ -155,20 +155,30 @@ export default function History() {
       .select("id")
       .single();
 
-    if (productError) {
+    if (productError || !newProduct) {
       toast({ title: "Erro ao duplicar", variant: "destructive" });
       return;
     }
 
     // 2. Copy ads
-    const { data: existingAds } = await supabase.from("ads").select("marketplace, title, description").eq("product_id", product.id);
+    const { data: existingAds, error: adsReadError } = await supabase.from("ads").select("marketplace, title, description").eq("product_id", product.id);
+    if (adsReadError) {
+      await supabase.from("products").delete().eq("id", newProduct.id);
+      toast({ title: "Erro ao duplicar anúncios", variant: "destructive" });
+      return;
+    }
     if (existingAds && existingAds.length > 0) {
-      await supabase.from("ads").insert(existingAds.map(a => ({ ...a, product_id: newProduct.id, user_id: user.id, status: "draft" })));
+      const { error: adsInsertError } = await supabase.from("ads").insert(existingAds.map(a => ({ ...a, product_id: newProduct.id, user_id: user.id, status: "draft" })));
+      if (adsInsertError) {
+        await supabase.from("products").delete().eq("id", newProduct.id);
+        toast({ title: "Erro ao duplicar anúncios", variant: "destructive" });
+        return;
+      }
     }
 
     // 3. Copy creatives
-    const { data: existingCreatives } = await supabase.from("creatives").select("prompt, image_url, approved, sort_order").eq("product_id", product.id);
-    if (existingCreatives && existingCreatives.length > 0) {
+    const { data: existingCreatives, error: creativesReadError } = await supabase.from("creatives").select("prompt, image_url, approved, sort_order").eq("product_id", product.id);
+    if (!creativesReadError && existingCreatives && existingCreatives.length > 0) {
       await supabase.from("creatives").insert(existingCreatives.map(c => ({ ...c, product_id: newProduct.id, user_id: user.id })));
     }
 
@@ -226,7 +236,7 @@ export default function History() {
             <div className="flex items-start gap-3">
               <div className="w-12 h-12 rounded-lg bg-muted flex items-center justify-center flex-shrink-0">
                 {product.photo_urls?.[0] ? (
-                  <img src={product.photo_urls[0]} alt="" className="w-12 h-12 rounded-lg object-cover" />
+                  <img src={product.photo_urls[0]} alt="" loading="lazy" className="w-12 h-12 rounded-lg object-cover" />
                 ) : (
                   <Package className="w-5 h-5 text-muted-foreground" />
                 )}
@@ -344,7 +354,7 @@ export default function History() {
                   <p className="font-semibold text-muted-foreground text-xs uppercase mb-1">Fotos do Produto</p>
                   <div className="flex gap-2 overflow-x-auto pb-1">
                     {selected.photo_urls.map((url, i) => (
-                      <img key={i} src={url} alt="" className="w-20 h-20 rounded-lg object-cover flex-shrink-0" />
+                      <img key={i} src={url} alt="" loading="lazy" className="w-20 h-20 rounded-lg object-cover flex-shrink-0" />
                     ))}
                   </div>
                 </div>

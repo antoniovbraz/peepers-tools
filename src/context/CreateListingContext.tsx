@@ -2,9 +2,6 @@ import React, { createContext, useContext, useState, useCallback, useEffect, use
 import { toast } from "@/hooks/use-toast";
 import type { OverlayElement } from "@/lib/overlayTemplates";
 
-/** @deprecated Use OverlayElement from overlayTemplates instead. Kept as alias for backwards compatibility. */
-export type OverlayElementData = OverlayElement;
-
 export interface PromptCard {
   id: number;
   prompt: string;
@@ -47,7 +44,7 @@ export interface ListingData {
   prompts: PromptCard[];
   visualDNA?: VisualDNA;
   overlayUrls: Record<number, string>;
-  overlayElements: Record<number, OverlayElementData[]>;
+  overlayElements: Record<number, OverlayElement[]>;
 }
 
 interface CreateListingContextType {
@@ -62,8 +59,8 @@ interface CreateListingContextType {
   updatePrompts: (prompts: PromptCard[]) => void;
   updateVisualDNA: (dna: VisualDNA) => void;
   updateOverlayUrl: (promptId: number, url: string) => void;
-  updateOverlayElements: (imageIndex: number, elements: OverlayElementData[]) => void;
-  getOverlayElements: (imageIndex: number) => OverlayElementData[] | undefined;
+  updateOverlayElements: (imageIndex: number, elements: OverlayElement[]) => void;
+  getOverlayElements: (imageIndex: number) => OverlayElement[] | undefined;
   getAllOverlayCopies: () => string[];
   goNext: () => void;
   goBack: () => void;
@@ -103,7 +100,7 @@ interface DraftState {
   data: Omit<ListingData, "photos">; // Files are not serializable
 }
 
-function saveDraft(step: number, completed: boolean[], data: ListingData) {
+function saveDraft(step: number, completed: boolean[], data: ListingData): boolean {
   try {
     const draft: DraftState = {
       currentStep: step,
@@ -119,8 +116,9 @@ function saveDraft(step: number, completed: boolean[], data: ListingData) {
       },
     };
     localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+    return true;
   } catch {
-    // localStorage full or unavailable — silently ignore
+    return false;
   }
 }
 
@@ -209,7 +207,15 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
   useEffect(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
-      saveDraft(currentStep, completedSteps, data);
+      const saved = saveDraft(currentStep, completedSteps, data);
+      if (!saved) {
+        toast({
+          title: "Rascunho não salvo",
+          description: "O armazenamento local está cheio. Libere espaço ou exporte seu trabalho.",
+          variant: "destructive",
+          duration: 8000,
+        });
+      }
     }, 2000);
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -251,14 +257,14 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
     }));
   }, []);
 
-  const updateOverlayElements = useCallback((imageIndex: number, elements: OverlayElementData[]) => {
+  const updateOverlayElements = useCallback((imageIndex: number, elements: OverlayElement[]) => {
     setData(prev => ({
       ...prev,
       overlayElements: { ...prev.overlayElements, [imageIndex]: elements },
     }));
   }, []);
 
-  const getOverlayElements = useCallback((imageIndex: number): OverlayElementData[] | undefined => {
+  const getOverlayElements = useCallback((imageIndex: number): OverlayElement[] | undefined => {
     return data.overlayElements[imageIndex];
   }, [data.overlayElements]);
 

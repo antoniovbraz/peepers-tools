@@ -16,7 +16,15 @@ serve(async (req) => {
 
     const { productName, category, characteristics, extras, adTitle } = await req.json();
     if (!productName || typeof productName !== "string" || productName.length > 500) {
-      return errorResponse("Nome do produto inválido", 400, cors);
+      return errorResponse("Nome do produto inválido", 400, cors, "VALIDATION_ERROR");
+    }
+    if (characteristics !== undefined && characteristics !== null) {
+      if (!Array.isArray(characteristics) || characteristics.length > 50) {
+        return errorResponse("Características inválidas (max 50 itens)", 400, cors, "VALIDATION_ERROR");
+      }
+      if (!characteristics.every((c: unknown) => typeof c === "string" && c.length <= 500)) {
+        return errorResponse("Cada característica deve ser texto de até 500 caracteres", 400, cors, "VALIDATION_ERROR");
+      }
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -185,6 +193,6 @@ Each prompt should be 150-250 words, highly detailed and specific. Do NOT use va
     });
   } catch (e) {
     console.error("generate-prompts error:", e);
-    return errorResponse(e instanceof Error ? e.message : "Unknown error", 500, cors);
+    return errorResponse(e instanceof Error ? e.message : "Unknown error", 500, cors, "INTERNAL_ERROR");
   }
 });

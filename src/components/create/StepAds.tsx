@@ -6,10 +6,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, ArrowLeft, RefreshCw, Loader2, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "@/hooks/use-toast";
+import { useErrorHandler } from "@/hooks/useErrorHandler";
 
 export default function StepAds() {
   const { data, updateAds, completeStep, goNext, goBack } = useCreateListing();
+  const handleError = useErrorHandler();
   const [loading, setLoading] = useState(false);
   const [ml, setMl] = useState(data.ads.mercadoLivre);
   const [shopee, setShopee] = useState(data.ads.shopee);
@@ -33,9 +34,8 @@ export default function StepAds() {
       setShopee(result.shopee);
       setGenerated(true);
       updateAds({ mercadoLivre: result.mercadoLivre, shopee: result.shopee });
-    } catch (err: any) {
-      console.error("Generate ads error:", err);
-      toast({ title: "Erro ao gerar anúncios", description: err.message, variant: "destructive" });
+    } catch (err) {
+      handleError(err, "Erro ao gerar anúncios");
     } finally {
       setLoading(false);
     }

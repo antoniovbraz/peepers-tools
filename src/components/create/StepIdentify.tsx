@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useCreateListing } from "@/context/CreateListingContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowRight, ArrowLeft, Check, Edit3, Loader2, Brain, Plus, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useErrorHandler } from "@/hooks/useErrorHandler";
 import {
   Collapsible,
   CollapsibleContent,
@@ -15,6 +16,7 @@ import {
 
 export default function StepIdentify() {
   const { data, updateIdentification, completeStep, goNext, goBack } = useCreateListing();
+  const handleError = useErrorHandler();
   const [loading, setLoading] = useState(false);
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(data.identification.name);
@@ -27,6 +29,9 @@ export default function StepIdentify() {
   const [skuMappingNote, setSkuMappingNote] = useState(data.identification.skuMappingNote ?? "");
   const [fichaOpen, setFichaOpen] = useState(false);
   const [identified, setIdentified] = useState(!!data.identification.name);
+  // Tracks the photo set that last triggered an auto-run, so re-uploading
+  // a completely different product forces AI to re-identify.
+  const autoRunPhotoKey = useRef<string | null>(null);
 
   const runAI = async () => {
     if (data.photoUrls.length === 0) {
@@ -59,19 +64,23 @@ export default function StepIdentify() {
         internalSku,
         skuMappingNote,
       });
-    } catch (err: any) {
-      console.error("AI identify error:", err);
-      toast({ title: "Erro na IA", description: err.message, variant: "destructive" });
+    } catch (err) {
+      handleError(err, "Erro na IA");
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (!identified && data.photoUrls.length > 0) {
+    const photoKey = data.photoUrls.join("|");
+    // Auto-run when: not yet identified, photos exist, and this exact photo set
+    // hasn't triggered a run before (prevents double-invocation in StrictMode).
+    if (!identified && data.photoUrls.length > 0 && autoRunPhotoKey.current !== photoKey) {
+      autoRunPhotoKey.current = photoKey;
       runAI();
     }
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data.photoUrls, identified]);
 
   const handleConfirm = () => {
     updateIdentification({ name, category, characteristics, extras, ean, originalSku, internalSku, skuMappingNote });

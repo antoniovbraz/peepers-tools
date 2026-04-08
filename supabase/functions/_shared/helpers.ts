@@ -13,8 +13,7 @@ export function getCorsHeaders(req: Request): Record<string, string> {
 
   const isAllowed =
     PRODUCTION_ORIGINS.includes(origin) ||
-    (allowedOrigin && origin === allowedOrigin) ||
-    origin.endsWith(".vercel.app");
+    (allowedOrigin && origin === allowedOrigin);
 
   return {
     "Access-Control-Allow-Origin": isAllowed ? origin : (allowedOrigin || PRODUCTION_ORIGINS[0]),
@@ -87,9 +86,12 @@ export function createRequestLogger(functionName: string, userId?: string) {
 export function errorResponse(
   message: string,
   status: number,
-  corsHeaders: Record<string, string>
+  corsHeaders: Record<string, string>,
+  errorCode?: string,
 ): Response {
-  return new Response(JSON.stringify({ error: message }), {
+  const body: { error: string; error_code?: string } = { error: message };
+  if (errorCode) body.error_code = errorCode;
+  return new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, "Content-Type": "application/json" },
   });
@@ -101,7 +103,7 @@ export async function authenticate(
 ): Promise<{ userId: string } | Response> {
   const authHeader = req.headers.get("Authorization");
   if (!authHeader?.startsWith("Bearer ")) {
-    return errorResponse("Unauthorized", 401, corsHeaders);
+    return errorResponse("Unauthorized", 401, corsHeaders, "AUTH_ERROR");
   }
 
   const supabaseClient = createClient(
@@ -112,10 +114,15 @@ export async function authenticate(
   const { data, error } = await supabaseClient.auth.getClaims(token);
 
   if (error || !data?.claims) {
-    return errorResponse("Unauthorized", 401, corsHeaders);
+    return errorResponse("Unauthorized", 401, corsHeaders, "AUTH_ERROR");
   }
 
-  return { userId: data.claims.sub as string };
+  const userId = data.claims.sub;
+  if (!userId || typeof userId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
+    return errorResponse("Unauthorized", 401, corsHeaders, "AUTH_ERROR");
+  }
+
+  return { userId };
 }
 
 export function handleAIError(
@@ -124,10 +131,10 @@ export function handleAIError(
   corsHeaders: Record<string, string>
 ): Response {
   if (status === 429) {
-    return errorResponse("Rate limit exceeded. Tente novamente em alguns segundos.", 429, corsHeaders);
+    return errorResponse("Rate limit exceeded. Tente novamente em alguns segundos.", 429, corsHeaders, "AI_RATE_LIMIT");
   }
   if (status === 402) {
-    return errorResponse("Créditos de IA insuficientes.", 402, corsHeaders);
+    return errorResponse("Créditos de IA insuficientes.", 402, corsHeaders, "AI_QUOTA_EXCEEDED");
   }
   console.error("AI error:", status, body);
   throw new Error(`AI gateway error: ${status}`);
@@ -171,9 +178,10 @@ export async function checkRateLimit(
       .gte("created_at", windowStart);
 
     if (error) {
-      // If table doesn't exist or query fails, allow the request (fail-open)
-      console.warn("Rate limit check failed:", error.message);
-      return null;
+      // Fail-closed: if the rate limit check itself fails, deny the request
+      // to prevent unlimited API calls during DB downtime.
+      console.error("Rate limit check failed (fail-closed):", error.message);
+      return errorResponse("Serviço temporariamente indisponível. Tente novamente em instantes.", 503, corsHeaders, "SERVICE_UNAVAILABLE");
     }
 
     if ((count ?? 0) >= limit) {
@@ -181,6 +189,7 @@ export async function checkRateLimit(
         `Limite de requisições atingido (${limit}/hora). Tente novamente em alguns minutos.`,
         429,
         corsHeaders,
+        "RATE_LIMIT_EXCEEDED",
       );
     }
 
@@ -191,9 +200,9 @@ export async function checkRateLimit(
 
     return null;
   } catch (err) {
-    // Fail-open: if rate limiting breaks, don't block the user
-    console.warn("Rate limit error:", (err as Error).message);
-    return null;
+    // Fail-closed: unexpected errors also block the request.
+    console.error("Rate limit error (fail-closed):", (err as Error).message);
+    return errorResponse("Serviço temporariamente indisponível. Tente novamente em instantes.", 503, corsHeaders, "SERVICE_UNAVAILABLE");
   }
 }
 
@@ -250,11 +259,12 @@ export function parseToolCallResult(
       "A IA não gerou um resultado válido. Tente novamente.",
       502,
       corsHeaders,
+      "AI_GATEWAY_ERROR",
     );
   }
   try {
     return { result: JSON.parse(toolCall.function.arguments) };
   } catch {
-    return errorResponse("Resposta da IA inválida", 502, corsHeaders);
+    return errorResponse("Resposta da IA inválida", 502, corsHeaders, "AI_GATEWAY_ERROR");
   }
 }

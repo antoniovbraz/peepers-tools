@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Camera, X, ArrowRight, Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { supabase } from "@/integrations/supabase/client";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
@@ -12,6 +13,7 @@ const MAX_FILES = 8;
 export default function StepUpload() {
   const { data, updatePhotos, completeStep, goNext } = useCreateListing();
   const { user } = useAuth();
+  const handleError = useErrorHandler();
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
@@ -51,9 +53,8 @@ export default function StepUpload() {
       const allFiles = [...data.photos, ...incoming];
       const allUrls = [...data.photoUrls, ...newUrls];
       updatePhotos(allFiles, allUrls);
-    } catch (err: any) {
-      console.error("Upload error:", err);
-      toast({ title: "Erro no upload", description: err.message, variant: "destructive" });
+    } catch (err) {
+      handleError(err, "Erro no upload");
     } finally {
       setUploading(false);
     }

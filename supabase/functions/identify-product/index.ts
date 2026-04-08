@@ -16,11 +16,11 @@ serve(async (req) => {
 
     const { photoUrls } = await req.json();
     if (!Array.isArray(photoUrls) || photoUrls.length === 0 || photoUrls.length > 4) {
-      return errorResponse("Envie de 1 a 4 fotos", 400, cors);
+      return errorResponse("Envie de 1 a 4 fotos", 400, cors, "VALIDATION_ERROR");
     }
     for (const url of photoUrls) {
       if (typeof url !== "string" || (!url.startsWith("data:image/") && !url.startsWith("https://"))) {
-        return errorResponse("Formato de foto inválido", 400, cors);
+        return errorResponse("Formato de foto inválido", 400, cors, "VALIDATION_ERROR");
       }
     }
 
@@ -107,6 +107,6 @@ Se visível na embalagem, extraia o código de barras/EAN/GTIN (13 dígitos) e o
     });
   } catch (e) {
     console.error("identify-product error:", e);
-    return errorResponse(e instanceof Error ? e.message : "Unknown error", 500, cors);
+    return errorResponse(e instanceof Error ? e.message : "Unknown error", 500, cors, "INTERNAL_ERROR");
   }
 });

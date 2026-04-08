@@ -17,10 +17,20 @@ serve(async (req) => {
 
     const { prompt, referencePhotos, feedback } = await req.json();
     if (!prompt || typeof prompt !== "string" || prompt.length > 5000) {
-      return errorResponse("Prompt inválido", 400, cors);
+      return errorResponse("Prompt inválido", 400, cors, "VALIDATION_ERROR");
     }
-    if (referencePhotos && !Array.isArray(referencePhotos)) {
-      return errorResponse("Fotos de referência inválidas", 400, cors);
+    if (referencePhotos !== undefined && referencePhotos !== null) {
+      if (!Array.isArray(referencePhotos) || referencePhotos.length > 3) {
+        return errorResponse("Fotos de referência inválidas (max 3)", 400, cors, "VALIDATION_ERROR");
+      }
+      for (const url of referencePhotos) {
+        if (typeof url !== "string" || (!url.startsWith("https://") && !url.startsWith("data:image/"))) {
+          return errorResponse("Formato de foto de referência inválido", 400, cors, "VALIDATION_ERROR");
+        }
+        if (url.startsWith("data:image/") && url.length > 10_000_000) {
+          return errorResponse("Imagem de referência muito grande (max ~7MB)", 400, cors, "VALIDATION_ERROR");
+        }
+      }
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -145,6 +155,6 @@ Ensure the product looks IDENTICAL to the reference and NOT reinterpreted.`,
     });
   } catch (e) {
     console.error("generate-image error:", e);
-    return errorResponse(e instanceof Error ? e.message : "Unknown error", 500, cors);
+    return errorResponse(e instanceof Error ? e.message : "Unknown error", 500, cors, "INTERNAL_ERROR");
   }
 });

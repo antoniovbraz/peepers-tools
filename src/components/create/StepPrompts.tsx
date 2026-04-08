@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowRight, ArrowLeft, RefreshCw, ClipboardList, Loader2, ThumbsUp, Sparkles, XCircle, Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useErrorHandler } from "@/hooks/useErrorHandler";
 import PromptCardItem from "./PromptCardItem";
 
 const MAX_PROMPTS = 7;
@@ -12,6 +13,7 @@ const INITIAL_PROMPTS = 3;
 
 export default function StepPrompts() {
   const { data, updatePrompts, updateVisualDNA, updateOverlayUrl, completeStep, goNext, goBack } = useCreateListing();
+  const handleError = useErrorHandler();
   const [prompts, setPrompts] = useState<PromptCard[]>(data.prompts);
   const [loading, setLoading] = useState(false);
   const [generated, setGenerated] = useState(prompts.some(p => p.prompt && p.prompt.length > 20));
@@ -66,9 +68,8 @@ export default function StepPrompts() {
       setPrompts(visible);
       updatePrompts(visible);
       setGenerated(true);
-    } catch (err: any) {
-      console.error("Generate prompts error:", err);
-      toast({ title: "Erro ao gerar prompts", description: err.message, variant: "destructive" });
+    } catch (err) {
+      handleError(err, "Erro ao gerar prompts");
     } finally {
       setLoading(false);
     }
@@ -138,9 +139,8 @@ export default function StepPrompts() {
         if (result?.imageUrl) {
           updatePrompt(p.id, { imageUrl: result.imageUrl });
         }
-      } catch (err: any) {
-        console.error(`Generate image #${p.id} error:`, err);
-        toast({ title: `Erro na imagem #${p.id}`, description: err.message, variant: "destructive" });
+      } catch (err) {
+        handleError(err, `Erro na imagem #${p.id}`);
       }
     }
 

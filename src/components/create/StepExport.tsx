@@ -4,8 +4,9 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Download, Check, PartyPopper, Image, FileText, Loader2, Archive, Plus } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useErrorHandler } from "@/hooks/useErrorHandler";
+import { saveListing } from "@/services/listingService";
 import JSZip from "jszip";
 import { saveAs } from "file-saver";
 import { useNavigate } from "react-router-dom";
@@ -13,6 +14,7 @@ import { useNavigate } from "react-router-dom";
 export default function StepExport() {
   const { data, completeStep, goBack, clearDraft, reset } = useCreateListing();
   const { user } = useAuth();
+  const handleError = useErrorHandler();
   const navigate = useNavigate();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -24,76 +26,13 @@ export default function StepExport() {
     if (!user) return;
     setSaving(true);
     try {
-      // 1. Insert product
-      const { data: product, error: productError } = await supabase
-        .from("products")
-        .insert({
-          user_id: user.id,
-          name: data.identification.name,
-          category: data.identification.category,
-          characteristics: data.identification.characteristics,
-          extras: data.identification.extras,
-          ean: data.identification.ean ?? null,
-          original_sku: data.identification.originalSku ?? null,
-          internal_sku: data.identification.internalSku ?? null,
-          sku_mapping_note: data.identification.skuMappingNote ?? null,
-          photo_urls: data.photoUrls,
-          visual_dna: data.visualDNA ?? null,
-          status: "completed",
-        })
-        .select("id")
-        .single();
-
-      if (productError) throw productError;
-      const productId = product.id;
-
-      // 2. Insert ads (ML + Shopee)
-      const { error: adsError } = await supabase.from("ads").insert([
-        {
-          product_id: productId,
-          user_id: user.id,
-          marketplace: "mercado_livre",
-          title: data.ads.mercadoLivre.title,
-          description: data.ads.mercadoLivre.description,
-          status: "completed",
-        },
-        {
-          product_id: productId,
-          user_id: user.id,
-          marketplace: "shopee",
-          title: data.ads.shopee.title,
-          description: data.ads.shopee.description,
-          status: "completed",
-        },
-      ]);
-
-      if (adsError) throw adsError;
-
-      // 3. Insert creatives (one row per prompt)
-      if (data.prompts.length > 0) {
-        const { error: creativesError } = await supabase.from("creatives").insert(
-          data.prompts.map((p, i) => ({
-            product_id: productId,
-            user_id: user.id,
-            prompt: p.prompt,
-            image_url: p.imageUrl ?? null,
-            overlay_url: data.overlayUrls[p.id] ?? null,
-            overlay_elements: data.overlayElements[p.id] ?? null,
-            approved: p.approved,
-            feedback: p.feedback ?? null,
-            sort_order: i,
-          }))
-        );
-        if (creativesError) throw creativesError;
-      }
-
+      await saveListing(user.id, data);
       completeStep(4);
       setSaved(true);
       clearDraft();
       toast({ title: "🎉 Produto salvo!", description: "Produto e anúncios salvos com sucesso." });
-    } catch (err: any) {
-      console.error("Save error:", err);
-      toast({ title: "Erro ao salvar", description: err.message, variant: "destructive" });
+    } catch (err) {
+      handleError(err, "Erro ao salvar");
     } finally {
       setSaving(false);
     }
@@ -176,9 +115,8 @@ export default function StepExport() {
       const safeName = (data.identification.name || "anuncio").replace(/[^a-zA-Z0-9]/g, "_").slice(0, 30);
       saveAs(blob, `${safeName}.zip`);
       toast({ title: "Download iniciado!" });
-    } catch (err: any) {
-      console.error("ZIP error:", err);
-      toast({ title: "Erro ao criar ZIP", description: err.message, variant: "destructive" });
+    } catch (err) {
+      handleError(err, "Erro ao criar ZIP");
     } finally {
       setDownloading(false);
     }

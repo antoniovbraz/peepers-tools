@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Copy, Check, Upload, ThumbsUp, RefreshCw, MessageSquare, Sparkles, Loader2, X, Layers } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
+import { useErrorHandler } from "@/hooks/useErrorHandler";
 import ImageOverlayEditor from "./ImageOverlayEditor";
 
 interface PromptCardItemProps {
@@ -33,6 +34,7 @@ export default function PromptCardItem({
   overlayUrl,
   onSaveOverlay,
 }: PromptCardItemProps) {
+  const handleError = useErrorHandler();
   const [copiedId, setCopiedId] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -70,9 +72,8 @@ export default function PromptCardItem({
       if (data?.imageUrl) {
         onUpdate(p.id, { imageUrl: data.imageUrl });
       }
-    } catch (err: any) {
-      console.error("Generate image error:", err);
-      toast({ title: "Erro ao gerar imagem", description: err.message, variant: "destructive" });
+    } catch (err) {
+      handleError(err, "Erro ao gerar imagem");
     } finally {
       setGenerating(false);
     }

@@ -16,10 +16,10 @@ serve(async (req) => {
 
     const { productName, category, characteristics, extras } = await req.json();
     if (!productName || typeof productName !== "string" || productName.length > 500) {
-      return errorResponse("Nome do produto inválido", 400, cors);
+      return errorResponse("Nome do produto inválido", 400, cors, "VALIDATION_ERROR");
     }
     if (category && typeof category !== "string") {
-      return errorResponse("Categoria inválida", 400, cors);
+      return errorResponse("Categoria inválida", 400, cors, "VALIDATION_ERROR");
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -102,6 +102,6 @@ Responda APENAS em português brasileiro.`,
     });
   } catch (e) {
     console.error("generate-ads error:", e);
-    return errorResponse(e instanceof Error ? e.message : "Unknown error", 500, cors);
+    return errorResponse(e instanceof Error ? e.message : "Unknown error", 500, cors, "INTERNAL_ERROR");
   }
 });

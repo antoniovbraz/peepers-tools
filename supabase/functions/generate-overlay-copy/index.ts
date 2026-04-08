@@ -16,8 +16,24 @@ serve(async (req) => {
     const { productName, characteristics, imageRole, imageIndex, previousCopies, targetElements } = await req.json();
     log.info("start", { imageIndex, targetElements, hasPrevious: !!previousCopies?.length });
 
-    if (!productName || typeof productName !== "string") {
+    if (!productName || typeof productName !== "string" || productName.length > 500) {
       return errorResponse("Nome do produto inválido", 400, cors);
+    }
+    if (imageIndex !== undefined && (typeof imageIndex !== "number" || imageIndex < 0 || imageIndex > 6)) {
+      return errorResponse("imageIndex inválido", 400, cors);
+    }
+    if (previousCopies !== undefined && previousCopies !== null) {
+      if (!Array.isArray(previousCopies) || previousCopies.length > 50) {
+        return errorResponse("previousCopies inválido (max 50 itens)", 400, cors);
+      }
+    }
+    if (targetElements !== undefined && targetElements !== null) {
+      if (!Array.isArray(targetElements) || targetElements.length > 10) {
+        return errorResponse("targetElements inválido (max 10 itens)", 400, cors);
+      }
+      if (!targetElements.every((e: unknown) => typeof e === "string" && e.length <= 50)) {
+        return errorResponse("Cada targetElement deve ser texto de até 50 caracteres", 400, cors);
+      }
     }
 
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
@@ -35,7 +51,7 @@ serve(async (req) => {
     const roleDesc = roleDescriptions[imageRole] || "Product image that needs marketing text";
 
     const previousContext = Array.isArray(previousCopies) && previousCopies.length > 0
-      ? `\n\nALREADY USED (do NOT repeat, paraphrase, or use similar angles):\n${previousCopies.map((c: string) => `- ${c}`).join("\n")}`
+      ? `\n\nALREADY USED (do NOT repeat, paraphrase, or use similar angles):\n${(previousCopies as string[]).slice(0, 20).map((c) => `- ${sanitizeForLLM(String(c), 150)}`).join("\n")}`
       : "";
 
     const targetInstruction = Array.isArray(targetElements) && targetElements.length > 0
@@ -120,6 +136,6 @@ Rules:
     });
   } catch (e) {
     console.error("generate-overlay-copy error:", e);
-    return errorResponse(e instanceof Error ? e.message : "Unknown error", 500, cors);
+    return errorResponse(e instanceof Error ? e.message : "Unknown error", 500, cors, "INTERNAL_ERROR");
   }
 });

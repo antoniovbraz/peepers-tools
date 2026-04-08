@@ -143,7 +143,7 @@ describe("CreateListingContext", () => {
     });
     // Advance past debounce
     act(() => { vi.advanceTimersByTime(3000); });
-    const draft = localStorage.getItem("draft_listing_v1");
+    const draft = localStorage.getItem("draft_product_v2");
     expect(draft).not.toBeNull();
     const parsed = JSON.parse(draft!);
     expect(parsed.data.identification.name).toBe("Draft Product");
