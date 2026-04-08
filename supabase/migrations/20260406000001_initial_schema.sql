@@ -1,5 +1,5 @@
 -- ============================================================
--- INITIAL SCHEMA — Item Story Forge
+-- INITIAL SCHEMA — Peepers Tools
 -- ============================================================
 
 -- Shared trigger function for updated_at

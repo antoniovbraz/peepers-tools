@@ -1,3 +1,3 @@
-# Welcome to your Lovable project
+# Peepers Tools
 
-TODO: Document your project here
+Crie anúncios profissionais para Mercado Livre e Shopee com IA.
