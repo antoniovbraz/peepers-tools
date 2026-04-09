@@ -108,16 +108,16 @@ export async function authenticate(
 
   const supabaseClient = createClient(
     Deno.env.get("SUPABASE_URL")!,
-    Deno.env.get("SUPABASE_ANON_KEY")!
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: authHeader } } }
   );
-  const token = authHeader.replace("Bearer ", "");
-  const { data, error } = await supabaseClient.auth.getUser(token);
+  const { data: { user }, error } = await supabaseClient.auth.getUser();
 
-  if (error || !data?.user) {
+  if (error || !user) {
     return errorResponse("Unauthorized", 401, corsHeaders, "AUTH_ERROR");
   }
 
-  const userId = data.user.id;
+  const userId = user.id;
   if (!userId || typeof userId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
     return errorResponse("Unauthorized", 401, corsHeaders, "AUTH_ERROR");
   }
