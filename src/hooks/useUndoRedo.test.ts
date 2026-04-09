@@ -1,12 +1,25 @@
 import { describe, it, expect } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useUndoRedo } from "@/hooks/useUndoRedo";
-import type { OverlayElement } from "@/lib/overlayTemplates";
+import type { OverlayElement } from "@/components/create/overlay-editor/types";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function makeEl(id: string): OverlayElement {
-  return { id, type: "headline", text: `Element ${id}`, x: 10, y: 10 };
+  return {
+    id,
+    type: "headline",
+    text: `Element ${id}`,
+    x: 10,
+    y: 10,
+    width: 40,
+    fontSize: 16,
+    color: "#000000",
+    bold: false,
+    opacity: 100,
+    textAlign: "left",
+    textStyle: "none",
+  };
 }
 
 const A = [makeEl("a")];

@@ -7,7 +7,7 @@ import { Copy, Check, Upload, ThumbsUp, RefreshCw, MessageSquare, Sparkles, Load
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
-import ImageOverlayEditor from "./ImageOverlayEditor";
+import OverlayEditor from "./overlay-editor/OverlayEditor";
 
 interface PromptCardItemProps {
   prompt: PromptCard;
@@ -234,7 +234,7 @@ export default function PromptCardItem({
 
         {/* Overlay Editor */}
         {p.imageUrl && p.approved && i > 0 && (
-          <ImageOverlayEditor
+          <OverlayEditor
             open={overlayOpen}
             onClose={() => setOverlayOpen(false)}
             imageUrl={p.imageUrl}

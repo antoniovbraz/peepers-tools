@@ -111,13 +111,13 @@ export async function authenticate(
     Deno.env.get("SUPABASE_ANON_KEY")!
   );
   const token = authHeader.replace("Bearer ", "");
-  const { data, error } = await supabaseClient.auth.getClaims(token);
+  const { data, error } = await supabaseClient.auth.getUser(token);
 
-  if (error || !data?.claims) {
+  if (error || !data?.user) {
     return errorResponse("Unauthorized", 401, corsHeaders, "AUTH_ERROR");
   }
 
-  const userId = data.claims.sub;
+  const userId = data.user.id;
   if (!userId || typeof userId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId)) {
     return errorResponse("Unauthorized", 401, corsHeaders, "AUTH_ERROR");
   }

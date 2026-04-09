@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
 import { toast } from "@/hooks/use-toast";
-import type { OverlayElement } from "@/lib/overlayTemplates";
+import type { OverlayElement } from "@/components/create/overlay-editor/types";
 
 export interface PromptCard {
   id: number;

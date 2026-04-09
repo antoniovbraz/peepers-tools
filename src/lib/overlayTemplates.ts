@@ -1,28 +1,4 @@
-export interface OverlayElement {
-  id: string;
-  type: "headline" | "subheadline" | "bullet" | "badge" | "arrow" | "circle";
-  text?: string;
-  x: number; // percentage 0-100
-  y: number; // percentage 0-100
-  width?: number; // percentage 0-100
-  fontSize?: number; // px
-  color?: string;
-  bgColor?: string;
-  bold?: boolean;
-  rotation?: number; // degrees
-  icon?: string; // lucide icon name
-  opacity?: number; // 0-100, default 100
-  textAlign?: "left" | "center" | "right"; // default left
-  textStyle?: "none" | "shadow" | "stroke"; // default none
-}
-
-export interface OverlayTemplate {
-  id: number;
-  role: string;
-  label: string;
-  description: string;
-  elements: OverlayElement[];
-}
+import type { OverlayElement } from "@/components/create/overlay-editor/types";
 
 export const IMAGE_ROLES = [
   { id: 1, role: "cover", label: "Cover", description: "Imagem principal — sem overlay" },
@@ -51,6 +27,9 @@ export function getDefaultTemplate(imageIndex: number, headlineColor: string, ac
           fontSize: 28,
           color: headlineColor,
           bold: true,
+          opacity: 100,
+          textAlign: "left",
+          textStyle: "none",
         },
         {
           id: "bullet-1",
@@ -61,6 +40,10 @@ export function getDefaultTemplate(imageIndex: number, headlineColor: string, ac
           width: 40,
           fontSize: 16,
           color: headlineColor,
+          bold: false,
+          opacity: 100,
+          textAlign: "left",
+          textStyle: "none",
         },
         {
           id: "bullet-2",
@@ -71,6 +54,10 @@ export function getDefaultTemplate(imageIndex: number, headlineColor: string, ac
           width: 40,
           fontSize: 16,
           color: headlineColor,
+          bold: false,
+          opacity: 100,
+          textAlign: "left",
+          textStyle: "none",
         },
         {
           id: "bullet-3",
@@ -81,6 +68,10 @@ export function getDefaultTemplate(imageIndex: number, headlineColor: string, ac
           width: 40,
           fontSize: 16,
           color: headlineColor,
+          bold: false,
+          opacity: 100,
+          textAlign: "left",
+          textStyle: "none",
         },
       ];
 
@@ -96,6 +87,9 @@ export function getDefaultTemplate(imageIndex: number, headlineColor: string, ac
           fontSize: 24,
           color: headlineColor,
           bold: true,
+          opacity: 100,
+          textAlign: "left",
+          textStyle: "none",
         },
         {
           id: "badge-1",
@@ -106,6 +100,7 @@ export function getDefaultTemplate(imageIndex: number, headlineColor: string, ac
           fontSize: 14,
           color: "#FFFFFF",
           bgColor: accentColor,
+          opacity: 100,
         },
         {
           id: "badge-2",
@@ -116,6 +111,7 @@ export function getDefaultTemplate(imageIndex: number, headlineColor: string, ac
           fontSize: 14,
           color: "#FFFFFF",
           bgColor: accentColor,
+          opacity: 100,
         },
         {
           id: "badge-3",
@@ -126,6 +122,7 @@ export function getDefaultTemplate(imageIndex: number, headlineColor: string, ac
           fontSize: 14,
           color: "#FFFFFF",
           bgColor: accentColor,
+          opacity: 100,
         },
       ];
 
@@ -136,8 +133,10 @@ export function getDefaultTemplate(imageIndex: number, headlineColor: string, ac
           type: "circle",
           x: 50,
           y: 50,
-          width: 30,
+          radius: 15,
           color: accentColor,
+          strokeWidth: 3,
+          opacity: 100,
         },
         {
           id: "arrow-1",
@@ -147,7 +146,9 @@ export function getDefaultTemplate(imageIndex: number, headlineColor: string, ac
           y: 30,
           fontSize: 14,
           color: headlineColor,
+          length: 10,
           rotation: -30,
+          opacity: 100,
         },
       ];
 
@@ -162,6 +163,7 @@ export function getDefaultTemplate(imageIndex: number, headlineColor: string, ac
           fontSize: 16,
           color: "#FFFFFF",
           bgColor: headlineColor,
+          opacity: 100,
         },
       ];
 
@@ -176,6 +178,7 @@ export function getDefaultTemplate(imageIndex: number, headlineColor: string, ac
           fontSize: 16,
           color: "#FFFFFF",
           bgColor: accentColor,
+          opacity: 100,
         },
       ];
 
@@ -191,6 +194,9 @@ export function getDefaultTemplate(imageIndex: number, headlineColor: string, ac
           fontSize: 24,
           color: headlineColor,
           bold: true,
+          opacity: 100,
+          textAlign: "left",
+          textStyle: "none",
         },
       ];
 
