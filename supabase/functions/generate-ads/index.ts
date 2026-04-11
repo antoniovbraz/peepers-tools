@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, sanitizeArrayForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger, fetchWithRetry, parseToolCallResult, checkRateLimit } from "../_shared/helpers.ts";
+import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, sanitizeArrayForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger, callAI, parseToolCallResult, checkRateLimit } from "../_shared/helpers.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -22,70 +22,61 @@ serve(async (req) => {
       return errorResponse("Categoria inválida", 400, cors, "VALIDATION_ERROR");
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
-
     const productInfo = `Produto: ${sanitizeForLLM(productName, 500)}\nCategoria: ${sanitizeForLLM(category || "", 200)}\nCaracterísticas: ${sanitizeArrayForLLM(characteristics || [], 20, 200)}\nInformações extras: ${sanitizeForLLM(extras || "nenhuma", 1000)}`;
 
-    const response = await fetchWithRetry("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        temperature: 0.3,
-        messages: [
-          {
-            role: "system",
-            content: `${LLM_SAFETY_INSTRUCTION}\n\nVocê é um copywriter especialista em marketplaces brasileiros.
+    const response = await callAI({
+      userId,
+      functionName: "ads",
+      requestId: log.requestId,
+      messages: [
+        {
+          role: "system",
+          content: `${LLM_SAFETY_INSTRUCTION}\n\nVocê é um copywriter especialista em marketplaces brasileiros.
 Crie títulos e descrições otimizados para Mercado Livre e Shopee.
 - Mercado Livre: título até 60 caracteres, descrição detalhada e profissional
 - Shopee: título até 120 caracteres com palavras-chave, descrição mais casual e com emojis
 Responda APENAS em português brasileiro.`,
-          },
-          {
-            role: "user",
-            content: `Crie anúncios para este produto:\n\n${productInfo}`,
-          },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "generate_ads",
-              description: "Retorna textos de anúncios para Mercado Livre e Shopee",
-              parameters: {
-                type: "object",
-                properties: {
-                  mercadoLivre: {
-                    type: "object",
-                    properties: {
-                      title: { type: "string" },
-                      description: { type: "string" },
-                    },
-                    required: ["title", "description"],
-                    additionalProperties: false,
+        },
+        {
+          role: "user",
+          content: `Crie anúncios para este produto:\n\n${productInfo}`,
+        },
+      ],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "generate_ads",
+            description: "Retorna textos de anúncios para Mercado Livre e Shopee",
+            parameters: {
+              type: "object",
+              properties: {
+                mercadoLivre: {
+                  type: "object",
+                  properties: {
+                    title: { type: "string" },
+                    description: { type: "string" },
                   },
-                  shopee: {
-                    type: "object",
-                    properties: {
-                      title: { type: "string" },
-                      description: { type: "string" },
-                    },
-                    required: ["title", "description"],
-                    additionalProperties: false,
-                  },
+                  required: ["title", "description"],
+                  additionalProperties: false,
                 },
-                required: ["mercadoLivre", "shopee"],
-                additionalProperties: false,
+                shopee: {
+                  type: "object",
+                  properties: {
+                    title: { type: "string" },
+                    description: { type: "string" },
+                  },
+                  required: ["title", "description"],
+                  additionalProperties: false,
+                },
               },
+              required: ["mercadoLivre", "shopee"],
+              additionalProperties: false,
             },
           },
-        ],
-        tool_choice: { type: "function", function: { name: "generate_ads" } },
-      }),
+        },
+      ],
+      tool_choice: { type: "function", function: { name: "generate_ads" } },
     });
 
     if (!response.ok) {
@@ -102,6 +93,10 @@ Responda APENAS em português brasileiro.`,
     });
   } catch (e) {
     console.error("generate-ads error:", e);
+    if (e instanceof Error && e.message.startsWith("API_KEY_MISSING:")) {
+      const provider = e.message.split(":")[1];
+      return errorResponse(`Configure sua chave de API do ${provider} em Configurações`, 403, cors, "API_KEY_MISSING");
+    }
     return errorResponse(e instanceof Error ? e.message : "Unknown error", 500, cors, "INTERNAL_ERROR");
   }
 });

@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger, fetchWithRetry, checkRateLimit } from "../_shared/helpers.ts";
+import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger, callAI, checkRateLimit } from "../_shared/helpers.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -33,8 +33,7 @@ serve(async (req) => {
       }
     }
 
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
 
     const contentParts: any[] = [];
     const photos = (referencePhotos || []).slice(0, 3);
@@ -81,23 +80,17 @@ Ensure the product looks IDENTICAL to the reference and NOT reinterpreted.`,
       text: finalPrompt,
     });
 
-    const response = await fetchWithRetry("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-3.1-flash-image-preview",
-        temperature: 0.9,
-        messages: [
-          {
-            role: "user",
-            content: contentParts,
-          },
-        ],
-        modalities: ["image", "text"],
-      }),
+    const response = await callAI({
+      userId,
+      functionName: "image",
+      requestId: log.requestId,
+      messages: [
+        {
+          role: "user",
+          content: contentParts,
+        },
+      ],
+      modalities: ["image", "text"],
     });
 
     if (!response.ok) {
@@ -155,6 +148,10 @@ Ensure the product looks IDENTICAL to the reference and NOT reinterpreted.`,
     });
   } catch (e) {
     console.error("generate-image error:", e);
+    if (e instanceof Error && e.message.startsWith("API_KEY_MISSING:")) {
+      const provider = e.message.split(":")[1];
+      return errorResponse(`Configure sua chave de API do ${provider} em Configurações`, 403, cors, "API_KEY_MISSING");
+    }
     return errorResponse(e instanceof Error ? e.message : "Unknown error", 500, cors, "INTERNAL_ERROR");
   }
 });

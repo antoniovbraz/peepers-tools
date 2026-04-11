@@ -22,3 +22,9 @@ verify_jwt = false
 
 [functions.generate-overlay-copy]
 verify_jwt = false
+
+[functions.manage-api-keys]
+verify_jwt = false
+
+[functions.validate-api-key]
+verify_jwt = false

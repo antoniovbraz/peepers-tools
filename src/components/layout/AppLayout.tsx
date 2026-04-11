@@ -1,6 +1,6 @@
 import { ReactNode } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { PlusCircle, ClipboardList, LogOut } from "lucide-react";
+import { PlusCircle, ClipboardList, LogOut, Settings } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { useIsMobile } from "@/hooks/use-mobile";
 import logoHorizontal from "@/assets/logo-horizontal.png";
@@ -8,6 +8,7 @@ import logoHorizontal from "@/assets/logo-horizontal.png";
 const navItems = [
   { path: "/create", label: "Criar", icon: PlusCircle },
   { path: "/history", label: "Histórico", icon: ClipboardList },
+  { path: "/settings", label: "Configurações", icon: Settings },
 ];
 
 export default function AppLayout({ children }: { children: ReactNode }) {

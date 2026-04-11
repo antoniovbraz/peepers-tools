@@ -39,17 +39,20 @@ All wizard state lives in `CreateListingContext` (`src/context/CreateListingCont
 All AI calls go through Supabase Edge Functions in `supabase/functions/`. Each function:
 1. Calls `authenticate(req, cors)` to verify the Supabase JWT
 2. Calls `checkRateLimit(userId, functionName, cors)` using the `rate_limits` table
-3. Calls the Lovable AI gateway at `https://ai.gateway.lovable.dev/v1/chat/completions` with model `google/gemini-2.5-flash`
+3. Calls `callGoogleAI()` which hits the Google Generative Language API directly (`https://generativelanguage.googleapis.com/v1beta`)
 4. Uses `tool_choice` / function-calling to get structured JSON back
 5. Returns the parsed result via `parseToolCallResult()`
 
+Models: `gemini-2.5-flash` (text/vision/function-calling), `gemini-2.0-flash-preview-image-generation` (image generation).
+
 Shared utilities live in `supabase/functions/_shared/helpers.ts`:
+- `callGoogleAI()` — adapter that converts OpenAI-style params to Gemini format and back; supports function calling, image generation, and vision
 - `sanitizeForLLM()` / `sanitizeArrayForLLM()` — wrap user input in `<user_input>` XML tags to prevent prompt injection
 - `fetchWithRetry()` — exponential backoff, 30 s timeout, up to 3 retries
 - `createRequestLogger()` — structured JSON logging with request ID and elapsed time
 
 ### Auth
-`AuthContext` (`src/context/AuthContext.tsx`) wraps the app and exposes `{ session, user, loading, signOut }`. OAuth (Google/Apple) goes through the Lovable auth integration (`src/integrations/lovable/index.ts`). All routes except `/auth` are protected by `ProtectedRoute` in `App.tsx`.
+`AuthContext` (`src/context/AuthContext.tsx`) wraps the app and exposes `{ session, user, loading, signOut }`. OAuth (Google) uses native Supabase Auth (`supabase.auth.signInWithOAuth`). All routes except `/auth` are protected by `ProtectedRoute` in `App.tsx`.
 
 ### Database
 Supabase Postgres with RLS on all tables. All policies enforce `auth.uid() = user_id`.
@@ -69,10 +72,9 @@ Storage buckets: `product-photos` (public) and `generated-images` (public).
 - **Path alias**: `@/` maps to `src/`. Always use this for imports within `src/`.
 - **Auto-generated files** — do not edit:
   - `src/integrations/supabase/client.ts`
-  - `src/integrations/lovable/index.ts`
 - **LLM prompt injection safety**: all user-provided strings embedded in prompts must go through `sanitizeForLLM()` from `_shared/helpers.ts`.
 - **UI components**: Radix UI primitives wrapped as shadcn/ui-style components in `src/components/ui/`. Use these instead of raw HTML or third-party component libraries.
 - **Toasts**: use `toast()` from `@/hooks/use-toast`, not `alert()` or custom modals.
 - **Tests**: Vitest + jsdom + `@testing-library/react`. Test files live at `src/**/*.{test,spec}.{ts,tsx}`. Playwright is configured for e2e but no e2e tests exist yet.
 - **Rate limits** (per hour, enforced in edge functions): identify-product: 20, generate-ads: 30, generate-prompts: 20, generate-image: 50, generate-overlay-copy: 50.
-- **Environment variables** (frontend, prefixed `VITE_`): `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`. Edge functions use `LOVABLE_API_KEY`, `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ALLOWED_ORIGIN`.
+- **Environment variables** (frontend, prefixed `VITE_`): `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY`. Edge functions use `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ALLOWED_ORIGIN`. Users provide their own AI API keys via the Settings page (BYOK model). See `.env.example`.

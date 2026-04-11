@@ -1,5 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, sanitizeArrayForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger, fetchWithRetry, parseToolCallResult, checkRateLimit } from "../_shared/helpers.ts";
+import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, sanitizeArrayForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger, callAI, parseToolCallResult, checkRateLimit } from "../_shared/helpers.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -26,9 +26,6 @@ serve(async (req) => {
         return errorResponse("Cada característica deve ser texto de até 500 caracteres", 400, cors, "VALIDATION_ERROR");
       }
     }
-
-    const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
-    if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const productInfo = `Produto: ${sanitizeForLLM(productName, 500)}\nCategoria: ${sanitizeForLLM(category || "", 200)}\nCaracterísticas: ${sanitizeArrayForLLM(characteristics || [], 20, 200)}\nExtras: ${sanitizeForLLM(extras || "nenhuma", 1000)}\nTítulo do anúncio: ${sanitizeForLLM(adTitle || productName, 200)}`;
 
@@ -129,54 +126,48 @@ Every prompt must END with:
 
 Each prompt should be 150-250 words, highly detailed and specific. Do NOT use vague instructions.`;
 
-    const response = await fetchWithRetry("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        temperature: 0.7,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: `Crie o Visual DNA e 7 prompts de imagem para este produto:\n\n${productInfo}` },
-        ],
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "generate_campaign",
-              description: "Retorna o Visual DNA da campanha e 7 prompts de imagem estruturados",
-              parameters: {
-                type: "object",
-                properties: {
-                  visualDNA: {
-                    type: "object",
-                    properties: {
-                      background: { type: "string", description: "Shared background style for all images" },
-                      lighting: { type: "string", description: "Shared lighting setup" },
-                      style: { type: "string", description: "Rendering approach" },
-                      tone: { type: "string", description: "Overall mood/feel" },
-                      accentColor: { type: "string", description: "Accent color hex for overlays (e.g. #D4A853)" },
-                      headlineColor: { type: "string", description: "Headline text color hex (e.g. #1A2332)" },
-                    },
-                    required: ["background", "lighting", "style", "tone", "accentColor", "headlineColor"],
+    const response = await callAI({
+      userId,
+      functionName: "prompts",
+      requestId: log.requestId,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: `Crie o Visual DNA e 7 prompts de imagem para este produto:\n\n${productInfo}` },
+      ],
+      tools: [
+        {
+          type: "function",
+          function: {
+            name: "generate_campaign",
+            description: "Retorna o Visual DNA da campanha e 7 prompts de imagem estruturados",
+            parameters: {
+              type: "object",
+              properties: {
+                visualDNA: {
+                  type: "object",
+                  properties: {
+                    background: { type: "string", description: "Shared background style for all images" },
+                    lighting: { type: "string", description: "Shared lighting setup" },
+                    style: { type: "string", description: "Rendering approach" },
+                    tone: { type: "string", description: "Overall mood/feel" },
+                    accentColor: { type: "string", description: "Accent color hex for overlays (e.g. #D4A853)" },
+                    headlineColor: { type: "string", description: "Headline text color hex (e.g. #1A2332)" },
                   },
-                  prompts: {
-                    type: "array",
-                    items: { type: "string" },
-                    description: "Lista de 7 prompts em inglês, cada um com os 3 blocos obrigatórios",
-                  },
+                  required: ["background", "lighting", "style", "tone", "accentColor", "headlineColor"],
                 },
-                required: ["visualDNA", "prompts"],
-                additionalProperties: false,
+                prompts: {
+                  type: "array",
+                  items: { type: "string" },
+                  description: "Lista de 7 prompts em inglês, cada um com os 3 blocos obrigatórios",
+                },
               },
+              required: ["visualDNA", "prompts"],
+              additionalProperties: false,
             },
           },
-        ],
-        tool_choice: { type: "function", function: { name: "generate_campaign" } },
-      }),
+        },
+      ],
+      tool_choice: { type: "function", function: { name: "generate_campaign" } },
     });
 
     if (!response.ok) {
@@ -193,6 +184,10 @@ Each prompt should be 150-250 words, highly detailed and specific. Do NOT use va
     });
   } catch (e) {
     console.error("generate-prompts error:", e);
+    if (e instanceof Error && e.message.startsWith("API_KEY_MISSING:")) {
+      const provider = e.message.split(":")[1];
+      return errorResponse(`Configure sua chave de API do ${provider} em Configurações`, 403, cors, "API_KEY_MISSING");
+    }
     return errorResponse(e instanceof Error ? e.message : "Unknown error", 500, cors, "INTERNAL_ERROR");
   }
 });

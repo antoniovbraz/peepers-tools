@@ -12,6 +12,9 @@ function friendlyMessage(err: unknown): string {
 
   const lower = raw.toLowerCase();
 
+  if (lower.includes("api_key_missing"))
+    return "Você precisa configurar sua chave de API em Configurações antes de usar a IA.";
+
   if (lower.includes("rate limit") || lower.includes("too many requests"))
     return "Limite de requisições atingido. Tente novamente em alguns minutos.";
 

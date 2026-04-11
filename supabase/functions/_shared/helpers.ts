@@ -7,13 +7,16 @@ const PRODUCTION_ORIGINS = [
   "https://peepers-tools.vercel.app",
 ];
 
+const DEV_ORIGIN_PATTERN = /^http:\/\/localhost:\d+$/;
+
 export function getCorsHeaders(req: Request): Record<string, string> {
   const origin = req.headers.get("Origin") || "";
   const allowedOrigin = Deno.env.get("ALLOWED_ORIGIN") || "";
 
   const isAllowed =
     PRODUCTION_ORIGINS.includes(origin) ||
-    (allowedOrigin && origin === allowedOrigin);
+    (allowedOrigin && origin === allowedOrigin) ||
+    DEV_ORIGIN_PATTERN.test(origin);
 
   return {
     "Access-Control-Allow-Origin": isAllowed ? origin : (allowedOrigin || PRODUCTION_ORIGINS[0]),
@@ -137,7 +140,7 @@ export function handleAIError(
     return errorResponse("Créditos de IA insuficientes.", 402, corsHeaders, "AI_QUOTA_EXCEEDED");
   }
   console.error("AI error:", status, body);
-  throw new Error(`AI gateway error: ${status}`);
+  throw new Error(`AI provider error: ${status}`);
 }
 
 /* ── Per-User Rate Limiting ── */
@@ -259,12 +262,726 @@ export function parseToolCallResult(
       "A IA não gerou um resultado válido. Tente novamente.",
       502,
       corsHeaders,
-      "AI_GATEWAY_ERROR",
+      "AI_PARSE_ERROR",
     );
   }
   try {
     return { result: JSON.parse(toolCall.function.arguments) };
   } catch {
-    return errorResponse("Resposta da IA inválida", 502, corsHeaders, "AI_GATEWAY_ERROR");
+    return errorResponse("Resposta da IA inválida", 502, corsHeaders, "AI_PARSE_ERROR");
   }
+}
+
+/* ── Google AI (Gemini) Direct Integration ── */
+
+const GOOGLE_AI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta";
+
+/* ── BYOK: User API Key & Config Resolution ── */
+
+/** Default model selections when user has no explicit config */
+const DEFAULT_MODELS: Record<string, { provider_id: string; model_id: string; temperature: number }> = {
+  identify:     { provider_id: "google", model_id: "gemini-2.5-flash", temperature: 0.3 },
+  ads:          { provider_id: "google", model_id: "gemini-2.5-flash", temperature: 0.7 },
+  prompts:      { provider_id: "google", model_id: "gemini-2.5-flash", temperature: 0.7 },
+  image:        { provider_id: "google", model_id: "gemini-2.0-flash-preview-image-generation", temperature: 0.9 },
+  overlay_copy: { provider_id: "google", model_id: "gemini-2.5-flash", temperature: 0.7 },
+};
+
+/**
+ * Retrieve and decrypt a user's API key for a given provider.
+ * Uses service_role to bypass RLS and call security-definer decrypt function.
+ */
+export async function getUserAIKey(userId: string, providerId: string): Promise<string> {
+  const supabaseAdmin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  const { data: keyRow, error } = await supabaseAdmin
+    .from("user_api_keys")
+    .select("encrypted_key, key_id")
+    .eq("user_id", userId)
+    .eq("provider_id", providerId)
+    .single();
+
+  if (error || !keyRow) {
+    const providerNames: Record<string, string> = {
+      google: "Google (Gemini)",
+      openai: "OpenAI",
+      anthropic: "Anthropic (Claude)",
+      replicate: "Replicate",
+    };
+    throw new Error(`API_KEY_MISSING:${providerNames[providerId] || providerId}`);
+  }
+
+  const { data: decrypted, error: decryptErr } = await supabaseAdmin
+    .rpc("decrypt_api_key", {
+      encrypted_data: keyRow.encrypted_key,
+      encryption_key_id: keyRow.key_id,
+    });
+
+  if (decryptErr || !decrypted) {
+    throw new Error("Erro ao descriptografar chave de API");
+  }
+
+  return decrypted;
+}
+
+/**
+ * Get user's AI config for a function, or fall back to defaults.
+ */
+export async function getUserAIConfig(
+  userId: string,
+  functionName: string,
+): Promise<{ providerId: string; modelId: string; temperature: number }> {
+  const supabaseAdmin = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+  );
+
+  const { data, error } = await supabaseAdmin
+    .from("user_ai_config")
+    .select("provider_id, model_id, temperature")
+    .eq("user_id", userId)
+    .eq("function_name", functionName)
+    .single();
+
+  if (!error && data) {
+    return {
+      providerId: data.provider_id,
+      modelId: data.model_id,
+      temperature: Number(data.temperature),
+    };
+  }
+
+  // Fall back to defaults
+  const defaults = DEFAULT_MODELS[functionName];
+  if (!defaults) {
+    return { providerId: "google", modelId: "gemini-2.5-flash", temperature: 0.7 };
+  }
+  return {
+    providerId: defaults.provider_id,
+    modelId: defaults.model_id,
+    temperature: defaults.temperature,
+  };
+}
+
+/**
+ * Log an AI usage event for billing/analytics.
+ */
+async function logUsage(params: {
+  userId: string;
+  functionName: string;
+  providerId: string;
+  modelId: string;
+  latencyMs: number;
+  status: string;
+  requestId: string;
+  errorMessage?: string;
+}): Promise<void> {
+  try {
+    const supabaseAdmin = createClient(
+      Deno.env.get("SUPABASE_URL")!,
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!,
+    );
+    await supabaseAdmin.from("usage_logs").insert({
+      user_id: params.userId,
+      function_name: params.functionName,
+      provider_id: params.providerId,
+      model_id: params.modelId,
+      latency_ms: params.latencyMs,
+      status: params.status,
+      request_id: params.requestId,
+      error_message: params.errorMessage || null,
+    });
+  } catch (err) {
+    // Non-fatal: don't fail the request if logging fails
+    console.error("Usage log error:", (err as Error).message);
+  }
+}
+
+/* ── Provider Adapters ── */
+
+/**
+ * Call OpenAI API. Returns OpenAI-native response format (already compatible).
+ */
+async function callOpenAI(apiKey: string, params: {
+  model: string;
+  messages: any[];
+  temperature: number;
+  tools?: any[];
+  tool_choice?: any;
+}): Promise<Response> {
+  const body: Record<string, unknown> = {
+    model: params.model,
+    temperature: params.temperature,
+    messages: params.messages,
+  };
+  if (params.tools?.length) {
+    body.tools = params.tools;
+    if (params.tool_choice) body.tool_choice = params.tool_choice;
+  }
+
+  return fetchWithRetry("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+}
+
+/**
+ * Call Anthropic Messages API and convert response to OpenAI-compatible format.
+ */
+async function callAnthropic(apiKey: string, params: {
+  model: string;
+  messages: any[];
+  temperature: number;
+  tools?: any[];
+  tool_choice?: any;
+}): Promise<Response> {
+  // Extract system message
+  let systemText = "";
+  const messages: any[] = [];
+  for (const msg of params.messages) {
+    if (msg.role === "system") {
+      systemText += typeof msg.content === "string" ? msg.content : msg.content.map((p: any) => p.text || "").join("\n");
+    } else {
+      messages.push(msg);
+    }
+  }
+
+  const body: Record<string, unknown> = {
+    model: params.model,
+    max_tokens: 4096,
+    temperature: params.temperature,
+    messages,
+  };
+  if (systemText) body.system = systemText;
+
+  // Convert OpenAI tools to Anthropic format
+  if (params.tools?.length) {
+    body.tools = params.tools
+      .filter((t: any) => t.type === "function")
+      .map((t: any) => ({
+        name: t.function.name,
+        description: t.function.description,
+        input_schema: t.function.parameters,
+      }));
+    if (params.tool_choice?.type === "function") {
+      body.tool_choice = { type: "tool", name: params.tool_choice.function.name };
+    }
+  }
+
+  const response = await fetchWithRetry("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) return response;
+
+  const data = await response.json();
+
+  // Convert Anthropic response → OpenAI format
+  const toolUse = data.content?.find((b: any) => b.type === "tool_use");
+  if (toolUse) {
+    return new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: null,
+          tool_calls: [{
+            id: toolUse.id,
+            type: "function",
+            function: {
+              name: toolUse.name,
+              arguments: JSON.stringify(toolUse.input),
+            },
+          }],
+        },
+      }],
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+
+  const textContent = data.content
+    ?.filter((b: any) => b.type === "text")
+    .map((b: any) => b.text)
+    .join("") || "";
+
+  return new Response(JSON.stringify({
+    choices: [{ message: { content: textContent } }],
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+
+/**
+ * Call Replicate API for image generation (async polling).
+ * Returns OpenAI-compatible response with images array.
+ */
+async function callReplicate(apiKey: string, params: {
+  model: string;
+  messages: any[];
+}): Promise<Response> {
+  // Extract prompt from last user message
+  const lastUserMsg = [...params.messages].reverse().find((m: any) => m.role === "user");
+  let prompt = "";
+  if (lastUserMsg) {
+    if (typeof lastUserMsg.content === "string") {
+      prompt = lastUserMsg.content;
+    } else if (Array.isArray(lastUserMsg.content)) {
+      prompt = lastUserMsg.content
+        .filter((p: any) => p.type === "text")
+        .map((p: any) => p.text)
+        .join("\n");
+    }
+  }
+
+  const modelVersions: Record<string, string> = {
+    "flux-1.1-pro": "black-forest-labs/flux-1.1-pro",
+    "flux-schnell": "black-forest-labs/flux-schnell",
+  };
+
+  const replicateModel = modelVersions[params.model] || params.model;
+
+  // Create prediction
+  const createRes = await fetchWithRetry("https://api.replicate.com/v1/predictions", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: replicateModel,
+      input: {
+        prompt,
+        aspect_ratio: "1:1",
+        output_format: "png",
+      },
+    }),
+  }, { maxRetries: 1, timeoutMs: 15_000 });
+
+  if (!createRes.ok) return createRes;
+
+  const prediction = await createRes.json();
+  const pollUrl = prediction.urls?.get || `https://api.replicate.com/v1/predictions/${prediction.id}`;
+
+  // Poll for completion (max 120s)
+  const deadline = Date.now() + 120_000;
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 2000));
+
+    const pollRes = await fetch(pollUrl, {
+      headers: { Authorization: `Bearer ${apiKey}` },
+    });
+
+    if (!pollRes.ok) continue;
+
+    const result = await pollRes.json();
+
+    if (result.status === "succeeded") {
+      const outputUrl = Array.isArray(result.output) ? result.output[0] : result.output;
+      return new Response(JSON.stringify({
+        choices: [{
+          message: {
+            content: "",
+            images: [{ image_url: { url: outputUrl } }],
+          },
+        }],
+      }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+
+    if (result.status === "failed" || result.status === "canceled") {
+      return new Response(JSON.stringify({ error: result.error || "Image generation failed" }), {
+        status: 502,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }
+
+  return new Response(JSON.stringify({ error: "Image generation timed out" }), {
+    status: 504,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+/* ── Main AI Router (BYOK) ── */
+
+/**
+ * Unified AI call that resolves user config, decrypts their API key,
+ * and routes to the correct provider adapter.
+ *
+ * All 5 edge functions should call this instead of callGoogleAI directly.
+ */
+export async function callAI(params: {
+  userId: string;
+  functionName: string;
+  messages: any[];
+  tools?: any[];
+  tool_choice?: any;
+  modalities?: string[];
+  requestId?: string;
+}): Promise<Response> {
+  const { userId, functionName, messages, tools, tool_choice, modalities, requestId } = params;
+
+  // 1. Get user's provider/model config (or defaults)
+  const config = await getUserAIConfig(userId, functionName);
+
+  // 2. Get decrypted API key for the provider
+  const apiKey = await getUserAIKey(userId, config.providerId);
+
+  const start = Date.now();
+  let status = "success";
+  let errorMessage: string | undefined;
+
+  try {
+    let response: Response;
+
+    switch (config.providerId) {
+      case "google":
+        response = await callGoogleAI({
+          apiKey,
+          model: config.modelId,
+          messages,
+          temperature: config.temperature,
+          tools,
+          tool_choice,
+          modalities,
+        });
+        break;
+
+      case "openai":
+        if (modalities?.includes("image")) {
+          // For OpenAI image gen, use DALL-E (different API)
+          response = await callOpenAIDallE(apiKey, messages, config.modelId);
+        } else {
+          response = await callOpenAI(apiKey, {
+            model: config.modelId,
+            messages,
+            temperature: config.temperature,
+            tools,
+            tool_choice,
+          });
+        }
+        break;
+
+      case "anthropic":
+        response = await callAnthropic(apiKey, {
+          model: config.modelId,
+          messages,
+          temperature: config.temperature,
+          tools,
+          tool_choice,
+        });
+        break;
+
+      case "replicate":
+        response = await callReplicate(apiKey, {
+          model: config.modelId,
+          messages,
+        });
+        break;
+
+      default:
+        throw new Error(`Provedor não suportado: ${config.providerId}`);
+    }
+
+    if (!response.ok) {
+      status = "error";
+      errorMessage = `HTTP ${response.status}`;
+    }
+
+    return response;
+  } catch (err) {
+    status = "error";
+    errorMessage = (err as Error).message;
+    throw err;
+  } finally {
+    // Non-blocking usage log
+    logUsage({
+      userId,
+      functionName,
+      providerId: config.providerId,
+      modelId: config.modelId,
+      latencyMs: Date.now() - start,
+      status,
+      requestId: requestId || "unknown",
+      errorMessage,
+    });
+  }
+}
+
+/**
+ * OpenAI DALL-E image generation via the images API.
+ * Returns OpenAI-compatible response with images array.
+ */
+async function callOpenAIDallE(apiKey: string, messages: any[], model: string): Promise<Response> {
+  // Extract prompt from last user message
+  const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
+  let prompt = "";
+  if (lastUserMsg) {
+    if (typeof lastUserMsg.content === "string") {
+      prompt = lastUserMsg.content;
+    } else if (Array.isArray(lastUserMsg.content)) {
+      prompt = lastUserMsg.content
+        .filter((p: any) => p.type === "text")
+        .map((p: any) => p.text)
+        .join("\n");
+    }
+  }
+
+  const response = await fetchWithRetry("https://api.openai.com/v1/images/generations", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: model === "gpt-4o" ? "dall-e-3" : model,
+      prompt: prompt.slice(0, 4000),
+      n: 1,
+      size: "1024x1024",
+      response_format: "b64_json",
+    }),
+  });
+
+  if (!response.ok) return response;
+
+  const data = await response.json();
+  const b64 = data.data?.[0]?.b64_json;
+
+  if (!b64) {
+    return new Response(JSON.stringify({ error: "No image generated" }), {
+      status: 502,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+
+  const base64Url = `data:image/png;base64,${b64}`;
+
+  return new Response(JSON.stringify({
+    choices: [{
+      message: {
+        content: "",
+        images: [{ image_url: { url: base64Url } }],
+      },
+    }],
+  }), { status: 200, headers: { "Content-Type": "application/json" } });
+}
+
+/**
+ * Convert OpenAI-style messages + tools to Google Gemini API format and call the model.
+ * This adapter maintains the OpenAI-compatible response format so existing
+ * parseToolCallResult() and edge function logic works unchanged.
+ *
+ * Supports:
+ * - Text generation with function calling (tool_choice)
+ * - Multimodal input (text + images via image_url)
+ * - Image generation (modalities: ["image", "text"])
+ */
+export async function callGoogleAI(params: {
+  apiKey: string;
+  model: string;
+  messages: any[];
+  temperature?: number;
+  tools?: any[];
+  tool_choice?: any;
+  modalities?: string[];
+}): Promise<Response> {
+  const { apiKey, model, messages, temperature = 0.7, tools, tool_choice, modalities } = params;
+
+  const isImageGeneration = modalities?.includes("image");
+
+  // Convert OpenAI messages to Gemini format
+  const { systemInstruction, contents } = convertMessages(messages);
+
+  // Build Gemini request body
+  const body: Record<string, unknown> = {
+    contents,
+    generationConfig: {
+      temperature,
+    },
+  };
+
+  if (systemInstruction) {
+    body.systemInstruction = { parts: [{ text: systemInstruction }] };
+  }
+
+  if (isImageGeneration) {
+    (body.generationConfig as any).responseModalities = ["IMAGE", "TEXT"];
+  }
+
+  // Convert OpenAI tools → Gemini function declarations
+  if (tools && tools.length > 0) {
+    body.tools = [{
+      functionDeclarations: tools
+        .filter((t: any) => t.type === "function")
+        .map((t: any) => ({
+          name: t.function.name,
+          description: t.function.description,
+          parameters: t.function.parameters,
+        })),
+    }];
+
+    if (tool_choice?.type === "function") {
+      body.toolConfig = {
+        functionCallingConfig: {
+          mode: "ANY",
+          allowedFunctionNames: [tool_choice.function.name],
+        },
+      };
+    }
+  }
+
+  const endpoint = `${GOOGLE_AI_BASE_URL}/models/${model}:generateContent?key=${apiKey}`;
+
+  const response = await fetchWithRetry(endpoint, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    return response;
+  }
+
+  const data = await response.json();
+
+  // Convert Gemini response → OpenAI-compatible format
+  return new Response(JSON.stringify(convertResponse(data, isImageGeneration)), {
+    status: 200,
+    headers: { "Content-Type": "application/json" },
+  });
+}
+
+/** Convert OpenAI-style messages to Gemini contents + systemInstruction */
+function convertMessages(messages: any[]): {
+  systemInstruction: string | null;
+  contents: any[];
+} {
+  let systemInstruction: string | null = null;
+  const contents: any[] = [];
+
+  for (const msg of messages) {
+    if (msg.role === "system") {
+      systemInstruction = typeof msg.content === "string"
+        ? msg.content
+        : msg.content.map((p: any) => p.text || "").join("\n");
+      continue;
+    }
+
+    const role = msg.role === "assistant" ? "model" : "user";
+    const parts: any[] = [];
+
+    if (typeof msg.content === "string") {
+      parts.push({ text: msg.content });
+    } else if (Array.isArray(msg.content)) {
+      for (const part of msg.content) {
+        if (part.type === "text") {
+          parts.push({ text: part.text });
+        } else if (part.type === "image_url") {
+          const url = part.image_url?.url || part.image_url;
+          if (typeof url === "string" && url.startsWith("data:")) {
+            // Inline base64 image
+            const match = url.match(/^data:(image\/[^;]+);base64,(.+)$/);
+            if (match) {
+              parts.push({
+                inlineData: {
+                  mimeType: match[1],
+                  data: match[2],
+                },
+              });
+            }
+          } else if (typeof url === "string" && url.startsWith("https://")) {
+            // URL-based image
+            parts.push({
+              fileData: {
+                mimeType: "image/jpeg",
+                fileUri: url,
+              },
+            });
+          }
+        }
+      }
+    }
+
+    if (parts.length > 0) {
+      contents.push({ role, parts });
+    }
+  }
+
+  return { systemInstruction, contents };
+}
+
+/** Convert Gemini response to OpenAI-compatible format */
+function convertResponse(data: any, isImageGeneration = false): Record<string, unknown> {
+  const candidate = data.candidates?.[0];
+  if (!candidate?.content?.parts) {
+    return { choices: [{ message: { content: "", tool_calls: [] } }] };
+  }
+
+  const parts = candidate.content.parts;
+
+  // Handle function call responses (tool_choice)
+  const functionCall = parts.find((p: any) => p.functionCall);
+  if (functionCall) {
+    return {
+      choices: [{
+        message: {
+          content: null,
+          tool_calls: [{
+            id: `call_${crypto.randomUUID().slice(0, 8)}`,
+            type: "function",
+            function: {
+              name: functionCall.functionCall.name,
+              arguments: JSON.stringify(functionCall.functionCall.args),
+            },
+          }],
+        },
+      }],
+    };
+  }
+
+  // Handle image generation responses
+  if (isImageGeneration) {
+    const images: any[] = [];
+    let textContent = "";
+
+    for (const part of parts) {
+      if (part.inlineData) {
+        const mimeType = part.inlineData.mimeType || "image/png";
+        const base64Url = `data:${mimeType};base64,${part.inlineData.data}`;
+        images.push({ image_url: { url: base64Url } });
+      } else if (part.text) {
+        textContent += part.text;
+      }
+    }
+
+    return {
+      choices: [{
+        message: {
+          content: textContent,
+          images,
+        },
+      }],
+    };
+  }
+
+  // Handle text responses
+  const textContent = parts
+    .filter((p: any) => p.text)
+    .map((p: any) => p.text)
+    .join("");
+
+  return {
+    choices: [{
+      message: {
+        content: textContent,
+      },
+    }],
+  };
 }

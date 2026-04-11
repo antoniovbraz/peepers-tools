@@ -5,10 +5,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { AuthProvider, useAuth } from "@/context/AuthContext";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { ApiKeyGuard } from "@/components/ApiKeyGuard";
 import AppLayout from "@/components/layout/AppLayout";
 
 const CreateListing = lazy(() => import("./pages/CreateListing"));
 const History = lazy(() => import("./pages/History"));
+const Settings = lazy(() => import("./pages/Settings"));
 const Auth = lazy(() => import("./pages/Auth"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
@@ -44,12 +46,15 @@ const App = () => (
                   element={
                     <ProtectedRoute>
                       <AppLayout>
-                        <Routes>
-                          <Route path="/" element={<Navigate to="/create" replace />} />
-                          <Route path="/create" element={<CreateListing />} />
-                          <Route path="/history" element={<History />} />
-                          <Route path="*" element={<NotFound />} />
-                        </Routes>
+                        <ApiKeyGuard>
+                          <Routes>
+                            <Route path="/" element={<Navigate to="/create" replace />} />
+                            <Route path="/create" element={<CreateListing />} />
+                            <Route path="/history" element={<History />} />
+                            <Route path="/settings" element={<Settings />} />
+                            <Route path="*" element={<NotFound />} />
+                          </Routes>
+                        </ApiKeyGuard>
                       </AppLayout>
                     </ProtectedRoute>
                   }
