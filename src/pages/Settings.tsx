@@ -94,12 +94,12 @@ function TabProviders() {
   const [userKeys, setUserKeys] = useState<UserKey[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Per-provider UI state (keyed by provider.id to avoid shared-state bug)
+  // Per-provider UI state (all keyed by provider.id to isolate each card)
   const [editingProvider, setEditingProvider] = useState<string | null>(null);
   const [keyInputs, setKeyInputs] = useState<Record<string, string>>({});
   const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
-  const [saving, setSaving] = useState(false);
-  const [validating, setValidating] = useState(false);
+  const [savingId, setSavingId] = useState<string | null>(null);
+  const [validatingId, setValidatingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
 
   const loadData = useCallback(async () => {
@@ -113,20 +113,22 @@ function TabProviders() {
         .order("name");
       setProviders(provData || []);
 
-      // Load user's keys
+      // Load user's keys (response is { keys: [...] })
       const { data: keyData, error: keyError } = await supabase.functions.invoke(
         "manage-api-keys",
         { method: "GET" }
       );
-      if (!keyError && Array.isArray(keyData)) {
-        setUserKeys(keyData);
+      if (!keyError && keyData?.keys) {
+        setUserKeys(keyData.keys);
       }
     } catch {
       // silent
     } finally {
       setLoading(false);
     }
-  }, [session]);
+  // Use session user id as dependency — avoids refetch on token refresh (new object ref)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.user?.id]);
 
   useEffect(() => {
     loadData();
@@ -137,7 +139,7 @@ function TabProviders() {
     if (!keyValue) return;
 
     // 1. Validate
-    setValidating(true);
+    setValidatingId(providerId);
     try {
       const { data: valResult, error: valError } = await supabase.functions.invoke(
         "validate-api-key",
@@ -160,11 +162,11 @@ function TabProviders() {
       });
       return;
     } finally {
-      setValidating(false);
+      setValidatingId(null);
     }
 
     // 2. Save
-    setSaving(true);
+    setSavingId(providerId);
     try {
       const { error: saveError } = await supabase.functions.invoke(
         "manage-api-keys",
@@ -187,7 +189,7 @@ function TabProviders() {
         variant: "destructive",
       });
     } finally {
-      setSaving(false);
+      setSavingId(null);
     }
   };
 
@@ -233,7 +235,7 @@ function TabProviders() {
         {providers.map((provider) => {
           const existingKey = userKeys.find((k) => k.provider_id === provider.id);
           const isEditing = editingProvider === provider.id;
-          const isBusy = saving || validating;
+          const isBusy = savingId === provider.id || validatingId === provider.id;
 
           return (
             <div
@@ -315,12 +317,12 @@ function TabProviders() {
                     disabled={!(keyInputs[provider.id] ?? "").trim() || isBusy}
                     className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none transition-colors"
                   >
-                    {validating ? (
+                    {validatingId === provider.id ? (
                       <>
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         Validando…
                       </>
-                    ) : saving ? (
+                    ) : savingId === provider.id ? (
                       <>
                         <Loader2 className="w-3.5 h-3.5 animate-spin" />
                         Salvando…
