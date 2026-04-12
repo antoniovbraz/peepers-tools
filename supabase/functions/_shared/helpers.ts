@@ -141,8 +141,19 @@ export function handleAIError(
   if (status === 402) {
     return errorResponse("Créditos de IA insuficientes.", 402, corsHeaders, "AI_QUOTA_EXCEEDED");
   }
-  console.error("AI error:", status, body);
-  throw new Error(`AI provider error: ${status}`);
+  if (status === 401 || status === 403) {
+    console.error("AI auth error:", status, body.slice(0, 500));
+    return errorResponse("Chave de API inválida ou sem permissão. Verifique sua chave em Configurações.", 403, corsHeaders, "AI_AUTH_ERROR");
+  }
+  if (status === 400) {
+    console.error("AI bad request:", body.slice(0, 500));
+    return errorResponse("Requisição inválida ao provedor de IA. Tente novamente.", 400, corsHeaders, "AI_BAD_REQUEST");
+  }
+  if (status === 503 || status === 529) {
+    return errorResponse("Provedor de IA temporariamente indisponível. Tente novamente.", 503, corsHeaders, "AI_UNAVAILABLE");
+  }
+  console.error("AI provider error:", status, body.slice(0, 500));
+  return errorResponse(`Erro do provedor de IA (${status}). Tente novamente.`, 502, corsHeaders, "AI_PROVIDER_ERROR");
 }
 
 /* ── Per-User Rate Limiting ── */

@@ -12,8 +12,11 @@ function friendlyMessage(err: unknown): string {
 
   const lower = raw.toLowerCase();
 
-  if (lower.includes("api_key_missing"))
-    return "Você precisa configurar sua chave de API em Configurações antes de usar a IA.";
+  if (lower.includes("api_key_missing") || lower.includes("ai_auth_error") || lower.includes("chave de api inválida"))
+    return "Chave de API inválida ou sem permissão. Verifique suas configurações.";
+
+  if (lower.includes("ai_unavailable") || lower.includes("provedor de ia temporariamente"))
+    return "Provedor de IA temporariamente indisponível. Tente novamente em instantes.";
 
   if (lower.includes("rate limit") || lower.includes("too many requests"))
     return "Limite de requisições atingido. Tente novamente em alguns minutos.";
