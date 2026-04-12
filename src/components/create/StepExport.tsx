@@ -47,6 +47,15 @@ export default function StepExport() {
       const shopeeText = `Título: ${data.ads.shopee.title}\n\nDescrição:\n${data.ads.shopee.description}`;
       zip.file("anuncio_mercadolivre.txt", mlText);
       zip.file("anuncio_shopee.txt", shopeeText);
+      if (data.ads.amazon?.title) {
+        const bullets = (data.ads.amazon.bullets ?? []).map((b, i) => `${i + 1}. ${b}`).join("\n");
+        const amazonText = `Título: ${data.ads.amazon.title}\n\nBullet Points:\n${bullets}\n\nTermos de Busca:\n${data.ads.amazon.backend_search_terms ?? ""}\n\nDescrição:\n${data.ads.amazon.description}`;
+        zip.file("anuncio_amazon.txt", amazonText);
+      }
+      if (data.ads.magalu?.title) {
+        const magaluText = `Título: ${data.ads.magalu.title}\n\nDescrição:\n${data.ads.magalu.description}`;
+        zip.file("anuncio_magalu.txt", magaluText);
+      }
 
       // Helper: fetch blob with error tolerance
       const fetchBlob = async (url: string): Promise<Blob | null> => {
@@ -162,6 +171,8 @@ export default function StepExport() {
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground">ML: {data.ads.mercadoLivre.title || "—"}</p>
             <p className="text-xs text-muted-foreground">Shopee: {data.ads.shopee.title || "—"}</p>
+            {data.ads.amazon?.title && <p className="text-xs text-muted-foreground">Amazon: {data.ads.amazon.title}</p>}
+            {data.ads.magalu?.title && <p className="text-xs text-muted-foreground">Magalu: {data.ads.magalu.title}</p>}
           </div>
         </div>
 

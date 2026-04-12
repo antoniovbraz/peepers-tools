@@ -24,6 +24,8 @@ export async function saveListing(userId: string, listing: ListingData): Promise
       sku_mapping_note: listing.identification.skuMappingNote ?? null,
       photo_urls: listing.photoUrls,
       visual_dna: listing.visualDNA ?? null,
+      marketplace: listing.marketplace ?? null,
+      suggested_category: listing.identification.suggested_category ?? null,
       status: "completed",
     })
     .select("id")
@@ -32,8 +34,17 @@ export async function saveListing(userId: string, listing: ListingData): Promise
   if (productError) throw productError;
   const productId = product.id as string;
 
-  // 2. Insert ads (ML + Shopee)
-  const { error: adsError } = await supabase.from("ads").insert([
+  // 2. Insert ads (all marketplaces)
+  type AdInsert = {
+    product_id: string;
+    user_id: string;
+    marketplace: string;
+    title: string;
+    description: string;
+    status: string;
+    metadata?: Record<string, unknown>;
+  };
+  const adsToInsert: AdInsert[] = [
     {
       product_id: productId,
       user_id: userId,
@@ -50,7 +61,32 @@ export async function saveListing(userId: string, listing: ListingData): Promise
       description: listing.ads.shopee.description,
       status: "completed",
     },
-  ]);
+  ];
+  if (listing.ads.amazon?.title) {
+    adsToInsert.push({
+      product_id: productId,
+      user_id: userId,
+      marketplace: "amazon",
+      title: listing.ads.amazon.title,
+      description: listing.ads.amazon.description,
+      status: "completed",
+      metadata: {
+        bullets: listing.ads.amazon.bullets ?? [],
+        backend_search_terms: listing.ads.amazon.backend_search_terms ?? "",
+      },
+    });
+  }
+  if (listing.ads.magalu?.title) {
+    adsToInsert.push({
+      product_id: productId,
+      user_id: userId,
+      marketplace: "magalu",
+      title: listing.ads.magalu.title,
+      description: listing.ads.magalu.description,
+      status: "completed",
+    });
+  }
+  const { error: adsError } = await supabase.from("ads").insert(adsToInsert);
 
   if (adsError) {
     await supabase.from("products").delete().eq("id", productId);

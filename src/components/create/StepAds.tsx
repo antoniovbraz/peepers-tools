@@ -75,7 +75,7 @@ export default function StepAds() {
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
         </div>
         <h2 className="font-display text-lg font-bold">Gerando anúncios...</h2>
-        <p className="text-sm text-muted-foreground text-center">Criando textos otimizados para Mercado Livre e Shopee</p>
+        <p className="text-sm text-muted-foreground text-center">Criando textos otimizados para todos os marketplaces</p>
         <div className="w-48 h-1.5 rounded-full bg-muted overflow-hidden">
           <div className="h-full bg-primary rounded-full animate-[pulse_2s_ease-in-out_infinite]" style={{ width: "50%" }} />
         </div>
