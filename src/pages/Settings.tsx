@@ -94,10 +94,10 @@ function TabProviders() {
   const [userKeys, setUserKeys] = useState<UserKey[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Per-provider UI state
+  // Per-provider UI state (keyed by provider.id to avoid shared-state bug)
   const [editingProvider, setEditingProvider] = useState<string | null>(null);
-  const [keyInput, setKeyInput] = useState("");
-  const [showKey, setShowKey] = useState(false);
+  const [keyInputs, setKeyInputs] = useState<Record<string, string>>({});
+  const [showKeys, setShowKeys] = useState<Record<string, boolean>>({});
   const [saving, setSaving] = useState(false);
   const [validating, setValidating] = useState(false);
   const [deleting, setDeleting] = useState<string | null>(null);
@@ -133,14 +133,15 @@ function TabProviders() {
   }, [loadData]);
 
   const handleValidateAndSave = async (providerId: string) => {
-    if (!keyInput.trim()) return;
+    const keyValue = (keyInputs[providerId] ?? "").trim();
+    if (!keyValue) return;
 
     // 1. Validate
     setValidating(true);
     try {
       const { data: valResult, error: valError } = await supabase.functions.invoke(
         "validate-api-key",
-        { body: { provider_id: providerId, api_key: keyInput.trim() } }
+        { body: { provider_id: providerId, api_key: keyValue } }
       );
       if (valError) throw valError;
       if (!valResult?.valid) {
@@ -169,15 +170,15 @@ function TabProviders() {
         "manage-api-keys",
         {
           method: "POST",
-          body: { provider_id: providerId, api_key: keyInput.trim() },
+          body: { provider_id: providerId, api_key: keyValue },
         }
       );
       if (saveError) throw saveError;
 
       toast({ title: "Chave salva com sucesso!" });
       setEditingProvider(null);
-      setKeyInput("");
-      setShowKey(false);
+      setKeyInputs((prev) => { const n = { ...prev }; delete n[providerId]; return n; });
+      setShowKeys((prev) => { const n = { ...prev }; delete n[providerId]; return n; });
       await loadData();
     } catch (err) {
       toast({
@@ -267,8 +268,8 @@ function TabProviders() {
                     <button
                       onClick={() => {
                         setEditingProvider(provider.id);
-                        setKeyInput("");
-                        setShowKey(false);
+                        setKeyInputs((prev) => ({ ...prev, [provider.id]: "" }));
+                        setShowKeys((prev) => ({ ...prev, [provider.id]: false }));
                       }}
                       className="text-xs text-primary hover:underline"
                     >
@@ -294,24 +295,24 @@ function TabProviders() {
                 <div className="flex gap-2">
                   <div className="relative flex-1">
                     <input
-                      type={showKey ? "text" : "password"}
-                      value={keyInput}
-                      onChange={(e) => setKeyInput(e.target.value)}
+                      type={showKeys[provider.id] ? "text" : "password"}
+                      value={keyInputs[provider.id] ?? ""}
+                      onChange={(e) => setKeyInputs((prev) => ({ ...prev, [provider.id]: e.target.value }))}
                       placeholder={`Cole sua chave de API do ${provider.name}`}
                       className="w-full rounded-md border bg-background px-3 py-2 pr-10 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                       disabled={isBusy}
                     />
                     <button
                       type="button"
-                      onClick={() => setShowKey(!showKey)}
+                      onClick={() => setShowKeys((prev) => ({ ...prev, [provider.id]: !prev[provider.id] }))}
                       className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     >
-                      {showKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      {showKeys[provider.id] ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                   <button
                     onClick={() => handleValidateAndSave(provider.id)}
-                    disabled={!keyInput.trim() || isBusy}
+                    disabled={!(keyInputs[provider.id] ?? "").trim() || isBusy}
                     className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none transition-colors"
                   >
                     {validating ? (
@@ -332,8 +333,8 @@ function TabProviders() {
                     <button
                       onClick={() => {
                         setEditingProvider(null);
-                        setKeyInput("");
-                        setShowKey(false);
+                        setKeyInputs((prev) => { const n = { ...prev }; delete n[provider.id]; return n; });
+                        setShowKeys((prev) => { const n = { ...prev }; delete n[provider.id]; return n; });
                       }}
                       className="rounded-md border px-3 py-2 text-sm text-muted-foreground hover:bg-muted transition-colors"
                     >
