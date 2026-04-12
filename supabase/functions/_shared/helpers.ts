@@ -289,9 +289,47 @@ const DEFAULT_MODELS: Record<string, { provider_id: string; model_id: string; te
   overlay_copy: { provider_id: "google", model_id: "gemini-2.5-flash", temperature: 0.7 },
 };
 
+/* ── API Key Encryption (AES-256-GCM, edge-function side) ── */
+
+/**
+ * Derive a stable AES-256-GCM CryptoKey from SUPABASE_SERVICE_ROLE_KEY via SHA-256.
+ * The JWT is already high-entropy so a single hash pass is sufficient.
+ */
+async function getAesKey(usage: "encrypt" | "decrypt"): Promise<CryptoKey> {
+  const secret = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const keyData = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(secret));
+  return crypto.subtle.importKey("raw", keyData, { name: "AES-GCM" }, false, [usage]);
+}
+
+/** Encrypt a raw API key string. Returns base64 ciphertext + base64 IV (nonce). */
+export async function encryptApiKey(rawKey: string): Promise<{ encrypted: string; nonce: string }> {
+  const aesKey = await getAesKey("encrypt");
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ciphertext = await crypto.subtle.encrypt(
+    { name: "AES-GCM", iv },
+    aesKey,
+    new TextEncoder().encode(rawKey),
+  );
+  const toBase64 = (buf: ArrayBuffer | Uint8Array) =>
+    btoa(String.fromCharCode(...new Uint8Array(buf instanceof Uint8Array ? buf.buffer : buf)));
+  return { encrypted: toBase64(ciphertext), nonce: toBase64(iv) };
+}
+
+/** Decrypt a previously encrypted API key. */
+export async function decryptApiKey(encryptedBase64: string, nonceBase64: string): Promise<string> {
+  const aesKey = await getAesKey("decrypt");
+  const fromBase64 = (b64: string) => Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  const plaintext = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: fromBase64(nonceBase64) },
+    aesKey,
+    fromBase64(encryptedBase64),
+  );
+  return new TextDecoder().decode(plaintext);
+}
+
 /**
  * Retrieve and decrypt a user's API key for a given provider.
- * Uses service_role to bypass RLS and call security-definer decrypt function.
+ * Keys are encrypted with AES-GCM inside the edge function; this decrypts them.
  */
 export async function getUserAIKey(userId: string, providerId: string): Promise<string> {
   const supabaseAdmin = createClient(
@@ -301,7 +339,7 @@ export async function getUserAIKey(userId: string, providerId: string): Promise<
 
   const { data: keyRow, error } = await supabaseAdmin
     .from("user_api_keys")
-    .select("encrypted_key, key_id")
+    .select("encrypted_key, key_nonce")
     .eq("user_id", userId)
     .eq("provider_id", providerId)
     .single();
@@ -316,17 +354,7 @@ export async function getUserAIKey(userId: string, providerId: string): Promise<
     throw new Error(`API_KEY_MISSING:${providerNames[providerId] || providerId}`);
   }
 
-  const { data: decrypted, error: decryptErr } = await supabaseAdmin
-    .rpc("decrypt_api_key", {
-      encrypted_data: keyRow.encrypted_key,
-      encryption_key_id: keyRow.key_id,
-    });
-
-  if (decryptErr || !decrypted) {
-    throw new Error("Erro ao descriptografar chave de API");
-  }
-
-  return decrypted;
+  return decryptApiKey(keyRow.encrypted_key, keyRow.key_nonce);
 }
 
 /**

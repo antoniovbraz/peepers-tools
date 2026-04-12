@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getCorsHeaders, authenticate, errorResponse, createRequestLogger, checkRateLimit } from "../_shared/helpers.ts";
+import { getCorsHeaders, authenticate, errorResponse, createRequestLogger, checkRateLimit, encryptApiKey } from "../_shared/helpers.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -61,16 +61,8 @@ serve(async (req) => {
         return errorResponse("Provedor não encontrado", 404, cors, "VALIDATION_ERROR");
       }
 
-      // Encrypt the key via DB function (pgsodium)
-      const { data: encrypted, error: encryptErr } = await supabaseAdmin
-        .rpc("encrypt_api_key", { raw_key: api_key });
-
-      if (encryptErr || !encrypted || encrypted.length === 0) {
-        log.error("encrypt-failed", { error: encryptErr?.message });
-        return errorResponse("Erro ao criptografar chave", 500, cors, "INTERNAL_ERROR");
-      }
-
-      const { encrypted: encryptedBytes, key_id: encryptionKeyId } = encrypted[0];
+      // Encrypt the key using AES-GCM (edge-function crypto, no pgsodium)
+      const { encrypted: encryptedKey, nonce: keyNonce } = await encryptApiKey(api_key);
 
       // Generate hint from last 4 chars
       const keyHint = "..." + api_key.slice(-4);
@@ -82,8 +74,8 @@ serve(async (req) => {
           {
             user_id: userId,
             provider_id,
-            encrypted_key: encryptedBytes,
-            key_id: encryptionKeyId,
+            encrypted_key: encryptedKey,
+            key_nonce: keyNonce,
             key_hint: keyHint,
             is_valid: true,
             last_validated_at: null,
