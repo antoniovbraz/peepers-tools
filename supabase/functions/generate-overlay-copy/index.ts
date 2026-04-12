@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, sanitizeArrayForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger, callAI, parseToolCallResult, checkRateLimit } from "../_shared/helpers.ts";
+import { buildKnowledge } from "../_shared/knowledge/index.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -13,7 +14,7 @@ serve(async (req) => {
     if (rateLimited) return rateLimited;
     const log = createRequestLogger("generate-overlay-copy", userId);
 
-    const { productName, characteristics, imageRole, imageIndex, previousCopies, targetElements } = await req.json();
+    const { productName, characteristics, imageRole, imageIndex, previousCopies, targetElements, category, suggested_category, marketplace } = await req.json();
     log.info("start", { imageIndex, targetElements, hasPrevious: !!previousCopies?.length });
 
     if (!productName || typeof productName !== "string" || productName.length > 500) {
@@ -57,16 +58,18 @@ serve(async (req) => {
       ? `\nOnly generate copy for these element types: ${targetElements.join(", ")}. Leave other fields empty or omit them.`
       : "";
 
-    const systemPrompt = `${LLM_SAFETY_INSTRUCTION}\n\nYou are a high-conversion e-commerce copywriter specializing in Brazilian Portuguese marketplace listings (Mercado Livre, Shopee, Amazon).
+    const knowledge = buildKnowledge({
+      functionName: "overlay_copy",
+      marketplace: (["mercadoLivre", "shopee", "amazon", "magalu"].includes(marketplace)) ? marketplace : "all",
+      category: suggested_category || category || "",
+    });
 
-Generate short, punchy, benefit-driven marketing copy for a product image overlay.
+    const systemPrompt = `${LLM_SAFETY_INSTRUCTION}\n\n${knowledge}\n\nYou are a high-conversion e-commerce copywriter specializing in Brazilian Portuguese marketplace listings (Mercado Livre, Shopee, Amazon).
 
-Rules:
+Generate short, punchy, benefit-driven marketing copy for a product image overlay following the rules in the knowledge base above.
+
+Additional rules:
 - ALL text must be in Brazilian Portuguese
-- Headlines: max 5 words, bold benefit-driven
-- Bullets/labels: max 8 words each, clear and simple
-- Badges: max 3 words each, short punchy labels for badge overlays
-- Use action words and emotional triggers
 - Focus on what the customer GAINS, not technical specs
 - Use ✓ prefix for bullet items
 - CRITICAL: Each image MUST highlight a COMPLETELY DIFFERENT angle/benefit. NEVER repeat or paraphrase headlines or bullets from other images.

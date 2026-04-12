@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, sanitizeArrayForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger, callAI, parseToolCallResult, checkRateLimit } from "../_shared/helpers.ts";
+import { buildKnowledge, type Marketplace } from "../_shared/knowledge/index.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -14,13 +15,24 @@ serve(async (req) => {
     const log = createRequestLogger("generate-ads", userId);
     log.info("start");
 
-    const { productName, category, characteristics, extras } = await req.json();
+    const { productName, category, suggested_category, characteristics, extras, marketplace, includeBrand } = await req.json();
     if (!productName || typeof productName !== "string" || productName.length > 500) {
       return errorResponse("Nome do produto inválido", 400, cors, "VALIDATION_ERROR");
     }
     if (category && typeof category !== "string") {
       return errorResponse("Categoria inválida", 400, cors, "VALIDATION_ERROR");
     }
+    const targetMarketplace: Marketplace = (["mercadoLivre", "shopee", "amazon", "magalu", "all"].includes(marketplace))
+      ? marketplace as Marketplace
+      : "all";
+    const brandEnabled = includeBrand === true;
+
+    const knowledge = buildKnowledge({
+      functionName: "ads",
+      marketplace: targetMarketplace,
+      category: suggested_category || category || "",
+      includeBrand: brandEnabled,
+    });
 
     const productInfo = `Produto: ${sanitizeForLLM(productName, 500)}\nCategoria: ${sanitizeForLLM(category || "", 200)}\nCaracterísticas: ${sanitizeArrayForLLM(characteristics || [], 20, 200)}\nInformações extras: ${sanitizeForLLM(extras || "nenhuma", 1000)}`;
 
@@ -31,10 +43,8 @@ serve(async (req) => {
       messages: [
         {
           role: "system",
-          content: `${LLM_SAFETY_INSTRUCTION}\n\nVocê é um copywriter especialista em marketplaces brasileiros.
-Crie títulos e descrições otimizados para Mercado Livre e Shopee.
-- Mercado Livre: título até 60 caracteres, descrição detalhada e profissional
-- Shopee: título até 120 caracteres com palavras-chave, descrição mais casual e com emojis
+          content: `${LLM_SAFETY_INSTRUCTION}\n\n${knowledge}\n\nVocê é um copywriter especialista em marketplaces brasileiros.
+Crie títulos e descrições otimizados para os marketplaces solicitados seguindo rigorosamente as regras da base de conhecimento acima.
 Responda APENAS em português brasileiro.`,
         },
         {
@@ -47,15 +57,15 @@ Responda APENAS em português brasileiro.`,
           type: "function",
           function: {
             name: "generate_ads",
-            description: "Retorna textos de anúncios para Mercado Livre e Shopee",
+            description: "Retorna textos de anúncios para os marketplaces",
             parameters: {
               type: "object",
               properties: {
                 mercadoLivre: {
                   type: "object",
                   properties: {
-                    title: { type: "string" },
-                    description: { type: "string" },
+                    title: { type: "string", description: "Título até 60 caracteres" },
+                    description: { type: "string", description: "Descrição detalhada em HTML simples" },
                   },
                   required: ["title", "description"],
                   additionalProperties: false,
@@ -63,8 +73,32 @@ Responda APENAS em português brasileiro.`,
                 shopee: {
                   type: "object",
                   properties: {
-                    title: { type: "string" },
-                    description: { type: "string" },
+                    title: { type: "string", description: "Título até 120 caracteres" },
+                    description: { type: "string", description: "Descrição casual com emojis e hashtags" },
+                  },
+                  required: ["title", "description"],
+                  additionalProperties: false,
+                },
+                amazon: {
+                  type: "object",
+                  properties: {
+                    title: { type: "string", description: "Título até 200 caracteres" },
+                    bullets: {
+                      type: "array",
+                      items: { type: "string" },
+                      description: "5 bullet points começando com benefício em maiúsculas",
+                    },
+                    description: { type: "string", description: "Descrição informativa e completa" },
+                    backend_search_terms: { type: "string", description: "Termos de busca para backend Amazon (250 chars, sem vírgula)" },
+                  },
+                  required: ["title", "bullets", "description"],
+                  additionalProperties: false,
+                },
+                magalu: {
+                  type: "object",
+                  properties: {
+                    title: { type: "string", description: "Título até 150 caracteres" },
+                    description: { type: "string", description: "Descrição clara e acessível com tabela de especificações" },
                   },
                   required: ["title", "description"],
                   additionalProperties: false,

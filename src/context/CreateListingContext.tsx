@@ -24,12 +24,17 @@ export interface VisualDNA {
   headlineColor: string;
 }
 
+export type Marketplace = "mercadoLivre" | "shopee" | "amazon" | "magalu";
+
 export interface ListingData {
   photos: File[];
   photoUrls: string[];
+  marketplace: Marketplace;
+  includeBrand: boolean;
   identification: {
     name: string;
     category: string;
+    suggested_category?: string;
     characteristics: string[];
     extras: string;
     ean?: string;
@@ -40,6 +45,8 @@ export interface ListingData {
   ads: {
     mercadoLivre: AdData;
     shopee: AdData;
+    amazon?: AdData & { bullets?: string[]; backend_search_terms?: string };
+    magalu?: AdData;
   };
   prompts: PromptCard[];
   visualDNA?: VisualDNA;
@@ -56,6 +63,8 @@ interface CreateListingContextType {
   updatePhotos: (photos: File[], urls: string[]) => void;
   updateIdentification: (id: ListingData["identification"]) => void;
   updateAds: (ads: ListingData["ads"]) => void;
+  updateMarketplace: (marketplace: Marketplace) => void;
+  updateIncludeBrand: (includeBrand: boolean) => void;
   updatePrompts: (prompts: PromptCard[]) => void;
   updateVisualDNA: (dna: VisualDNA) => void;
   updateOverlayUrl: (promptId: number, url: string) => void;
@@ -80,6 +89,8 @@ const defaultPrompts: PromptCard[] = Array.from({ length: DEFAULT_PROMPT_COUNT }
 const initialData: ListingData = {
   photos: [],
   photoUrls: [],
+  marketplace: "mercadoLivre",
+  includeBrand: false,
   identification: { name: "", category: "", characteristics: [], extras: "" },
   ads: {
     mercadoLivre: { title: "", description: "" },
@@ -107,6 +118,8 @@ function saveDraft(step: number, completed: boolean[], data: ListingData): boole
       completedSteps: completed,
       data: {
         photoUrls: data.photoUrls,
+        marketplace: data.marketplace,
+        includeBrand: data.includeBrand,
         identification: data.identification,
         ads: data.ads,
         prompts: data.prompts,
@@ -176,6 +189,8 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
                 setData({
                   photos: [],
                   photoUrls: draft.data.photoUrls || [],
+                  marketplace: draft.data.marketplace || "mercadoLivre",
+                  includeBrand: draft.data.includeBrand ?? false,
                   identification: draft.data.identification,
                   ads: draft.data.ads,
                   prompts: draft.data.prompts,
@@ -242,6 +257,14 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
     setData(prev => ({ ...prev, ads }));
   }, []);
 
+  const updateMarketplace = useCallback((marketplace: Marketplace) => {
+    setData(prev => ({ ...prev, marketplace }));
+  }, []);
+
+  const updateIncludeBrand = useCallback((includeBrand: boolean) => {
+    setData(prev => ({ ...prev, includeBrand }));
+  }, []);
+
   const updatePrompts = useCallback((prompts: PromptCard[]) => {
     setData(prev => ({ ...prev, prompts }));
   }, []);
@@ -304,7 +327,7 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
       value={{
         currentStep, completedSteps, data,
         setCurrentStep, completeStep,
-        updatePhotos, updateIdentification, updateAds, updatePrompts,
+        updatePhotos, updateIdentification, updateAds, updateMarketplace, updateIncludeBrand, updatePrompts,
         updateVisualDNA, updateOverlayUrl, updateOverlayElements,
         getOverlayElements, getAllOverlayCopies,
         goNext, goBack, reset, clearDraft,

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, ArrowLeft, Check, Edit3, Loader2, Brain, Plus, ChevronDown } from "lucide-react";
+import { ArrowRight, ArrowLeft, Check, Edit3, Loader2, Brain, Plus, ChevronDown, Tag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
@@ -13,6 +13,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
+import { CATEGORIES } from "@/lib/knowledgeCategories";
 
 export default function StepIdentify() {
   const { data, updateIdentification, completeStep, goNext, goBack } = useCreateListing();
@@ -21,6 +22,7 @@ export default function StepIdentify() {
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(data.identification.name);
   const [category, setCategory] = useState(data.identification.category);
+  const [suggestedCategory, setSuggestedCategory] = useState(data.identification.suggested_category ?? "");
   const [characteristics, setCharacteristics] = useState<string[]>(data.identification.characteristics);
   const [extras, setExtras] = useState(data.identification.extras);
   const [ean, setEan] = useState(data.identification.ean ?? "");
@@ -50,6 +52,7 @@ export default function StepIdentify() {
 
       setName(result.name || "");
       setCategory(result.category || "");
+      if (result.suggested_category) setSuggestedCategory(result.suggested_category);
       setCharacteristics(result.characteristics || []);
       if (result.ean) setEan(result.ean);
       if (result.original_sku) setOriginalSku(result.original_sku);
@@ -57,6 +60,7 @@ export default function StepIdentify() {
       updateIdentification({
         name: result.name || "",
         category: result.category || "",
+        suggested_category: result.suggested_category || "",
         characteristics: result.characteristics || [],
         extras,
         ean: result.ean ?? ean,
@@ -83,7 +87,7 @@ export default function StepIdentify() {
   }, [data.photoUrls, identified]);
 
   const handleConfirm = () => {
-    updateIdentification({ name, category, characteristics, extras, ean, originalSku, internalSku, skuMappingNote });
+    updateIdentification({ name, category, suggested_category: suggestedCategory, characteristics, extras, ean, originalSku, internalSku, skuMappingNote });
     completeStep(1);
     goNext();
   };
@@ -119,6 +123,27 @@ export default function StepIdentify() {
         <div className="space-y-2">
           <label htmlFor="product-category" className="text-xs font-semibold text-muted-foreground uppercase">Categoria</label>
           <Input id="product-category" value={category} onChange={e => setCategory(e.target.value)} disabled={!editing} />
+          {suggestedCategory && (
+            <div className="flex items-center gap-1.5 mt-1">
+              <Tag className="w-3 h-3 text-accent" />
+              <span className="text-xs text-muted-foreground">Guia de conteúdo:</span>
+              {editing ? (
+                <select
+                  className="text-xs bg-transparent border border-border rounded px-1 py-0.5"
+                  value={suggestedCategory}
+                  onChange={e => setSuggestedCategory(e.target.value)}
+                >
+                  {CATEGORIES.map(c => (
+                    <option key={c.key} value={c.key}>{c.label}</option>
+                  ))}
+                </select>
+              ) : (
+                <Badge variant="outline" className="text-xs h-5 py-0">
+                  {CATEGORIES.find(c => c.key === suggestedCategory)?.label ?? suggestedCategory}
+                </Badge>
+              )}
+            </div>
+          )}
         </div>
         <div className="space-y-2 md:col-span-2">
           <div className="flex flex-wrap gap-2">

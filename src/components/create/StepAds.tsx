@@ -7,13 +7,18 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowRight, ArrowLeft, RefreshCw, Loader2, Check } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
+import { Checkbox } from "@/components/ui/checkbox";
 
 export default function StepAds() {
-  const { data, updateAds, completeStep, goNext, goBack } = useCreateListing();
+  const { data, updateAds, updateIncludeBrand, completeStep, goNext, goBack } = useCreateListing();
   const handleError = useErrorHandler();
   const [loading, setLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<"mercadoLivre" | "shopee" | "amazon" | "magalu">("mercadoLivre");
   const [ml, setMl] = useState(data.ads.mercadoLivre);
   const [shopee, setShopee] = useState(data.ads.shopee);
+  const [amazon, setAmazon] = useState(data.ads.amazon ?? { title: "", description: "", bullets: [] as string[] });
+  const [magalu, setMagalu] = useState(data.ads.magalu ?? { title: "", description: "" });
+  const [includeBrand, setIncludeBrand] = useState(data.includeBrand);
   const [generated, setGenerated] = useState(!!data.ads.mercadoLivre.title);
 
   const generateAds = async () => {
@@ -23,8 +28,11 @@ export default function StepAds() {
         body: {
           productName: data.identification.name,
           category: data.identification.category,
+          suggested_category: data.identification.suggested_category,
           characteristics: data.identification.characteristics,
           extras: data.identification.extras,
+          marketplace: "all",
+          includeBrand,
         },
       });
       if (error) throw error;
@@ -32,8 +40,10 @@ export default function StepAds() {
 
       setMl(result.mercadoLivre);
       setShopee(result.shopee);
+      if (result.amazon) setAmazon(result.amazon);
+      if (result.magalu) setMagalu(result.magalu);
       setGenerated(true);
-      updateAds({ mercadoLivre: result.mercadoLivre, shopee: result.shopee });
+      updateAds({ mercadoLivre: result.mercadoLivre, shopee: result.shopee, amazon: result.amazon, magalu: result.magalu });
     } catch (err) {
       handleError(err, "Erro ao gerar anúncios");
     } finally {
@@ -48,9 +58,14 @@ export default function StepAds() {
   }, []);
 
   const handleConfirm = () => {
-    updateAds({ mercadoLivre: ml, shopee });
+    updateAds({ mercadoLivre: ml, shopee, amazon, magalu });
     completeStep(2);
     goNext();
+  };
+
+  const handleIncludeBrandChange = (checked: boolean) => {
+    setIncludeBrand(checked);
+    updateIncludeBrand(checked);
   };
 
   if (loading) {
@@ -98,42 +113,133 @@ export default function StepAds() {
         <p className="text-sm text-muted-foreground">Textos gerados pela IA — edite à vontade</p>
       </div>
 
-      <div className="space-y-5 lg:grid lg:grid-cols-2 lg:gap-5 lg:space-y-0">
-      <div className="bg-card rounded-xl border p-4 space-y-3">
-        <Badge className="bg-[hsl(50,95%,55%)] text-black text-xs font-bold">Mercado Livre</Badge>
-        <div className="space-y-2">
-          <label htmlFor="ml-title" className="text-xs font-semibold text-muted-foreground">Título</label>
-          <Input id="ml-title" value={ml.title} onChange={e => setMl({ ...ml, title: e.target.value })} maxLength={60} />
-          <div className="flex justify-end">
-            <span className={`text-xs ${ml.title.length > 60 ? "text-destructive" : "text-muted-foreground"}`}>
-              {ml.title.length}/60
-            </span>
-          </div>
-        </div>
-        <div className="space-y-2">
-          <label htmlFor="ml-desc" className="text-xs font-semibold text-muted-foreground">Descrição</label>
-          <Textarea id="ml-desc" value={ml.description} onChange={e => setMl({ ...ml, description: e.target.value })} rows={5} />
-        </div>
+      {/* Brand toggle */}
+      <div className="flex items-center gap-2 p-3 bg-muted/40 rounded-lg border">
+        <Checkbox
+          id="include-brand"
+          checked={includeBrand}
+          onCheckedChange={(v) => handleIncludeBrandChange(v === true)}
+        />
+        <label htmlFor="include-brand" className="text-sm cursor-pointer select-none">
+          Incluir marca no título
+        </label>
+        <span className="text-xs text-muted-foreground ml-1">(padrão: sem marca nos títulos)</span>
       </div>
 
-      {/* Shopee */}
-      <div className="bg-card rounded-xl border p-4 space-y-3">
-        <Badge className="bg-[hsl(10,85%,55%)] text-white text-xs font-bold">Shopee</Badge>
-        <div className="space-y-2">
-          <label htmlFor="shopee-title" className="text-xs font-semibold text-muted-foreground">Título</label>
-          <Input id="shopee-title" value={shopee.title} onChange={e => setShopee({ ...shopee, title: e.target.value })} maxLength={120} />
-          <div className="flex justify-end">
-            <span className={`text-xs ${shopee.title.length > 120 ? "text-destructive" : "text-muted-foreground"}`}>
-              {shopee.title.length}/120
-            </span>
+      {/* Marketplace tabs */}
+      <div className="flex gap-2 overflow-x-auto pb-1">
+        {(["mercadoLivre", "shopee", "amazon", "magalu"] as const).map(tab => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
+              activeTab === tab
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted text-muted-foreground hover:bg-muted/80"
+            }`}
+          >
+            {tab === "mercadoLivre" ? "Mercado Livre" : tab === "shopee" ? "Shopee" : tab === "amazon" ? "Amazon" : "Magalu"}
+          </button>
+        ))}
+      </div>
+
+      {/* Mercado Livre */}
+      {activeTab === "mercadoLivre" && (
+        <div className="bg-card rounded-xl border p-4 space-y-3">
+          <Badge className="bg-[hsl(50,95%,55%)] text-black text-xs font-bold">Mercado Livre</Badge>
+          <div className="space-y-2">
+            <label htmlFor="ml-title" className="text-xs font-semibold text-muted-foreground">Título</label>
+            <Input id="ml-title" value={ml.title} onChange={e => setMl({ ...ml, title: e.target.value })} maxLength={60} />
+            <div className="flex justify-end">
+              <span className={`text-xs ${ml.title.length > 60 ? "text-destructive" : "text-muted-foreground"}`}>
+                {ml.title.length}/60
+              </span>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="ml-desc" className="text-xs font-semibold text-muted-foreground">Descrição</label>
+            <Textarea id="ml-desc" value={ml.description} onChange={e => setMl({ ...ml, description: e.target.value })} rows={6} />
           </div>
         </div>
-        <div className="space-y-2">
-          <label htmlFor="shopee-desc" className="text-xs font-semibold text-muted-foreground">Descrição</label>
-          <Textarea id="shopee-desc" value={shopee.description} onChange={e => setShopee({ ...shopee, description: e.target.value })} rows={5} />
+      )}
+
+      {/* Shopee */}
+      {activeTab === "shopee" && (
+        <div className="bg-card rounded-xl border p-4 space-y-3">
+          <Badge className="bg-[hsl(10,85%,55%)] text-white text-xs font-bold">Shopee</Badge>
+          <div className="space-y-2">
+            <label htmlFor="shopee-title" className="text-xs font-semibold text-muted-foreground">Título</label>
+            <Input id="shopee-title" value={shopee.title} onChange={e => setShopee({ ...shopee, title: e.target.value })} maxLength={120} />
+            <div className="flex justify-end">
+              <span className={`text-xs ${shopee.title.length > 120 ? "text-destructive" : "text-muted-foreground"}`}>
+                {shopee.title.length}/120
+              </span>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="shopee-desc" className="text-xs font-semibold text-muted-foreground">Descrição</label>
+            <Textarea id="shopee-desc" value={shopee.description} onChange={e => setShopee({ ...shopee, description: e.target.value })} rows={6} />
+          </div>
         </div>
-      </div>
-      </div>
+      )}
+
+      {/* Amazon */}
+      {activeTab === "amazon" && (
+        <div className="bg-card rounded-xl border p-4 space-y-3">
+          <Badge className="bg-[hsl(210,90%,45%)] text-white text-xs font-bold">Amazon</Badge>
+          <div className="space-y-2">
+            <label htmlFor="amazon-title" className="text-xs font-semibold text-muted-foreground">Título</label>
+            <Input id="amazon-title" value={amazon.title} onChange={e => setAmazon({ ...amazon, title: e.target.value })} maxLength={200} />
+            <div className="flex justify-end">
+              <span className={`text-xs ${amazon.title.length > 200 ? "text-destructive" : "text-muted-foreground"}`}>
+                {amazon.title.length}/200
+              </span>
+            </div>
+          </div>
+          {amazon.bullets && amazon.bullets.length > 0 && (
+            <div className="space-y-2">
+              <label className="text-xs font-semibold text-muted-foreground">Bullet Points (5)</label>
+              {amazon.bullets.map((b, i) => (
+                <Input
+                  key={i}
+                  value={b}
+                  onChange={e => {
+                    const next = [...(amazon.bullets ?? [])];
+                    next[i] = e.target.value;
+                    setAmazon({ ...amazon, bullets: next });
+                  }}
+                  maxLength={200}
+                />
+              ))}
+            </div>
+          )}
+          <div className="space-y-2">
+            <label htmlFor="amazon-desc" className="text-xs font-semibold text-muted-foreground">Descrição</label>
+            <Textarea id="amazon-desc" value={amazon.description} onChange={e => setAmazon({ ...amazon, description: e.target.value })} rows={5} />
+          </div>
+        </div>
+      )}
+
+      {/* Magalu */}
+      {activeTab === "magalu" && (
+        <div className="bg-card rounded-xl border p-4 space-y-3">
+          <Badge className="bg-[hsl(320,85%,45%)] text-white text-xs font-bold">Magazine Luiza</Badge>
+          <div className="space-y-2">
+            <label htmlFor="magalu-title" className="text-xs font-semibold text-muted-foreground">Título</label>
+            <Input id="magalu-title" value={magalu.title} onChange={e => setMagalu({ ...magalu, title: e.target.value })} maxLength={150} />
+            <div className="flex justify-end">
+              <span className={`text-xs ${magalu.title.length > 150 ? "text-destructive" : "text-muted-foreground"}`}>
+                {magalu.title.length}/150
+              </span>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <label htmlFor="magalu-desc" className="text-xs font-semibold text-muted-foreground">Descrição</label>
+            <Textarea id="magalu-desc" value={magalu.description} onChange={e => setMagalu({ ...magalu, description: e.target.value })} rows={5} />
+          </div>
+        </div>
+      )}
+
       <Button variant="outline" className="w-full gap-2" onClick={generateAds}>
         <RefreshCw className="w-4 h-4" /> Regenerar tudo
       </Button>

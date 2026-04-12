@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getCorsHeaders, authenticate, errorResponse, handleAIError, LLM_SAFETY_INSTRUCTION, createRequestLogger, callAI, parseToolCallResult, checkRateLimit } from "../_shared/helpers.ts";
+import { CATEGORIES, normalizeCategory } from "../_shared/knowledge/index.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -29,6 +30,8 @@ serve(async (req) => {
       image_url: { url },
     }));
 
+    const categoryOptions = CATEGORIES.map((c) => `${c.key} (${c.label})`).join(", ");
+
     const response = await callAI({
       userId,
       functionName: "identify",
@@ -39,12 +42,14 @@ serve(async (req) => {
           content: `${LLM_SAFETY_INSTRUCTION}\n\nVocê é um especialista em identificação de produtos para e-commerce brasileiro.
 Analise as fotos do produto e retorne informações detalhadas.
 Responda APENAS em português brasileiro.
-Se visível na embalagem, extraia o código de barras/EAN/GTIN (13 dígitos) e o SKU do fabricante. Se não visíveis, retorne null para esses campos.`,
+Se visível na embalagem, extraia o código de barras/EAN/GTIN (13 dígitos) e o SKU do fabricante. Se não visíveis, retorne null para esses campos.
+
+Para o campo suggested_category, escolha O MAIS ADEQUADO entre estas opções: ${categoryOptions}`,
         },
         {
           role: "user",
           content: [
-            { type: "text", text: "Identifique este produto com base nas fotos. Retorne: nome do produto, categoria, lista de características principais, e se visível na embalagem, o código EAN/GTIN e o SKU do fabricante." },
+            { type: "text", text: "Identifique este produto com base nas fotos. Retorne: nome do produto, categoria descritiva, a suggested_category (key exato da lista fornecida), lista de características principais, e se visível na embalagem, o código EAN/GTIN e o SKU do fabricante." },
             ...imageContent,
           ],
         },
@@ -59,7 +64,11 @@ Se visível na embalagem, extraia o código de barras/EAN/GTIN (13 dígitos) e o
               type: "object",
               properties: {
                 name: { type: "string", description: "Nome do produto" },
-                category: { type: "string", description: "Categoria do produto (ex: Papelaria, Eletrônicos)" },
+                category: { type: "string", description: "Categoria descritiva do produto (ex: Papelaria, Eletrônicos)" },
+                suggested_category: {
+                  type: "string",
+                  description: "Chave de categoria do sistema (ex: acessorios_celular, eletronicos, moda, brinquedos…)",
+                },
                 characteristics: {
                   type: "array",
                   items: { type: "string" },
@@ -74,7 +83,7 @@ Se visível na embalagem, extraia o código de barras/EAN/GTIN (13 dígitos) e o
                   description: "SKU ou código do fabricante impresso na embalagem. Null se não visível.",
                 },
               },
-              required: ["name", "category", "characteristics"],
+              required: ["name", "category", "suggested_category", "characteristics"],
             },
           },
         },
@@ -90,9 +99,16 @@ Se visível na embalagem, extraia o código de barras/EAN/GTIN (13 dígitos) e o
     const data = await response.json();
     const parsed = parseToolCallResult(data, cors);
     if (parsed instanceof Response) return parsed;
-    const result = parsed.result;
+    const result = parsed.result as Record<string, unknown>;
 
-    log.info("done", { product: (result as any)?.name });
+    // Normalize suggested_category to a valid key
+    if (result.suggested_category && typeof result.suggested_category === "string") {
+      result.suggested_category = normalizeCategory(result.suggested_category);
+    } else {
+      result.suggested_category = normalizeCategory(typeof result.category === "string" ? result.category : "");
+    }
+
+    log.info("done", { product: result?.name });
     return new Response(JSON.stringify(result), {
       headers: { ...cors, "Content-Type": "application/json" },
     });

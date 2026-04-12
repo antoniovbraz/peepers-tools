@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, sanitizeArrayForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger, callAI, parseToolCallResult, checkRateLimit } from "../_shared/helpers.ts";
+import { buildKnowledge } from "../_shared/knowledge/index.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -14,7 +15,7 @@ serve(async (req) => {
     const log = createRequestLogger("generate-prompts", userId);
     log.info("start");
 
-    const { productName, category, characteristics, extras, adTitle } = await req.json();
+    const { productName, category, suggested_category, characteristics, extras, adTitle, marketplace } = await req.json();
     if (!productName || typeof productName !== "string" || productName.length > 500) {
       return errorResponse("Nome do produto inválido", 400, cors, "VALIDATION_ERROR");
     }
@@ -29,7 +30,13 @@ serve(async (req) => {
 
     const productInfo = `Produto: ${sanitizeForLLM(productName, 500)}\nCategoria: ${sanitizeForLLM(category || "", 200)}\nCaracterísticas: ${sanitizeArrayForLLM(characteristics || [], 20, 200)}\nExtras: ${sanitizeForLLM(extras || "nenhuma", 1000)}\nTítulo do anúncio: ${sanitizeForLLM(adTitle || productName, 200)}`;
 
-    const systemPrompt = `${LLM_SAFETY_INSTRUCTION}\n\nYou are an expert e-commerce product photographer, prompt engineer, and visual campaign director.
+    const imageKnowledge = buildKnowledge({
+      functionName: "prompts",
+      marketplace: (["mercadoLivre", "shopee", "amazon", "magalu"].includes(marketplace)) ? marketplace : "mercadoLivre",
+      category: suggested_category || category || "",
+    });
+
+    const systemPrompt = `${LLM_SAFETY_INSTRUCTION}\n\n${imageKnowledge}\n\nYou are an expert e-commerce product photographer, prompt engineer, and visual campaign director.
 
 You must generate EXACTLY 7 image prompts in ENGLISH for the product described below, PLUS a "visualDNA" object that defines the shared art direction for the entire campaign.
 
