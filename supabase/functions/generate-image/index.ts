@@ -35,6 +35,7 @@ serve(async (req) => {
 
 
 
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const contentParts: any[] = [];
     const photos = (referencePhotos || []).slice(0, 3);
     if (photos.length > 0) {

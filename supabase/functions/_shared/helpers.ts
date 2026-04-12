@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const CORS_ALLOW_HEADERS =
@@ -32,6 +33,7 @@ export function getCorsHeaders(req: Request): Record<string, string> {
 export function sanitizeForLLM(input: string, maxLen = 500): string {
   if (!input || typeof input !== "string") return "";
   // Strip control chars except newline and tab
+  // eslint-disable-next-line no-control-regex
   const cleaned = input.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
   const truncated = cleaned.slice(0, maxLen);
   return `<user_input>${truncated}</user_input>`;

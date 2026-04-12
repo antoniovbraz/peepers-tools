@@ -56,8 +56,8 @@ export default function Auth() {
         if (error) throw error;
         toast({ title: "Senha atualizada!", description: "Sua nova senha foi definida com sucesso." });
         setIsRecovery(false);
-      } catch (err: any) {
-        toast({ title: "Erro", description: err.message || "Não foi possível atualizar a senha.", variant: "destructive" });
+      } catch (err: unknown) {
+        toast({ title: "Erro", description: (err as Error).message || "Não foi possível atualizar a senha.", variant: "destructive" });
       } finally {
         setUpdatingPassword(false);
       }
@@ -126,11 +126,11 @@ export default function Auth() {
         if (error) throw error;
         toast({ title: "Conta criada!", description: "Verifique seu email para confirmar." });
       }
-    } catch (err: any) {
-      const msg = err.message?.includes("Invalid login") ? "Email ou senha incorretos." 
-        : err.message?.includes("Email not confirmed") ? "Confirme seu email antes de entrar."
-        : err.message?.includes("already registered") ? "Este email já está cadastrado."
-        : err.message || "Erro desconhecido";
+    } catch (err: unknown) {
+      const msg = (err as Error).message?.includes("Invalid login") ? "Email ou senha incorretos." 
+        : (err as Error).message?.includes("Email not confirmed") ? "Confirme seu email antes de entrar."
+        : (err as Error).message?.includes("already registered") ? "Este email já está cadastrado."
+        : (err as Error).message || "Erro desconhecido";
       toast({ title: "Erro", description: msg, variant: "destructive" });
     } finally {
       setSubmitting(false);
@@ -149,8 +149,8 @@ export default function Auth() {
       });
       if (error) throw error;
       toast({ title: "Email enviado!", description: "Verifique sua caixa de entrada para redefinir a senha." });
-    } catch (err: any) {
-      toast({ title: "Erro", description: err.message || "Não foi possível enviar o email.", variant: "destructive" });
+    } catch (err: unknown) {
+      toast({ title: "Erro", description: (err as Error).message || "Não foi possível enviar o email.", variant: "destructive" });
     } finally {
       setResettingPassword(false);
     }

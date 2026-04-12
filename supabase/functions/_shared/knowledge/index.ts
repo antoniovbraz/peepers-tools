@@ -5,7 +5,7 @@
  */
 
 import { MERCADO_LIVRE_RULES, SHOPEE_RULES, AMAZON_BR_RULES, MAGALU_RULES } from "./marketplace-rules.ts";
-import { COPYWRITING_FRAMEWORK, DESCRIPTION_TEMPLATES } from "./copywriting.ts";
+import { COPYWRITING_FRAMEWORK } from "./copywriting.ts";
 import { getCategoryGuide, normalizeCategory, type KnowledgeCategory } from "./category-guides.ts";
 import { SEO_STRATEGY } from "./seo-strategy.ts";
 import { IMAGE_RULES } from "./image-rules.ts";

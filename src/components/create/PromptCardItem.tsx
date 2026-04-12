@@ -109,7 +109,7 @@ export default function PromptCardItem({
       URL.revokeObjectURL(blobUrl);
       blobUrlRef.current = null;
       onUpdate(p.id, { imageUrl: urlData.publicUrl });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Upload to storage failed:", err);
       // Keep blob URL as fallback
     }
