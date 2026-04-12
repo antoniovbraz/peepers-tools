@@ -1,6 +1,6 @@
 # Copilot Instructions — Peepers Tools
 
-AI-powered product listing generator for Brazilian marketplaces (Mercado Livre and Shopee). All user-facing text is in **Brazilian Portuguese**.
+AI-powered product listing generator for Brazilian marketplaces (Mercado Livre, Shopee, Amazon BR, and Magalu). All user-facing text is in **Brazilian Portuguese**.
 
 ## Commands
 
@@ -35,6 +35,15 @@ Steps 3–4 (image-heavy) are wrapped in individual `ErrorBoundary` instances to
 ### State Management
 All wizard state lives in `CreateListingContext` (`src/context/CreateListingContext.tsx`). There is no Redux or Zustand. The context auto-saves to `localStorage` (key: `draft_product_v2`) with a 2-second debounce. On mount it offers to restore a draft via a toast. `File` objects are excluded from the draft (not serializable).
 
+Key `ListingData` fields:
+- `marketplace: Marketplace` — active marketplace (`"mercadoLivre"` | `"shopee"` | `"amazon"` | `"magalu"`)
+- `includeBrand: boolean` — whether to include brand name in generated titles
+- `identification.suggested_category?: string` — normalised category key returned by `identify-product`
+- `ads.amazon?: AdData & { bullets?: string[]; backend_search_terms?: string }` — Amazon-specific ad data
+- `ads.magalu?: AdData` — Magalu ad data
+
+Context handlers: `updateMarketplace(marketplace)`, `updateIncludeBrand(includeBrand)` in addition to the existing `updateIdentification()`, `updateAds()`, etc.
+
 ### AI Edge Functions (Deno / Supabase)
 All AI calls go through Supabase Edge Functions in `supabase/functions/`. Each function:
 1. Calls `authenticate(req, cors)` to verify the Supabase JWT
@@ -58,14 +67,26 @@ Shared utilities live in `supabase/functions/_shared/helpers.ts`:
 Supabase Postgres with RLS on all tables. All policies enforce `auth.uid() = user_id`.
 
 - `products` — core product info + `visual_dna` JSONB
-- `ads` — one row per marketplace (`mercadoLivre` | `shopee`) per product
+- `ads` — one row per marketplace (`mercadoLivre` | `shopee` | `amazon` | `magalu`) per product
 - `creatives` — AI-generated images, overlay URLs, and `overlay_elements` JSONB
 - `rate_limits` — per-user per-function hourly quota tracking
 
 Storage buckets: `product-photos` (public) and `generated-images` (public).
 
 ### Overlay System
-`src/lib/overlayTemplates.ts` defines `OverlayElement` — all position/size values are **percentages (0–100)** relative to the image. Templates are indexed 1–7 matching `IMAGE_ROLES`. Use `OverlayElement` directly; `OverlayElementData` is a deprecated alias.
+`OverlayElement` is the canonical type, defined in `src/components/create/overlay-editor/types.ts` — all position/size values are **percentages (0–100)** relative to the image. `src/lib/overlayTemplates.ts` imports it and defines `IMAGE_ROLES` (seven image slots) plus default templates per slot. Templates are indexed 1–7; index 1 (cover) has no overlay. Use `OverlayElement` directly; `OverlayElementData` is a deprecated alias.
+
+### Knowledge Base
+`supabase/functions/_shared/knowledge/` contains 7 modules assembled by `buildKnowledge(options)` before each AI call (token budget ~6 000):
+- `marketplace-rules.ts` — title format, tone, char limits per marketplace (ML 60, Shopee 120, Amazon BR 200, Magalu 150)
+- `copywriting.ts` — AIDA framework, PT-BR power words, anti-patterns
+- `category-guides.ts` — 10 normalised categories with required fields and sales angles; exports `normalizeCategory()` and `CATEGORIES`
+- `seo-strategy.ts` — keyword strategy and backend search terms per marketplace
+- `image-rules.ts` — resolution/format rules + AI prompt guidelines per category
+- `overlay-copy.ts` — char limits per element (headline 30, subheadline 50, bullet 40, badge 15, CTA 20)
+- `index.ts` — `buildKnowledge({ functionName, marketplace, category, includeBrand })` assembler
+
+Frontend mirror: `src/lib/knowledgeCategories.ts` exports the same `CATEGORIES` array and `KnowledgeCategory` type for use in UI components.
 
 ## Key Conventions
 
