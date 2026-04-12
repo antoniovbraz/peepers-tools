@@ -30,7 +30,7 @@ export function ApiKeyGuard({ children }: { children: React.ReactNode }) {
 
         if (cancelled) return;
 
-        if (!error && Array.isArray(data) && data.length > 0) {
+        if (!error && Array.isArray(data?.keys) && data.keys.length > 0) {
           setChecked(true);
           return;
         }
