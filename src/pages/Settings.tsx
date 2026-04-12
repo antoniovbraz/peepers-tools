@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Shield, Eye, EyeOff, Check, X, Loader2, Trash2, User, Cpu, BarChart3 } from "lucide-react";
+import { Shield, Eye, EyeOff, Check, X, Loader2, Trash2, User, Cpu, BarChart3, ExternalLink } from "lucide-react";
 
 /* ── Types ── */
 
@@ -249,9 +249,10 @@ function TabProviders() {
                         href={provider.docs_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-xs text-primary hover:underline"
+                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
                       >
-                        Obter chave de API →
+                        Obter chave de API
+                        <ExternalLink className="w-3 h-3" />
                       </a>
                     )}
                   </div>
