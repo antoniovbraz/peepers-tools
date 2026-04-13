@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
-import { Shield, Eye, EyeOff, Check, X, Loader2, Trash2, User, Cpu, BarChart3, ExternalLink } from "lucide-react";
+import { Shield, Eye, EyeOff, Check, X, Loader2, Trash2, User, Cpu, BarChart3, ExternalLink, Zap, Scale, Crown, Sliders, ChevronDown } from "lucide-react";
 
 /* ── Types ── */
 
@@ -19,6 +19,101 @@ interface UserKey {
   key_hint: string;
   is_valid: boolean;
   last_validated_at: string | null;
+}
+
+interface AIModel {
+  id: string;
+  provider_id: string;
+  display_name: string;
+  capabilities: string[];
+  recommended_for: string[];
+  cost_per_1k_input: number | null;
+  cost_per_1k_output: number | null;
+  cost_per_image: number | null;
+}
+
+interface FunctionConfig {
+  provider_id: string;
+  model_id: string;
+  temperature: number;
+}
+
+type ProfileId = "economico" | "equilibrado" | "premium" | "personalizado";
+
+const AI_FUNCTIONS = ["identify", "ads", "prompts", "image", "overlay_copy"] as const;
+type AIFunction = typeof AI_FUNCTIONS[number];
+
+const FUNCTION_LABELS: Record<AIFunction, string> = {
+  identify: "Identificar Produto",
+  ads: "Gerar Anúncios",
+  prompts: "Gerar Prompts",
+  image: "Gerar Imagem",
+  overlay_copy: "Gerar Copy Overlay",
+};
+
+const FUNCTION_REQUIREMENTS: Record<AIFunction, string[]> = {
+  identify: ["vision", "function_calling"],
+  ads: ["text", "function_calling"],
+  prompts: ["text", "function_calling"],
+  image: ["image_gen"],
+  overlay_copy: ["text", "function_calling"],
+};
+
+const PROFILE_CONFIGS: Record<Exclude<ProfileId, "personalizado">, Record<AIFunction, FunctionConfig>> = {
+  economico: {
+    identify:     { provider_id: "google",    model_id: "gemini-2.5-flash", temperature: 0.3 },
+    ads:          { provider_id: "google",    model_id: "gemini-2.5-flash", temperature: 0.7 },
+    prompts:      { provider_id: "google",    model_id: "gemini-2.5-flash", temperature: 0.7 },
+    image:        { provider_id: "replicate", model_id: "flux-schnell", temperature: 0.9 },
+    overlay_copy: { provider_id: "google",    model_id: "gemini-2.5-flash", temperature: 0.7 },
+  },
+  equilibrado: {
+    identify:     { provider_id: "google",    model_id: "gemini-2.5-flash", temperature: 0.3 },
+    ads:          { provider_id: "anthropic", model_id: "claude-haiku-3.5", temperature: 0.7 },
+    prompts:      { provider_id: "google",    model_id: "gemini-2.5-flash", temperature: 0.7 },
+    image:        { provider_id: "google",    model_id: "gemini-2.0-flash-preview-image-generation", temperature: 0.9 },
+    overlay_copy: { provider_id: "anthropic", model_id: "claude-haiku-3.5", temperature: 0.7 },
+  },
+  premium: {
+    identify:     { provider_id: "openai",    model_id: "gpt-4o", temperature: 0.3 },
+    ads:          { provider_id: "anthropic", model_id: "claude-sonnet-4-20250514", temperature: 0.7 },
+    prompts:      { provider_id: "anthropic", model_id: "claude-sonnet-4-20250514", temperature: 0.7 },
+    image:        { provider_id: "openai",    model_id: "dall-e-3", temperature: 0.9 },
+    overlay_copy: { provider_id: "anthropic", model_id: "claude-sonnet-4-20250514", temperature: 0.7 },
+  },
+};
+
+const PROFILE_META: Record<ProfileId, { name: string; description: string; icon: React.ElementType }> = {
+  economico:     { name: "Econômico",     description: "Menor custo por produto",   icon: Zap },
+  equilibrado:   { name: "Equilibrado",   description: "Melhor custo-benefício",    icon: Scale },
+  premium:       { name: "Premium",       description: "Máxima qualidade",          icon: Crown },
+  personalizado: { name: "Personalizado", description: "Escolha manual por função", icon: Sliders },
+};
+
+function estimateCost(config: Record<AIFunction, FunctionConfig>, models: AIModel[]): string | null {
+  let total = 0;
+  const modelMap = new Map(models.map((m) => [m.id, m]));
+
+  for (const fn of AI_FUNCTIONS) {
+    const c = config[fn];
+    const model = modelMap.get(c.model_id);
+    if (!model) return null;
+
+    if (fn === "image") {
+      total += (model.cost_per_image ?? 0) * 7;
+    } else {
+      total += (model.cost_per_1k_input ?? 0) * 2 + (model.cost_per_1k_output ?? 0) * 1;
+    }
+  }
+
+  if (total === 0) return null;
+  return total < 0.01
+    ? `~${(total * 100).toFixed(1)}¢`
+    : `~$${total.toFixed(2)}`;
+}
+
+function getRequiredProviders(config: Record<AIFunction, FunctionConfig>): string[] {
+  return [...new Set(AI_FUNCTIONS.map((fn) => config[fn].provider_id))];
 }
 
 /* ── Tab Button ── */
@@ -101,6 +196,11 @@ function TabProviders() {
   const [savingId, setSavingId] = useState<string | null>(null);
   const [validatingId, setValidatingId] = useState<string | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
+  const [models, setModels] = useState<AIModel[]>([]);
+  const [activeProfile, setActiveProfile] = useState<ProfileId | null>(null);
+  const [customConfig, setCustomConfig] = useState<Record<AIFunction, FunctionConfig> | null>(null);
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [expandedCustom, setExpandedCustom] = useState(false);
 
   const loadData = useCallback(async () => {
     if (!session) return;
@@ -120,6 +220,49 @@ function TabProviders() {
       );
       if (!keyError && keyData?.keys) {
         setUserKeys(keyData.keys);
+      }
+
+      // Load models
+      const { data: modelData } = await supabase
+        .from("ai_models")
+        .select("*")
+        .eq("status", "active");
+      setModels(modelData || []);
+
+      // Load current AI config to detect active profile
+      const { data: configData } = await supabase
+        .from("user_ai_config")
+        .select("function_name, provider_id, model_id, temperature");
+
+      if (configData && configData.length > 0) {
+        const configMap: Record<string, FunctionConfig> = {};
+        for (const row of configData) {
+          configMap[row.function_name] = {
+            provider_id: row.provider_id,
+            model_id: row.model_id,
+            temperature: Number(row.temperature),
+          };
+        }
+
+        let matched: ProfileId | null = null;
+        for (const [profileId, profileConfig] of Object.entries(PROFILE_CONFIGS)) {
+          const isMatch = AI_FUNCTIONS.every((fn) => {
+            const saved = configMap[fn];
+            const preset = profileConfig[fn];
+            return saved && saved.provider_id === preset.provider_id && saved.model_id === preset.model_id;
+          });
+          if (isMatch) {
+            matched = profileId as ProfileId;
+            break;
+          }
+        }
+
+        if (matched) {
+          setActiveProfile(matched);
+        } else if (AI_FUNCTIONS.every((fn) => configMap[fn])) {
+          setActiveProfile("personalizado");
+          setCustomConfig(configMap as Record<AIFunction, FunctionConfig>);
+        }
       }
     } catch {
       // silent
@@ -211,6 +354,114 @@ function TabProviders() {
       });
     } finally {
       setDeleting(null);
+    }
+  };
+
+  const handleSelectProfile = async (profileId: ProfileId) => {
+    if (profileId === "personalizado") {
+      setExpandedCustom(true);
+      if (!customConfig) {
+        const base = activeProfile && activeProfile !== "personalizado"
+          ? PROFILE_CONFIGS[activeProfile]
+          : PROFILE_CONFIGS.equilibrado;
+        setCustomConfig({ ...base });
+      }
+      setActiveProfile("personalizado");
+      return;
+    }
+
+    const config = PROFILE_CONFIGS[profileId];
+    const requiredProviders = getRequiredProviders(config);
+    const missingProviders = requiredProviders.filter(
+      (pid) => !userKeys.some((k) => k.provider_id === pid)
+    );
+
+    if (missingProviders.length > 0) {
+      toast({
+        title: "Chaves de API necessárias",
+        description: `Configure as chaves: ${missingProviders.join(", ")}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSavingProfile(true);
+    try {
+      for (const fn of AI_FUNCTIONS) {
+        const c = config[fn];
+        const { error } = await supabase
+          .from("user_ai_config")
+          .upsert(
+            {
+              user_id: session!.user.id,
+              function_name: fn,
+              provider_id: c.provider_id,
+              model_id: c.model_id,
+              temperature: c.temperature,
+            },
+            { onConflict: "user_id,function_name" }
+          );
+        if (error) throw error;
+      }
+      setActiveProfile(profileId);
+      setExpandedCustom(false);
+      toast({ title: `Perfil "${PROFILE_META[profileId].name}" ativado!` });
+    } catch (err) {
+      toast({
+        title: "Erro ao salvar perfil",
+        description: err instanceof Error ? err.message : "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
+  const handleSaveCustomProfile = async () => {
+    if (!customConfig) return;
+
+    const requiredProviders = getRequiredProviders(customConfig);
+    const missingProviders = requiredProviders.filter(
+      (pid) => !userKeys.some((k) => k.provider_id === pid)
+    );
+
+    if (missingProviders.length > 0) {
+      toast({
+        title: "Chaves de API necessárias",
+        description: `Configure as chaves: ${missingProviders.join(", ")}`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSavingProfile(true);
+    try {
+      for (const fn of AI_FUNCTIONS) {
+        const c = customConfig[fn];
+        const { error } = await supabase
+          .from("user_ai_config")
+          .upsert(
+            {
+              user_id: session!.user.id,
+              function_name: fn,
+              provider_id: c.provider_id,
+              model_id: c.model_id,
+              temperature: c.temperature,
+            },
+            { onConflict: "user_id,function_name" }
+          );
+        if (error) throw error;
+      }
+      setActiveProfile("personalizado");
+      toast({ title: "Perfil personalizado salvo!" });
+    } catch (err) {
+      toast({
+        title: "Erro ao salvar perfil",
+        description: err instanceof Error ? err.message : "Erro desconhecido",
+        variant: "destructive",
+      });
+    } finally {
+      setSavingProfile(false);
     }
   };
 
@@ -348,6 +599,175 @@ function TabProviders() {
             </div>
           );
         })}
+      </div>
+
+      {/* ── AI Profiles ── */}
+      <div className="mt-10 space-y-6">
+        <div>
+          <h3 className="text-lg font-semibold">Perfis de IA</h3>
+          <p className="text-sm text-muted-foreground">
+            Selecione um perfil para configurar quais modelos serão usados em cada etapa.
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          {(Object.keys(PROFILE_META) as ProfileId[]).map((profileId) => {
+            const meta = PROFILE_META[profileId];
+            const Icon = meta.icon;
+            const isActive = activeProfile === profileId;
+            const isPreset = profileId !== "personalizado";
+            const config = isPreset ? PROFILE_CONFIGS[profileId] : null;
+            const cost = config ? estimateCost(config, models) : null;
+            const requiredProviders = config ? getRequiredProviders(config) : [];
+            const missingKeys = requiredProviders.filter(
+              (pid) => !userKeys.some((k) => k.provider_id === pid)
+            );
+            const isDisabled = isPreset && missingKeys.length > 0;
+
+            return (
+              <button
+                key={profileId}
+                onClick={() => !isDisabled && !savingProfile && handleSelectProfile(profileId)}
+                disabled={isDisabled || savingProfile}
+                className={`relative text-left p-5 rounded-lg border-2 transition-all ${
+                  isActive
+                    ? "border-primary bg-primary/5"
+                    : isDisabled
+                    ? "border-muted bg-muted/30 opacity-60 cursor-not-allowed"
+                    : "border-border hover:border-primary/50 hover:bg-muted/50 cursor-pointer"
+                }`}
+              >
+                {isActive && (
+                  <span className="absolute top-3 right-3">
+                    <Check className="w-4 h-4 text-primary" />
+                  </span>
+                )}
+                <div className="flex items-center gap-3 mb-2">
+                  <div className={`p-2 rounded-lg ${isActive ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"}`}>
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <p className="font-medium">{meta.name}</p>
+                    <p className="text-xs text-muted-foreground">{meta.description}</p>
+                  </div>
+                </div>
+                {cost && (
+                  <p className="text-xs text-muted-foreground mt-2">
+                    Custo estimado: <span className="font-medium text-foreground">{cost}</span> /produto
+                  </p>
+                )}
+                {isDisabled && (
+                  <p className="text-xs text-destructive mt-2">
+                    Requer: {missingKeys.join(", ")}
+                  </p>
+                )}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Active profile details */}
+        {activeProfile && activeProfile !== "personalizado" && (
+          <div className="bg-card border rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b bg-muted/50">
+                  <th className="text-left px-4 py-2.5 font-medium">Função</th>
+                  <th className="text-left px-4 py-2.5 font-medium">Modelo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {AI_FUNCTIONS.map((fn) => {
+                  const c = PROFILE_CONFIGS[activeProfile][fn];
+                  const model = models.find((m) => m.id === c.model_id);
+                  return (
+                    <tr key={fn} className="border-b last:border-0">
+                      <td className="px-4 py-2.5 text-muted-foreground">{FUNCTION_LABELS[fn]}</td>
+                      <td className="px-4 py-2.5">{model?.display_name || c.model_id}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        {/* Custom profile editor */}
+        {activeProfile === "personalizado" && (
+          <div className="space-y-4">
+            <button
+              onClick={() => setExpandedCustom(!expandedCustom)}
+              className="flex items-center gap-2 text-sm font-medium text-primary hover:underline"
+            >
+              <ChevronDown className={`w-4 h-4 transition-transform ${expandedCustom ? "rotate-180" : ""}`} />
+              {expandedCustom ? "Ocultar configurações" : "Editar configurações"}
+            </button>
+
+            {expandedCustom && customConfig && (
+              <div className="bg-card border rounded-lg p-5 space-y-4">
+                {AI_FUNCTIONS.map((fn) => {
+                  const currentConfig = customConfig[fn];
+                  const requirements = FUNCTION_REQUIREMENTS[fn];
+                  const compatibleModels = models.filter((m) =>
+                    requirements.every((req) => m.capabilities.includes(req)) &&
+                    userKeys.some((k) => k.provider_id === m.provider_id)
+                  );
+
+                  return (
+                    <div key={fn} className="space-y-1.5">
+                      <label className="text-sm font-medium">{FUNCTION_LABELS[fn]}</label>
+                      <select
+                        value={currentConfig.model_id}
+                        onChange={(e) => {
+                          const selectedModel = models.find((m) => m.id === e.target.value);
+                          if (selectedModel) {
+                            setCustomConfig((prev) => prev ? {
+                              ...prev,
+                              [fn]: {
+                                ...prev[fn],
+                                provider_id: selectedModel.provider_id,
+                                model_id: selectedModel.id,
+                              },
+                            } : prev);
+                          }
+                        }}
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+                      >
+                        {compatibleModels.map((m) => (
+                          <option key={m.id} value={m.id}>
+                            {m.display_name} ({providers.find((p) => p.id === m.provider_id)?.name || m.provider_id})
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  );
+                })}
+
+                <div className="flex items-center gap-3 pt-2">
+                  <button
+                    onClick={handleSaveCustomProfile}
+                    disabled={savingProfile}
+                    className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 disabled:pointer-events-none transition-colors"
+                  >
+                    {savingProfile ? (
+                      <>
+                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                        Salvando…
+                      </>
+                    ) : (
+                      "Salvar perfil"
+                    )}
+                  </button>
+                  {customConfig && estimateCost(customConfig, models) && (
+                    <span className="text-xs text-muted-foreground">
+                      Custo estimado: {estimateCost(customConfig, models)} /produto
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
