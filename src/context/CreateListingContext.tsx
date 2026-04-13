@@ -161,21 +161,25 @@ function clearDraftStorage() {
 
 const CreateListingContext = createContext<CreateListingContextType | null>(null);
 
+// Module-level flag: survives component remounts within the same page load.
+// Prevents duplicate draft toasts when CreateListingProvider remounts due to
+// Suspense lazy-loading, ApiKeyGuard async checks, or route transitions.
+let draftToastShown = false;
+
 export function CreateListingProvider({ children }: { children: React.ReactNode }) {
   const [currentStep, setCurrentStep] = useState(0);
   const [completedSteps, setCompletedSteps] = useState<boolean[]>([false, false, false, false, false]);
   const [data, setData] = useState<ListingData>({ ...initialData, prompts: defaultPrompts.map(p => ({ ...p })) });
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const draftChecked = useRef(false);
 
   // Check for draft on mount
   useEffect(() => {
-    if (draftChecked.current) return;
-    draftChecked.current = true;
+    if (draftToastShown) return;
 
     const draft = loadDraft();
     if (draft) {
-      toast({
+      draftToastShown = true;
+      const { dismiss } = toast({
         title: "📝 Rascunho encontrado",
         description: `Continuar editando "${draft.data.identification?.name || "seu produto"}"?`,
         duration: 10000,
@@ -184,6 +188,7 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
             <button
               className="px-3 py-1.5 text-xs font-semibold rounded-md bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={() => {
+                dismiss();
                 setCurrentStep(draft.currentStep);
                 setCompletedSteps(draft.completedSteps);
                 setData({
@@ -206,7 +211,9 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
             <button
               className="px-3 py-1.5 text-xs font-semibold rounded-md border border-border text-foreground hover:bg-muted"
               onClick={() => {
+                dismiss();
                 clearDraftStorage();
+                draftToastShown = false;
                 toast({ title: "Rascunho descartado" });
               }}
             >
