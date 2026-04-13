@@ -838,7 +838,7 @@ export async function callGoogleAI(params: {
   const isImageGeneration = modalities?.includes("image");
 
   // Convert OpenAI messages to Gemini format
-  const { systemInstruction, contents } = convertMessages(messages);
+  const { systemInstruction, contents } = await convertMessages(messages);
 
   // Build Gemini request body
   const body: Record<string, unknown> = {
@@ -864,7 +864,7 @@ export async function callGoogleAI(params: {
         .map((t: any) => ({
           name: t.function.name,
           description: t.function.description,
-          parameters: t.function.parameters,
+          parameters: sanitizeSchemaForGemini(t.function.parameters),
         })),
     }];
 
@@ -899,11 +899,61 @@ export async function callGoogleAI(params: {
   });
 }
 
+/**
+ * Recursively sanitize a JSON Schema object for Gemini compatibility.
+ * - Converts `type: ["string", "null"]` → `type: "string", nullable: true`
+ * - Removes `additionalProperties` (unsupported by Gemini)
+ */
+function sanitizeSchemaForGemini(schema: any): any {
+  if (!schema || typeof schema !== "object") return schema;
+  if (Array.isArray(schema)) return schema.map(sanitizeSchemaForGemini);
+
+  const result: any = {};
+  for (const [key, value] of Object.entries(schema)) {
+    if (key === "additionalProperties") continue;
+    if (key === "type" && Array.isArray(value)) {
+      const types = (value as string[]).filter((t) => t !== "null");
+      result.type = types.length === 1 ? types[0] : types;
+      if ((value as string[]).includes("null")) result.nullable = true;
+    } else if (key === "properties" && typeof value === "object") {
+      const props: any = {};
+      for (const [pk, pv] of Object.entries(value as Record<string, any>)) {
+        props[pk] = sanitizeSchemaForGemini(pv);
+      }
+      result[key] = props;
+    } else if (key === "items" && typeof value === "object") {
+      result[key] = sanitizeSchemaForGemini(value);
+    } else {
+      result[key] = value;
+    }
+  }
+  return result;
+}
+
+/** Fetch a single image URL and return inlineData part, or null on failure */
+async function fetchImageAsPart(url: string): Promise<{ inlineData: { mimeType: string; data: string } } | null> {
+  try {
+    const imgRes = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+    if (imgRes.ok) {
+      const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+      const mimeType = contentType.split(";")[0].trim();
+      const arrayBuf = await imgRes.arrayBuffer();
+      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
+      return { inlineData: { mimeType, data: base64 } };
+    }
+    console.warn(`Failed to fetch image (${imgRes.status}): ${url.slice(0, 120)}`);
+    return null;
+  } catch (fetchErr) {
+    console.warn(`Image fetch error: ${(fetchErr as Error).message}`);
+    return null;
+  }
+}
+
 /** Convert OpenAI-style messages to Gemini contents + systemInstruction */
-function convertMessages(messages: any[]): {
+async function convertMessages(messages: any[]): Promise<{
   systemInstruction: string | null;
   contents: any[];
-} {
+}> {
   let systemInstruction: string | null = null;
   const contents: any[] = [];
 
@@ -917,6 +967,7 @@ function convertMessages(messages: any[]): {
 
     const role = msg.role === "assistant" ? "model" : "user";
     const parts: any[] = [];
+    const imagePromises: { index: number; promise: Promise<any | null> }[] = [];
 
     if (typeof msg.content === "string") {
       parts.push({ text: msg.content });
@@ -938,24 +989,24 @@ function convertMessages(messages: any[]): {
               });
             }
           } else if (typeof url === "string" && url.startsWith("https://")) {
-            // Fetch external image and convert to base64 inlineData
-            // (Gemini fileData.fileUri only accepts Google Files API / GCS URIs)
-            try {
-              const imgRes = await fetch(url, { signal: AbortSignal.timeout(15_000) });
-              if (imgRes.ok) {
-                const contentType = imgRes.headers.get("content-type") || "image/jpeg";
-                const mimeType = contentType.split(";")[0].trim();
-                const arrayBuf = await imgRes.arrayBuffer();
-                const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
-                parts.push({
-                  inlineData: { mimeType, data: base64 },
-                });
-              } else {
-                console.warn(`Failed to fetch image (${imgRes.status}): ${url.slice(0, 120)}`);
-              }
-            } catch (fetchErr) {
-              console.warn(`Image fetch error: ${(fetchErr as Error).message}`);
-            }
+            // Queue parallel fetch for external images
+            const idx = parts.length;
+            parts.push(null); // placeholder
+            imagePromises.push({ index: idx, promise: fetchImageAsPart(url) });
+          }
+        }
+      }
+
+      // Resolve all image fetches in parallel
+      if (imagePromises.length > 0) {
+        const results = await Promise.all(imagePromises.map((ip) => ip.promise));
+        // Fill placeholders in reverse to safely splice
+        for (let i = imagePromises.length - 1; i >= 0; i--) {
+          const result = results[i];
+          if (result) {
+            parts[imagePromises[i].index] = result;
+          } else {
+            parts.splice(imagePromises[i].index, 1);
           }
         }
       }
@@ -964,6 +1015,17 @@ function convertMessages(messages: any[]): {
     if (parts.length > 0) {
       contents.push({ role, parts });
     }
+  }
+
+  // Log warning if images were expected but none converted
+  const hasImageParts = contents.some((c: any) =>
+    c.parts?.some((p: any) => p.inlineData)
+  );
+  const hadImageInputs = messages.some((m: any) =>
+    Array.isArray(m.content) && m.content.some((p: any) => p.type === "image_url")
+  );
+  if (hadImageInputs && !hasImageParts) {
+    console.warn("WARNING: All images failed to convert — model will receive text-only input");
   }
 
   return { systemInstruction, contents };

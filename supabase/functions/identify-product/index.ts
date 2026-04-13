@@ -75,11 +75,13 @@ Para o campo suggested_category, escolha O MAIS ADEQUADO entre estas opções: $
                   description: "Lista de características do produto",
                 },
                 ean: {
-                  type: ["string", "null"],
+                  type: "string",
+                  nullable: true,
                   description: "Código EAN/GTIN de 13 dígitos visível na embalagem. Null se não visível.",
                 },
                 original_sku: {
-                  type: ["string", "null"],
+                  type: "string",
+                  nullable: true,
                   description: "SKU ou código do fabricante impresso na embalagem. Null se não visível.",
                 },
               },
