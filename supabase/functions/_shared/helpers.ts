@@ -353,7 +353,7 @@ export async function getUserAIKey(userId: string, providerId: string): Promise<
     .select("encrypted_key, key_nonce")
     .eq("user_id", userId)
     .eq("provider_id", providerId)
-    .single();
+    .maybeSingle();
 
   if (error || !keyRow) {
     const providerNames: Record<string, string> = {
@@ -385,9 +385,9 @@ export async function getUserAIConfig(
     .select("provider_id, model_id, temperature")
     .eq("user_id", userId)
     .eq("function_name", functionName)
-    .single();
+    .maybeSingle();
 
-  if (!error && data) {
+  if (data && !error) {
     return {
       providerId: data.provider_id,
       modelId: data.model_id,
@@ -938,13 +938,24 @@ function convertMessages(messages: any[]): {
               });
             }
           } else if (typeof url === "string" && url.startsWith("https://")) {
-            // URL-based image
-            parts.push({
-              fileData: {
-                mimeType: "image/jpeg",
-                fileUri: url,
-              },
-            });
+            // Fetch external image and convert to base64 inlineData
+            // (Gemini fileData.fileUri only accepts Google Files API / GCS URIs)
+            try {
+              const imgRes = await fetch(url, { signal: AbortSignal.timeout(15_000) });
+              if (imgRes.ok) {
+                const contentType = imgRes.headers.get("content-type") || "image/jpeg";
+                const mimeType = contentType.split(";")[0].trim();
+                const arrayBuf = await imgRes.arrayBuffer();
+                const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
+                parts.push({
+                  inlineData: { mimeType, data: base64 },
+                });
+              } else {
+                console.warn(`Failed to fetch image (${imgRes.status}): ${url.slice(0, 120)}`);
+              }
+            } catch (fetchErr) {
+              console.warn(`Image fetch error: ${(fetchErr as Error).message}`);
+            }
           }
         }
       }
