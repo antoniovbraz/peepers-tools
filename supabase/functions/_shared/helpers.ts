@@ -484,7 +484,7 @@ async function callOpenAI(apiKey: string, params: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
-  });
+  }, { timeoutMs: 120_000, maxRetries: 0 });
 }
 
 /**
@@ -538,7 +538,7 @@ async function callAnthropic(apiKey: string, params: {
       "Content-Type": "application/json",
     },
     body: JSON.stringify(body),
-  });
+  }, { timeoutMs: 120_000, maxRetries: 0 });
 
   if (!response.ok) return response;
 
@@ -898,7 +898,7 @@ export async function callGoogleAI(params: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  });
+  }, { timeoutMs: 120_000, maxRetries: 0 });
 
   if (!response.ok) {
     // Read and log the actual Google error before returning
