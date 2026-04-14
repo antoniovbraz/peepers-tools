@@ -327,6 +327,8 @@ const MODEL_API_NAMES: Record<string, Record<string, string>> = {
     // Stable names — pass-through, listed for documentation
     "gemini-2.5-flash":       "gemini-2.5-flash",
     "gemini-2.5-flash-image": "gemini-2.5-flash-image",
+    "gemini-2.0-flash":       "gemini-2.0-flash",
+    "gemini-1.5-flash":       "gemini-1.5-flash",  // GA fallback
   },
   openai: {
     "gpt-4o":            "gpt-4o",
@@ -830,6 +832,36 @@ export async function callAI(params: {
     if (!response.ok) {
       status = "error";
       errorMessage = `HTTP ${response.status}`;
+    }
+
+    // ── Auto-fallback for Google text models ─────────────────────────────
+    // If gemini-2.5-flash (or any other google text model) returns 503/429,
+    // silently retry once with gemini-1.5-flash (stable GA model).
+    if (!response.ok && config.providerId === "google" && !modalities?.includes("image")) {
+      if (response.status === 503 || response.status === 429) {
+        const GOOGLE_TEXT_FALLBACK = "gemini-1.5-flash";
+        if (config.modelId !== GOOGLE_TEXT_FALLBACK) {
+          try {
+            const fallbackResponse = await callGoogleAI({
+              apiKey,
+              model: GOOGLE_TEXT_FALLBACK,
+              messages: cappedMessages,
+              temperature: config.temperature,
+              tools,
+              tool_choice,
+              modalities,
+            });
+            if (fallbackResponse.ok) {
+              console.log(`[callAI] Google text fallback: ${config.modelId} → ${GOOGLE_TEXT_FALLBACK}`);
+              status = "success";
+              errorMessage = undefined;
+              return fallbackResponse;
+            }
+          } catch (_fallbackErr) {
+            // fallback also failed — return original response
+          }
+        }
+      }
     }
 
     // ── Auto-fallback for image generation ──────────────────────────────
