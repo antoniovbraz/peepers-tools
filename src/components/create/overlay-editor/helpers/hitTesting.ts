@@ -1,6 +1,6 @@
-import type { OverlayElement, HitTestResult } from "../types";
+import type { OverlayElement, HitTestResult, HitTestResultWithHandle, ResizeHandlePosition } from "../types";
 
-import { CANVAS_FONT_FAMILY, BADGE_PADDING_X, BADGE_PADDING_Y } from "../constants";
+import { CANVAS_FONT_FAMILY, BADGE_PADDING_X, BADGE_PADDING_Y, RESIZE_HANDLE_HIT_AREA } from "../constants";
 import { measureTextBlock } from "./textMeasure";
 
 /**
@@ -105,5 +105,72 @@ export function hitTest(
       return { element: el, bounds };
     }
   }
+  return null;
+}
+
+/**
+ * Testa se coordenadas atingem um resize handle do elemento selecionado.
+ * Prioridade sobre hitTest normal — handles ficam "acima" do corpo.
+ */
+export function hitTestResizeHandle(
+  mx: number,
+  my: number,
+  selectedElement: OverlayElement | undefined,
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+): HitTestResultWithHandle | null {
+  if (!selectedElement) return null;
+
+  const bounds = getElementBounds(selectedElement, ctx, W, H);
+  const hitArea = RESIZE_HANDLE_HIT_AREA;
+
+  // Only text elements (headline/subheadline/bullet) get a right-edge handle for width
+  // Circle gets bottom-right for radius
+  // Arrow gets bottom-right for length
+  const handles: { pos: ResizeHandlePosition; hx: number; hy: number }[] = [];
+
+  const isText = selectedElement.type === "headline" || selectedElement.type === "subheadline" || selectedElement.type === "bullet";
+
+  if (isText) {
+    // Right-edge midpoint handle (resizes width)
+    handles.push({
+      pos: "right",
+      hx: bounds.x2,
+      hy: (bounds.y1 + bounds.y2) / 2,
+    });
+  }
+
+  if (selectedElement.type === "circle") {
+    // Bottom-right handle (resizes radius)
+    handles.push({
+      pos: "bottom-right",
+      hx: bounds.x2,
+      hy: bounds.y2,
+    });
+  }
+
+  if (selectedElement.type === "arrow") {
+    // Endpoint handle (resizes length)
+    const px = (selectedElement.x / 100) * W;
+    const py = (selectedElement.y / 100) * H;
+    const rotRad = (selectedElement.rotation * Math.PI) / 180;
+    const lengthPx = (selectedElement.length / 100) * W;
+    handles.push({
+      pos: "bottom-right",
+      hx: px + lengthPx * Math.cos(rotRad),
+      hy: py + lengthPx * Math.sin(rotRad),
+    });
+  }
+
+  for (const h of handles) {
+    if (
+      mx >= h.hx - hitArea && mx <= h.hx + hitArea &&
+      my >= h.hy - hitArea && my <= h.hy + hitArea
+    ) {
+      return { element: selectedElement, bounds, handle: h.pos };
+    }
+  }
+
   return null;
 }

@@ -83,6 +83,14 @@ export interface HitTestResult {
   bounds: { x1: number; y1: number; x2: number; y2: number };
 }
 
+/** Which resize handle was hit (if any) */
+export type ResizeHandlePosition = "right" | "bottom-right";
+
+/** Hit test result that may include a resize handle */
+export interface HitTestResultWithHandle extends HitTestResult {
+  handle?: ResizeHandlePosition;
+}
+
 /** Resultado de medição de texto */
 export interface TextMeasurement {
   lines: string[];

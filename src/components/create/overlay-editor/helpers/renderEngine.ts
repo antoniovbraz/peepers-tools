@@ -1,8 +1,19 @@
 import type { OverlayElement, RenderOptions } from "../types";
 
-import { CANVAS_FONT_FAMILY, BADGE_PADDING_X, BADGE_PADDING_Y } from "../constants";
+import { CANVAS_FONT_FAMILY, BADGE_PADDING_X, BADGE_PADDING_Y, RESIZE_HANDLE_SIZE } from "../constants";
 import { measureTextBlock } from "./textMeasure";
 import { getElementBounds } from "./hitTesting";
+
+function drawResizeHandle(ctx: CanvasRenderingContext2D, cx: number, cy: number) {
+  const s = RESIZE_HANDLE_SIZE / 2;
+  ctx.fillStyle = "#FFFFFF";
+  ctx.strokeStyle = "hsl(217.2 91.2% 59.8%)";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.roundRect(cx - s, cy - s, RESIZE_HANDLE_SIZE, RESIZE_HANDLE_SIZE, 3);
+  ctx.fill();
+  ctx.stroke();
+}
 
 /**
  * Renderiza a imagem base + todos overlay elements no contexto canvas.
@@ -206,6 +217,27 @@ export function renderOverlay(
           bounds.x2 - bounds.x1 + 8, bounds.y2 - bounds.y1 + 8,
         );
         ctx.setLineDash([]);
+
+        // Draw resize handles
+        if (options.showSelectionHandles) {
+          const isText = el.type === "headline" || el.type === "subheadline" || el.type === "bullet";
+          if (isText) {
+            // Right-edge midpoint (width resize)
+            drawResizeHandle(ctx, bounds.x2, (bounds.y1 + bounds.y2) / 2);
+          }
+          if (el.type === "circle") {
+            // Bottom-right (radius resize)
+            drawResizeHandle(ctx, bounds.x2, bounds.y2);
+          }
+          if (el.type === "arrow") {
+            // Arrow endpoint
+            const rotRad = (el.rotation * Math.PI) / 180;
+            const lengthPx = (el.length / 100) * W;
+            const endX = (el.x / 100) * W + lengthPx * Math.cos(rotRad);
+            const endY = (el.y / 100) * H + lengthPx * Math.sin(rotRad);
+            drawResizeHandle(ctx, endX, endY);
+          }
+        }
       }
     }
 

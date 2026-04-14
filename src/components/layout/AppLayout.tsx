@@ -22,7 +22,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
       <div className="flex flex-col min-h-[100dvh] bg-background">
         <header className="flex items-center justify-between px-4 py-3 border-b bg-card">
           <img src={logoHorizontal} alt="Peepers Shop" className="h-8" />
-          <button onClick={signOut} className="text-muted-foreground hover:text-foreground transition-colors p-1">
+          <button onClick={signOut} aria-label="Sair" className="text-muted-foreground hover:text-foreground transition-colors p-1">
             <LogOut className="w-4 h-4" />
           </button>
         </header>
@@ -38,6 +38,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               <button
                 key={tab.path}
                 onClick={() => navigate(tab.path)}
+                aria-current={isActive ? "page" : undefined}
                 className={`flex flex-col items-center gap-0.5 px-6 py-1 rounded-lg transition-colors ${
                   isActive ? "text-primary" : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -68,6 +69,7 @@ export default function AppLayout({ children }: { children: ReactNode }) {
               <button
                 key={item.path}
                 onClick={() => navigate(item.path)}
+                aria-current={isActive ? "page" : undefined}
                 className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
                   isActive
                     ? "bg-primary/10 text-primary"

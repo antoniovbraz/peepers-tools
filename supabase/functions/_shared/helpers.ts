@@ -36,7 +36,12 @@ export function sanitizeForLLM(input: string, maxLen = 500): string {
   // eslint-disable-next-line no-control-regex
   const cleaned = input.replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, "");
   const truncated = cleaned.slice(0, maxLen);
-  return `<user_input>${truncated}</user_input>`;
+  // Escape XML entities to prevent early-close of <user_input> tags
+  const escaped = truncated
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;");
+  return `<user_input>${escaped}</user_input>`;
 }
 
 /**

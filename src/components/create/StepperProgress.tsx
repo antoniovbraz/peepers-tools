@@ -13,7 +13,7 @@ export default function StepperProgress() {
   const { currentStep, completedSteps } = useCreateListing();
 
   return (
-    <div className="px-4 md:px-8 py-3">
+    <div className="px-4 md:px-8 py-3" role="progressbar" aria-valuenow={currentStep + 1} aria-valuemin={1} aria-valuemax={5} aria-label={`Passo ${currentStep + 1} de 5: ${steps[currentStep].label}`}>
       <div className="flex items-center justify-between relative">
         {/* Connector line */}
         <div className="absolute top-4 left-[10%] right-[10%] h-0.5 bg-border" />

@@ -100,11 +100,12 @@ export function useOverlayAI(params: UseOverlayAIParams): UseOverlayAIReturn {
               0,
               targetBadges.length || 5,
             ) as string[];
+            const badgeIdToIndex = new Map(targetBadges.map((el, i) => [el.id, i]));
             return prev.map((el) => {
               if (el.type !== "badge") return el;
               if (idsToUpdate && !idsToUpdate.has(el.id)) return el;
-              const idx = targetBadges.indexOf(el);
-              if (idx >= 0 && idx < badgeTexts.length) {
+              const idx = badgeIdToIndex.get(el.id);
+              if (idx !== undefined && idx < badgeTexts.length) {
                 return { ...el, text: badgeTexts[idx] };
               }
               return el;
@@ -123,11 +124,12 @@ export function useOverlayAI(params: UseOverlayAIParams): UseOverlayAIReturn {
               0,
               targetBullets.length || 5,
             ) as string[];
+            const bulletIdToIndex = new Map(targetBullets.map((el, i) => [el.id, i]));
             const updated = prev.map((el) => {
               if (el.type !== "bullet") return el;
               if (idsToUpdate && !idsToUpdate.has(el.id)) return el;
-              const idx = targetBullets.indexOf(el);
-              if (idx >= 0 && idx < bulletTexts.length) {
+              const idx = bulletIdToIndex.get(el.id);
+              if (idx !== undefined && idx < bulletTexts.length) {
                 return { ...el, text: bulletTexts[idx] };
               }
               return el;

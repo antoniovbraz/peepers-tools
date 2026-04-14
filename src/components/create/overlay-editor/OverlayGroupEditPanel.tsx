@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 import { Trash2, Bold } from "lucide-react";
 import type { OverlayElement } from "./types";
+import ColorSwatch from "./ColorSwatch";
 
 interface OverlayGroupEditPanelProps {
   checkedCount: number;
@@ -13,19 +14,6 @@ interface OverlayGroupEditPanelProps {
   onBatchFontSize: (v: number) => void;
   onBatchOpacity: (v: number) => void;
   pushStructuralSnapshot: () => void;
-}
-
-function ColorSwatch({ color, active, onClick }: { color: string; active: boolean; onClick: () => void }) {
-  return (
-    <button
-      type="button"
-      className={`w-8 h-8 rounded-full border-2 transition-all active:scale-95 ${
-        active ? "border-primary ring-2 ring-primary/30 scale-110" : "border-border hover:scale-105"
-      }`}
-      style={{ backgroundColor: color }}
-      onClick={onClick}
-    />
-  );
 }
 
 export default function OverlayGroupEditPanel({

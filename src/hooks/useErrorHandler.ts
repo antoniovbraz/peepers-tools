@@ -2,7 +2,7 @@ import { useCallback } from "react";
 import { toast } from "@/hooks/use-toast";
 
 /** Maps common backend/network error messages to friendly PT-BR strings. */
-function friendlyMessage(err: unknown): string {
+export function friendlyMessage(err: unknown): string {
   const raw =
     err instanceof Error
       ? err.message

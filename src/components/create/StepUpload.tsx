@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { supabase } from "@/integrations/supabase/client";
+import { compressImage } from "@/lib/compressImage";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_FILES = 8;
@@ -49,8 +50,9 @@ export default function StepUpload() {
 
     setUploading(true);
     try {
-      const newUrls = await Promise.all(incoming.map(uploadToStorage));
-      const allFiles = [...data.photos, ...incoming];
+      const compressed = await Promise.all(incoming.map(compressImage));
+      const newUrls = await Promise.all(compressed.map(uploadToStorage));
+      const allFiles = [...data.photos, ...compressed];
       const allUrls = [...data.photoUrls, ...newUrls];
       updatePhotos(allFiles, allUrls);
     } catch (err) {
@@ -148,6 +150,7 @@ export default function StepUpload() {
             <div key={i} className="relative aspect-square rounded-xl overflow-hidden bg-muted">
               <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
               <button
+                aria-label={`Remover foto ${i + 1}`}
                 onClick={() => removePhoto(i)}
                 className="absolute top-2 right-2 w-7 h-7 rounded-full bg-foreground/70 flex items-center justify-center"
               >

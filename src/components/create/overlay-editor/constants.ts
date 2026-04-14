@@ -26,6 +26,10 @@ export const TEXT_SNAPSHOT_DEBOUNCE_MS = 500;
 export const HIT_TEST_THRESHOLD_DESKTOP = 50;
 export const HIT_TEST_THRESHOLD_MOBILE = 120;
 
+/** Resize handle size in canvas pixels */
+export const RESIZE_HANDLE_SIZE = 16;
+export const RESIZE_HANDLE_HIT_AREA = 24;
+
 /** Padding do badge em px */
 export const BADGE_PADDING_X = 12;
 export const BADGE_PADDING_Y = 8;

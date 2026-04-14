@@ -8,8 +8,33 @@ interface OverlayToolbarProps {
 }
 
 export default function OverlayToolbar({ onAdd, isMobile }: OverlayToolbarProps) {
+  if (isMobile) {
+    return (
+      <div className="flex gap-1.5 overflow-x-auto pb-1 scrollbar-thin">
+        <Button size="sm" variant="outline" className="text-xs gap-1 h-10 min-w-fit shrink-0" onClick={() => onAdd("headline")}>
+          <Type className="w-3 h-3" /> Título
+        </Button>
+        <Button size="sm" variant="outline" className="text-xs gap-1 h-10 min-w-fit shrink-0" onClick={() => onAdd("subheadline")}>
+          <Type className="w-3 h-3" /> Sub
+        </Button>
+        <Button size="sm" variant="outline" className="text-xs gap-1 h-10 min-w-fit shrink-0" onClick={() => onAdd("bullet")}>
+          <Plus className="w-3 h-3" /> Bullet
+        </Button>
+        <Button size="sm" variant="outline" className="text-xs gap-1 h-10 min-w-fit shrink-0" onClick={() => onAdd("badge")}>
+          <Plus className="w-3 h-3" /> Badge
+        </Button>
+        <Button size="sm" variant="outline" className="text-xs gap-1 h-10 min-w-fit shrink-0" onClick={() => onAdd("arrow")}>
+          <ArrowRight className="w-3 h-3" /> Seta
+        </Button>
+        <Button size="sm" variant="outline" className="text-xs gap-1 h-10 min-w-fit shrink-0" onClick={() => onAdd("circle")}>
+          <Circle className="w-3 h-3" /> Círculo
+        </Button>
+      </div>
+    );
+  }
+
   return (
-    <div className={`grid gap-1.5 ${isMobile ? "grid-cols-3" : "grid-cols-2"}`}>
+    <div className="grid grid-cols-2 gap-1.5">
       <Button size="sm" variant="outline" className="text-xs gap-1 h-10" onClick={() => onAdd("headline")}>
         <Type className="w-3 h-3" /> Título
       </Button>

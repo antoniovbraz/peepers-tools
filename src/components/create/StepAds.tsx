@@ -127,10 +127,12 @@ export default function StepAds() {
       </div>
 
       {/* Marketplace tabs */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <div className="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Marketplace">
         {(["mercadoLivre", "shopee", "amazon", "magalu"] as const).map(tab => (
           <button
             key={tab}
+            role="tab"
+            aria-selected={activeTab === tab}
             onClick={() => setActiveTab(tab)}
             className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-colors ${
               activeTab === tab

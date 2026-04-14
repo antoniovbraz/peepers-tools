@@ -5,7 +5,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Type, X, ChevronsDown, ListChecks } from "lucide-react";
+import { Type, X, ChevronsDown, ListChecks, Keyboard } from "lucide-react";
 import { IMAGE_ROLES } from "@/lib/overlayTemplates";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useCreateListing } from "@/context/CreateListingContext";
@@ -22,6 +22,9 @@ import OverlayAlignmentBar from "./OverlayAlignmentBar";
 import OverlayGroupEditPanel from "./OverlayGroupEditPanel";
 import OverlayAICopyButton from "./OverlayAICopyButton";
 import OverlayExportButton from "./OverlayExportButton";
+import OverlayShortcutsHelp from "./OverlayShortcutsHelp";
+
+import { clearTextCache } from "./helpers/textMeasure";
 
 export default function OverlayEditor({
   open, onClose, imageUrl, imageIndex,
@@ -31,6 +34,7 @@ export default function OverlayEditor({
   const [loadedImage, setLoadedImage] = useState<HTMLImageElement | null>(null);
   const [layersOpen, setLayersOpen] = useState(false);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const textInputRef = useRef<HTMLInputElement | null>(null);
 
   const { getAllOverlayCopies } = useCreateListing();
@@ -80,6 +84,7 @@ export default function OverlayEditor({
     if (!open) {
       setSheetOpen(false);
       setLayersOpen(false);
+      clearTextCache();
     }
   }, [open]);
 
@@ -106,11 +111,16 @@ export default function OverlayEditor({
         setSheetOpen(false);
         return;
       }
+      if (e.key === "?") {
+        setShortcutsOpen((prev) => !prev);
+        return;
+      }
       if (editor.selectedId && ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(e.key)) {
         e.preventDefault();
         const delta = e.shiftKey ? 5 : 1;
         const dx = e.key === "ArrowLeft" ? -delta : e.key === "ArrowRight" ? delta : 0;
         const dy = e.key === "ArrowUp" ? -delta : e.key === "ArrowDown" ? delta : 0;
+        editor.pushStructuralSnapshot();
         editor.setElements((prev) =>
           prev.map((el) =>
             el.id === editor.selectedId
@@ -189,7 +199,7 @@ export default function OverlayEditor({
     if (!open) return null;
     return (
       <div className="fixed inset-0 z-50 bg-background flex flex-col">
-        <div className="flex items-center justify-between px-3 py-2 border-b shrink-0">
+        <div className="flex items-center justify-between px-3 py-2 pt-[max(0.5rem,env(safe-area-inset-top))] border-b shrink-0">
           <h2 className="text-sm font-bold flex items-center gap-2 truncate">
             <Type className="w-4 h-4 shrink-0" />
             Overlay — {role?.label || `#${imageIndex}`}
@@ -207,6 +217,10 @@ export default function OverlayEditor({
             loadedImage={loadedImage}
             headlineColor={headlineColor}
             accentColor={accentColor}
+            onDuplicate={editor.duplicateElement}
+            onDelete={editor.deleteElement}
+            onMoveLayer={editor.moveLayer}
+            onUpdate={editor.updateElement}
           />
         </div>
 
@@ -324,8 +338,13 @@ export default function OverlayEditor({
           <DialogTitle className="text-base font-bold flex items-center gap-2">
             <Type className="w-4 h-4" />
             Editor de Overlay — {role?.label || `Imagem #${imageIndex}`}
+            <Button variant="ghost" size="icon" className="h-7 w-7 ml-auto"
+              onClick={() => setShortcutsOpen(true)} title="Atalhos do teclado (?)">
+              <Keyboard className="w-3.5 h-3.5" />
+            </Button>
           </DialogTitle>
         </DialogHeader>
+        <OverlayShortcutsHelp open={shortcutsOpen} onOpenChange={setShortcutsOpen} />
         <div className="grid grid-cols-[1fr_340px] gap-4 flex-1 min-h-0 overflow-hidden">
           <div className="min-h-0 overflow-hidden flex items-center justify-center">
             <OverlayCanvas
@@ -335,6 +354,10 @@ export default function OverlayEditor({
               loadedImage={loadedImage}
               headlineColor={headlineColor}
               accentColor={accentColor}
+              onDuplicate={editor.duplicateElement}
+              onDelete={editor.deleteElement}
+              onMoveLayer={editor.moveLayer}
+              onUpdate={editor.updateElement}
             />
           </div>
           <div className="min-h-0 flex flex-col overflow-hidden">

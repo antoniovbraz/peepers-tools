@@ -28,6 +28,16 @@ serve(async (req) => {
       }
     }
 
+    if (adTitle && (typeof adTitle !== "string" || adTitle.length > 500)) {
+      return errorResponse("Título do anúncio inválido (máx 500 caracteres)", 400, cors, "VALIDATION_ERROR");
+    }
+    if (category && (typeof category !== "string" || category.length > 200)) {
+      return errorResponse("Categoria inválida (máx 200 caracteres)", 400, cors, "VALIDATION_ERROR");
+    }
+    if (characteristics && characteristics.length > 20) {
+      log.warn("characteristics clipped", { original: characteristics.length, clipped: 20 });
+    }
+
     const productInfo = `Produto: ${sanitizeForLLM(productName, 500)}\nCategoria: ${sanitizeForLLM(category || "", 200)}\nCaracterísticas: ${sanitizeArrayForLLM(characteristics || [], 20, 200)}\nExtras: ${sanitizeForLLM(extras || "nenhuma", 1000)}\nTítulo do anúncio: ${sanitizeForLLM(adTitle || productName, 200)}`;
 
     const imageKnowledge = buildKnowledge({

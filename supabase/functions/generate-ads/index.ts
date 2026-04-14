@@ -19,8 +19,8 @@ serve(async (req) => {
     if (!productName || typeof productName !== "string" || productName.length > 500) {
       return errorResponse("Nome do produto inválido", 400, cors, "VALIDATION_ERROR");
     }
-    if (category && typeof category !== "string") {
-      return errorResponse("Categoria inválida", 400, cors, "VALIDATION_ERROR");
+    if (category && (typeof category !== "string" || category.length > 200)) {
+      return errorResponse("Categoria inválida (máx 200 caracteres)", 400, cors, "VALIDATION_ERROR");
     }
     const targetMarketplace: Marketplace = (["mercadoLivre", "shopee", "amazon", "magalu", "all"].includes(marketplace))
       ? marketplace as Marketplace

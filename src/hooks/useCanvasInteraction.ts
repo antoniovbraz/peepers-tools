@@ -1,10 +1,17 @@
 import { useRef, useCallback, useState, useEffect } from "react";
 import type { OverlayElement } from "@/components/create/overlay-editor/types";
 import { HIT_TEST_THRESHOLD_DESKTOP, HIT_TEST_THRESHOLD_MOBILE } from "@/components/create/overlay-editor/constants";
-import { hitTest } from "@/components/create/overlay-editor/helpers/hitTesting";
-import { getElementSizePercent } from "@/components/create/overlay-editor/helpers/hitTesting";
+import { hitTest, getElementSizePercent, hitTestResizeHandle } from "@/components/create/overlay-editor/helpers/hitTesting";
 import { getSnappedPos, clampToCanvas } from "@/components/create/overlay-editor/helpers/dragEngine";
+import type { ElementSnapInfo } from "@/components/create/overlay-editor/helpers/dragEngine";
+import type { ResizeHandlePosition } from "@/components/create/overlay-editor/types";
 import type { UseOverlayEditorReturn } from "@/hooks/useOverlayEditor";
+
+export interface ContextMenuState {
+  elementId: string;
+  x: number;
+  y: number;
+}
 
 export interface UseCanvasInteractionReturn {
   canvasRef: React.RefObject<HTMLCanvasElement | null>;
@@ -12,9 +19,12 @@ export interface UseCanvasInteractionReturn {
   hoveredId: string | null;
   activeGuides: { x: number[]; y: number[] };
   showDragBadge: boolean;
+  contextMenu: ContextMenuState | null;
+  setContextMenu: (v: ContextMenuState | null) => void;
   handleMouseDown: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   handleMouseMove: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   handleMouseUp: () => void;
+  handleContextMenu: (e: React.MouseEvent<HTMLCanvasElement>) => void;
   handleTouchStart: (e: React.TouchEvent<HTMLCanvasElement>) => void;
   handleTouchMove: (e: React.TouchEvent<HTMLCanvasElement>) => void;
   handleTouchEnd: () => void;
@@ -39,6 +49,8 @@ export function useCanvasInteraction(params: {
     y: [],
   });
   const [showDragBadge, setShowDragBadge] = useState(true);
+  const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null);
+  const contextMenuRef = useRef<ContextMenuState | null>(null);
 
   const draggingRef = useRef<string | null>(null);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
@@ -47,6 +59,10 @@ export function useCanvasInteraction(params: {
   const dragMovedRef = useRef(false);
   const dragElementRef = useRef<OverlayElement | null>(null);
   const lastTapRef = useRef<{ time: number; id: string | null }>({ time: 0, id: null });
+
+  // Resize handle state
+  const resizingRef = useRef<{ id: string; handle: ResizeHandlePosition } | null>(null);
+  const resizeStartRef = useRef<{ mx: number; my: number; element: OverlayElement } | null>(null);
 
   // Badge fade-out
   useEffect(() => {
@@ -90,6 +106,17 @@ export function useCanvasInteraction(params: {
     [editor.elements, isMobile],
   );
 
+  // Build snap info for all elements EXCEPT the one being dragged
+  const getElementSnaps = useCallback((): ElementSnapInfo[] => {
+    const id = draggingRef.current;
+    return editor.elements
+      .filter((el) => el.id !== id)
+      .map((el) => {
+        const size = getElSize(el);
+        return { id: el.id, x: el.x, y: el.y, w: size.w, h: size.h };
+      });
+  }, [editor.elements, getElSize]);
+
   // rAF drag loop
   const dragLoop = useCallback(() => {
     const pos = dragPosRef.current;
@@ -106,7 +133,8 @@ export function useCanvasInteraction(params: {
     }
 
     const clamped = clampToCanvas(pos.x, pos.y, elW, elH);
-    const snapped = getSnappedPos(clamped.x, clamped.y, elW, elH);
+    const snaps = getElementSnaps();
+    const snapped = getSnappedPos(clamped.x, clamped.y, elW, elH, snaps);
     setActiveGuides({ x: snapped.guidesX, y: snapped.guidesY });
     editor.setElements((prev) => {
       const updated = prev.map((e) =>
@@ -118,7 +146,7 @@ export function useCanvasInteraction(params: {
     });
     dragPosRef.current = null;
     rafRef.current = null;
-  }, [getElSize, editor]);
+  }, [getElSize, editor, getElementSnaps]);
 
   const scheduleRaf = useCallback(() => {
     if (rafRef.current) return;
@@ -129,6 +157,24 @@ export function useCanvasInteraction(params: {
     (clientX: number, clientY: number) => {
       const c = getCanvasCoords(clientX, clientY);
       if (!c) return false;
+
+      // Check resize handles first (only on selected element)
+      const ctx = c.canvas.getContext("2d");
+      if (ctx) {
+        const handleResult = hitTestResizeHandle(
+          c.mx, c.my,
+          editor.selectedElement,
+          ctx, c.canvas.width, c.canvas.height,
+        );
+        if (handleResult?.handle) {
+          resizingRef.current = { id: handleResult.element.id, handle: handleResult.handle };
+          resizeStartRef.current = { mx: c.mx, my: c.my, element: { ...handleResult.element } };
+          dragMovedRef.current = false;
+          editor.pushStructuralSnapshot();
+          return true;
+        }
+      }
+
       const result = doHitTest(c.mx, c.my, c.canvas);
       if (result) {
         editor.setSelectedId(result.element.id);
@@ -150,8 +196,64 @@ export function useCanvasInteraction(params: {
     [getCanvasCoords, doHitTest, editor, isMobile],
   );
 
+  const moveResize = useCallback(
+    (clientX: number, clientY: number) => {
+      const resize = resizingRef.current;
+      const start = resizeStartRef.current;
+      if (!resize || !start) return;
+
+      const c = getCanvasCoords(clientX, clientY);
+      if (!c) return;
+
+      dragMovedRef.current = true;
+      const el = start.element;
+      const W = c.canvas.width;
+      const H = c.canvas.height;
+
+      // Delta in percentage
+      const dxPct = ((c.mx - start.mx) / W) * 100;
+      const dyPct = ((c.my - start.my) / H) * 100;
+
+      const isText = el.type === "headline" || el.type === "subheadline" || el.type === "bullet";
+
+      if (isText && resize.handle === "right" && "width" in el) {
+        const newWidth = Math.max(10, Math.min(95, el.width + dxPct));
+        editor.setElements((prev) =>
+          prev.map((e) =>
+            e.id === resize.id ? { ...e, width: Math.round(newWidth) } as OverlayElement : e,
+          ),
+        );
+      } else if (el.type === "circle" && resize.handle === "bottom-right") {
+        const diagPct = Math.sqrt(dxPct * dxPct + dyPct * dyPct) * Math.sign(dxPct + dyPct);
+        const newRadius = Math.max(2, Math.min(50, el.radius + diagPct));
+        editor.setElements((prev) =>
+          prev.map((e) =>
+            e.id === resize.id ? { ...e, radius: Math.round(newRadius) } as OverlayElement : e,
+          ),
+        );
+      } else if (el.type === "arrow" && resize.handle === "bottom-right") {
+        const diagPct = Math.sqrt(dxPct * dxPct + dyPct * dyPct) * Math.sign(dxPct + dyPct);
+        const newLength = Math.max(2, Math.min(50, el.length + diagPct));
+        editor.setElements((prev) =>
+          prev.map((e) =>
+            e.id === resize.id ? { ...e, length: Math.round(newLength) } as OverlayElement : e,
+          ),
+        );
+      }
+
+      // Update start point for next move delta
+      resizeStartRef.current = { ...start, mx: c.mx, my: c.my };
+    },
+    [getCanvasCoords, editor],
+  );
+
   const moveDrag = useCallback(
     (clientX: number, clientY: number) => {
+      // Handle resize mode
+      if (resizingRef.current) {
+        moveResize(clientX, clientY);
+        return;
+      }
       if (!draggingRef.current) return;
       dragMovedRef.current = true;
       const c = getCanvasCoords(clientX, clientY);
@@ -162,10 +264,18 @@ export function useCanvasInteraction(params: {
       };
       scheduleRaf();
     },
-    [getCanvasCoords, scheduleRaf],
+    [getCanvasCoords, scheduleRaf, moveResize],
   );
 
   const endDrag = useCallback(() => {
+    // End resize if active
+    if (resizingRef.current) {
+      resizingRef.current = null;
+      resizeStartRef.current = null;
+      dragMovedRef.current = false;
+      return;
+    }
+
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     rafRef.current = null;
     const pos = dragPosRef.current;
@@ -181,7 +291,8 @@ export function useCanvasInteraction(params: {
         elH = size.h;
       }
       const clamped = clampToCanvas(pos.x, pos.y, elW, elH);
-      const snapped = getSnappedPos(clamped.x, clamped.y, elW, elH);
+      const snaps = getElementSnaps();
+      const snapped = getSnappedPos(clamped.x, clamped.y, elW, elH, snaps);
       editor.setElements((prev) =>
         prev.map((e) => (e.id === id ? { ...e, x: snapped.x, y: snapped.y } : e)),
       );
@@ -196,7 +307,7 @@ export function useCanvasInteraction(params: {
     dragElementRef.current = null;
     dragMovedRef.current = false;
     setActiveGuides({ x: [], y: [] });
-  }, [getElSize, editor, isMobile, onSheetOpen]);
+  }, [getElSize, getElementSnaps, editor, isMobile, onSheetOpen]);
 
   // Mouse handlers
   const handleMouseDown = useCallback(
@@ -282,15 +393,36 @@ export function useCanvasInteraction(params: {
 
   const handleTouchEnd = useCallback(() => endDrag(), [endDrag]);
 
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent<HTMLCanvasElement>) => {
+      const c = getCanvasCoords(e.clientX, e.clientY);
+      if (!c) return;
+      const result = doHitTest(c.mx, c.my, c.canvas);
+      if (result) {
+        e.preventDefault();
+        editor.setSelectedId(result.element.id);
+        const rect = c.canvas.getBoundingClientRect();
+        const relX = e.clientX - rect.left;
+        const relY = e.clientY - rect.top;
+        contextMenuRef.current = { elementId: result.element.id, x: relX, y: relY };
+        setContextMenu({ elementId: result.element.id, x: relX, y: relY });
+      }
+    },
+    [getCanvasCoords, doHitTest, editor],
+  );
+
   return {
     canvasRef,
     containerRef,
     hoveredId,
     activeGuides,
     showDragBadge,
+    contextMenu,
+    setContextMenu,
     handleMouseDown,
     handleMouseMove,
     handleMouseUp,
+    handleContextMenu,
     handleTouchStart,
     handleTouchMove,
     handleTouchEnd,

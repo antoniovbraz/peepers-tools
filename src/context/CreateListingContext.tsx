@@ -78,7 +78,6 @@ interface CreateListingContextType {
 }
 
 const DEFAULT_PROMPT_COUNT = 3;
-const MAX_PROMPT_COUNT = 7;
 
 const defaultPrompts: PromptCard[] = Array.from({ length: DEFAULT_PROMPT_COUNT }, (_, i) => ({
   id: i + 1,
@@ -203,7 +202,7 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
                   overlayUrls: draft.data.overlayUrls || {},
                   overlayElements: draft.data.overlayElements || {},
                 });
-                toast({ title: "Rascunho restaurado ✓" });
+                toast({ title: "Rascunho restaurado ✓", description: draft.data.photoUrls?.length ? "As fotos originais foram preservadas via URL. Se precisar, re-envie na etapa de upload." : undefined });
               }}
             >
               Continuar
@@ -302,7 +301,7 @@ export function CreateListingProvider({ children }: { children: React.ReactNode 
     const copies: string[] = [];
     for (const elements of Object.values(data.overlayElements)) {
       for (const el of elements) {
-        if (el.text && (el.type === "headline" || el.type === "bullet" || el.type === "badge")) {
+        if (el.text && (el.type === "headline" || el.type === "subheadline" || el.type === "bullet" || el.type === "badge")) {
           copies.push(el.text);
         }
       }

@@ -1,4 +1,4 @@
-Atue como o Engenheiro de Software Líder (Staff/Principal) assumindo a responsabilidade técnica do **Peepers Tools** — ferramenta interna para criação automatizada de anúncios visuais para e-commerce brasileiro (Mercado Livre, Shopee, Amazon BR e Magalu).
+Atue como o Engenheiro de Software Líder (Staff/Principal) assumindo a responsabilidade técnica do **Peepers Tools** — que terá um conjunto de ferramentas internas começando com a ferramenta para criação automatizada de anúncios visuais para e-commerce brasileiro (Mercado Livre, Shopee, Amazon BR e Magalu).
 
 ---
 

@@ -6,6 +6,7 @@ import { renderOverlay } from "./helpers/renderEngine";
 import type { OverlayElement, RenderOptions } from "./types";
 import type { UseCanvasInteractionReturn } from "@/hooks/useCanvasInteraction";
 import { useIsMobile } from "@/hooks/use-mobile";
+import OverlayContextMenu from "./OverlayContextMenu";
 
 interface OverlayCanvasProps {
   interaction: UseCanvasInteractionReturn;
@@ -14,6 +15,10 @@ interface OverlayCanvasProps {
   loadedImage: HTMLImageElement | null;
   headlineColor: string;
   accentColor: string;
+  onDuplicate?: (id: string) => void;
+  onDelete?: (id: string) => void;
+  onMoveLayer?: (id: string, direction: "up" | "down") => void;
+  onUpdate?: (id: string, updates: Partial<OverlayElement>) => void;
 }
 
 export default function OverlayCanvas({
@@ -23,6 +28,10 @@ export default function OverlayCanvas({
   loadedImage,
   headlineColor,
   accentColor,
+  onDuplicate,
+  onDelete,
+  onMoveLayer,
+  onUpdate,
 }: OverlayCanvasProps) {
   const isMobile = useIsMobile();
   const [fontsReady, setFontsReady] = useState(false);
@@ -79,12 +88,14 @@ export default function OverlayCanvas({
     >
       <canvas
         ref={interaction.canvasRef}
+        aria-label="Canvas de edição de overlay"
         className="w-full h-full cursor-move"
         style={{ touchAction: "pan-y" }}
         onMouseDown={interaction.handleMouseDown}
         onMouseMove={interaction.handleMouseMove}
         onMouseUp={interaction.handleMouseUp}
         onMouseLeave={interaction.handleMouseLeave}
+        onContextMenu={interaction.handleContextMenu}
         onTouchStart={interaction.handleTouchStart}
         onTouchMove={interaction.handleTouchMove}
         onTouchEnd={interaction.handleTouchEnd}
@@ -96,6 +107,21 @@ export default function OverlayCanvas({
           <Move className="w-3 h-3 mr-1" /> Arraste para mover
         </Badge>
       </div>
+      {interaction.contextMenu && onDuplicate && onDelete && onMoveLayer && onUpdate && (
+        <OverlayContextMenu
+          x={interaction.contextMenu.x}
+          y={interaction.contextMenu.y}
+          elementId={interaction.contextMenu.elementId}
+          onDuplicate={onDuplicate}
+          onDelete={onDelete}
+          onMoveLayer={onMoveLayer}
+          onCenterH={() => {
+            onUpdate(interaction.contextMenu!.elementId, { x: 50 });
+            interaction.setContextMenu(null);
+          }}
+          onClose={() => interaction.setContextMenu(null)}
+        />
+      )}
     </div>
   );
 }

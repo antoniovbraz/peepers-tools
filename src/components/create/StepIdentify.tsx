@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, ArrowLeft, Check, Edit3, Loader2, Brain, Plus, ChevronDown, Tag } from "lucide-react";
+import { ArrowRight, ArrowLeft, Check, Edit3, Brain, Plus, ChevronDown, Tag } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
