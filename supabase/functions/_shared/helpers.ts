@@ -165,7 +165,19 @@ export function handleAIError(
     return errorResponse(msg, 400, corsHeaders, "AI_BAD_REQUEST");
   }
   if (status === 503 || status === 529) {
-    return errorResponse("Provedor de IA temporariamente indisponível. Tente novamente.", 503, corsHeaders, "AI_UNAVAILABLE");
+    // Log the full provider error body so it appears in Supabase function logs
+    let detail = "";
+    try {
+      const parsed = JSON.parse(body);
+      detail = parsed?.error?.message || parsed?.error?.status || parsed?.message || "";
+    } catch { /* body wasn't JSON */ }
+    console.error(`AI 503 error detail: ${detail || body.slice(0, 500)}`);
+    return errorResponse(
+      detail ? `Provedor de IA indisponível: ${detail.slice(0, 200)}` : "Provedor de IA temporariamente indisponível. Tente novamente.",
+      503,
+      corsHeaders,
+      "AI_UNAVAILABLE",
+    );
   }
   console.error("AI provider error:", status, body.slice(0, 500));
   return errorResponse(`Erro do provedor de IA (${status}). Tente novamente.`, 502, corsHeaders, "AI_PROVIDER_ERROR");
