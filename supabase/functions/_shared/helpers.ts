@@ -310,7 +310,7 @@ const DEFAULT_MODELS: Record<string, { provider_id: string; model_id: string; te
   identify:     { provider_id: "google", model_id: "gemini-2.5-flash", temperature: 0.3 },
   ads:          { provider_id: "google", model_id: "gemini-2.5-flash", temperature: 0.7 },
   prompts:      { provider_id: "google", model_id: "gemini-2.5-flash", temperature: 0.7 },
-  image:        { provider_id: "google", model_id: "gemini-2.0-flash-preview-image-generation", temperature: 0.9 },
+  image:        { provider_id: "google", model_id: "gemini-2.5-flash-image", temperature: 0.9 },
   overlay_copy: { provider_id: "google", model_id: "gemini-2.5-flash", temperature: 0.7 },
 };
 

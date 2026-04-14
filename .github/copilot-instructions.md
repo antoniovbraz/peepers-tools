@@ -52,7 +52,7 @@ All AI calls go through Supabase Edge Functions in `supabase/functions/`. Each f
 4. Uses `tool_choice` / function-calling to get structured JSON back
 5. Returns the parsed result via `parseToolCallResult()`
 
-Models: `gemini-2.5-flash` (text/vision/function-calling), `gemini-2.0-flash-preview-image-generation` (image generation).
+Models: `gemini-2.5-flash` (text/vision/function-calling), `gemini-2.5-flash-image` (image generation).
 
 Shared utilities live in `supabase/functions/_shared/helpers.ts`:
 - `callGoogleAI()` — adapter that converts OpenAI-style params to Gemini format and back; supports function calling, image generation, and vision

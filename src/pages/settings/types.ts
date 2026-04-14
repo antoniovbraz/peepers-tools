@@ -67,7 +67,7 @@ export const PROFILE_CONFIGS: Record<Exclude<ProfileId, "personalizado">, Record
     identify:     { provider_id: "google",    model_id: "gemini-2.5-flash", temperature: 0.3 },
     ads:          { provider_id: "anthropic", model_id: "claude-haiku-3.5", temperature: 0.7 },
     prompts:      { provider_id: "google",    model_id: "gemini-2.5-flash", temperature: 0.7 },
-    image:        { provider_id: "google",    model_id: "gemini-2.0-flash-preview-image-generation", temperature: 0.9 },
+    image:        { provider_id: "google",    model_id: "gemini-2.5-flash-image", temperature: 0.9 },
     overlay_copy: { provider_id: "anthropic", model_id: "claude-haiku-3.5", temperature: 0.7 },
   },
   premium: {
