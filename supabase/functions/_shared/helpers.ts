@@ -523,6 +523,25 @@ async function callOpenAI(apiKey: string, params: {
 }
 
 /**
+ * Convert OpenAI-format content parts to Anthropic format.
+ * Converts `image_url` parts to Anthropic `image` blocks with `source`.
+ */
+function convertContentToAnthropic(content: any): any {
+  if (typeof content === "string" || !Array.isArray(content)) return content;
+  return content.map((part: any) => {
+    if (part.type !== "image_url") return part;
+    const url: string = part.image_url?.url ?? part.image_url ?? "";
+    if (url.startsWith("data:")) {
+      const match = url.match(/^data:([^;]+);base64,(.+)$/s);
+      if (match) {
+        return { type: "image", source: { type: "base64", media_type: match[1], data: match[2] } };
+      }
+    }
+    return { type: "image", source: { type: "url", url } };
+  });
+}
+
+/**
  * Call Anthropic Messages API and convert response to OpenAI-compatible format.
  */
 async function callAnthropic(apiKey: string, params: {
@@ -539,7 +558,8 @@ async function callAnthropic(apiKey: string, params: {
     if (msg.role === "system") {
       systemText += typeof msg.content === "string" ? msg.content : msg.content.map((p: any) => p.text || "").join("\n");
     } else {
-      messages.push(msg);
+      // Convert image_url content parts to Anthropic's native image format
+      messages.push({ ...msg, content: convertContentToAnthropic(msg.content) });
     }
   }
 
