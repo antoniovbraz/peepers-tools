@@ -314,6 +314,39 @@ const DEFAULT_MODELS: Record<string, { provider_id: string; model_id: string; te
   overlay_copy: { provider_id: "google", model_id: "gemini-2.5-flash", temperature: 0.7 },
 };
 
+/**
+ * Centralized mapping: internal model IDs → actual provider API model names.
+ * When our internal ID differs from the provider's API name, list it here.
+ * Models not listed are passed through as-is (identity mapping).
+ *
+ * ⚠️  UPDATE THIS when adding, renaming, or deprecating any model.
+ */
+const MODEL_API_NAMES: Record<string, Record<string, string>> = {
+  google: {
+    // Stable names — pass-through, listed for documentation
+    "gemini-2.5-flash":       "gemini-2.5-flash",
+    "gemini-2.5-flash-image": "gemini-2.5-flash-image",
+  },
+  openai: {
+    "gpt-4o":      "gpt-4o",
+    "gpt-4o-mini": "gpt-4o-mini",
+    "dall-e-3":    "dall-e-3",
+  },
+  anthropic: {
+    "claude-sonnet-4-20250514": "claude-sonnet-4-20250514",
+    "claude-haiku-3.5":         "claude-3-5-haiku-20241022",
+  },
+  replicate: {
+    "flux-1.1-pro": "black-forest-labs/flux-1.1-pro",
+    "flux-schnell": "black-forest-labs/flux-schnell",
+  },
+};
+
+/** Resolve internal model ID → actual API model name for a provider. */
+function resolveModelName(providerId: string, internalId: string): string {
+  return MODEL_API_NAMES[providerId]?.[internalId] ?? internalId;
+}
+
 /* ── API Key Encryption (AES-256-GCM, edge-function side) ── */
 
 /**
@@ -468,7 +501,7 @@ async function callOpenAI(apiKey: string, params: {
   tool_choice?: any;
 }): Promise<Response> {
   const body: Record<string, unknown> = {
-    model: params.model,
+    model: resolveModelName("openai", params.model),
     temperature: params.temperature,
     messages: params.messages,
   };
@@ -509,10 +542,7 @@ async function callAnthropic(apiKey: string, params: {
   }
 
   const body: Record<string, unknown> = {
-    model: ({
-      "claude-haiku-3.5": "claude-3-5-haiku-20241022",
-      "claude-sonnet-4-20250514": "claude-sonnet-4-20250514",
-    } as Record<string, string>)[params.model] || params.model,
+    model: resolveModelName("anthropic", params.model),
     max_tokens: 4096,
     temperature: params.temperature,
     messages,
@@ -599,12 +629,7 @@ async function callReplicate(apiKey: string, params: {
     }
   }
 
-  const modelVersions: Record<string, string> = {
-    "flux-1.1-pro": "black-forest-labs/flux-1.1-pro",
-    "flux-schnell": "black-forest-labs/flux-schnell",
-  };
-
-  const replicateModel = modelVersions[params.model] || params.model;
+  const replicateModel = resolveModelName("replicate", params.model);
 
   // Create prediction
   const createRes = await fetchWithRetry("https://api.replicate.com/v1/predictions", {
@@ -799,7 +824,7 @@ async function callOpenAIDallE(apiKey: string, messages: any[], model: string): 
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: model === "gpt-4o" ? "dall-e-3" : model,
+      model: resolveModelName("openai", model),
       prompt: prompt.slice(0, 4000),
       n: 1,
       size: "1024x1024",
@@ -895,7 +920,8 @@ export async function callGoogleAI(params: {
     }
   }
 
-  const endpoint = `${GOOGLE_AI_BASE_URL}/models/${model}:generateContent?key=${apiKey}`;
+  const resolvedModel = resolveModelName("google", model);
+  const endpoint = `${GOOGLE_AI_BASE_URL}/models/${resolvedModel}:generateContent?key=${apiKey}`;
 
   const response = await fetchWithRetry(endpoint, {
     method: "POST",
