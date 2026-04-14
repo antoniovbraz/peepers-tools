@@ -1096,7 +1096,7 @@ export async function callGoogleAI(params: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  }, { timeoutMs: 120_000, maxRetries: 0 });
+  }, { timeoutMs: 120_000, maxRetries: 2, initialDelayMs: 1000 });
 
   if (!response.ok) {
     // Read and log the actual Google error before returning
