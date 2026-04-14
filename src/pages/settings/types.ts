@@ -60,7 +60,7 @@ export const PROFILE_CONFIGS: Record<Exclude<ProfileId, "personalizado">, Record
     identify:     { provider_id: "google",    model_id: "gemini-2.5-flash", temperature: 0.3 },
     ads:          { provider_id: "google",    model_id: "gemini-2.5-flash", temperature: 0.7 },
     prompts:      { provider_id: "google",    model_id: "gemini-2.5-flash", temperature: 0.7 },
-    image:        { provider_id: "replicate", model_id: "flux-schnell", temperature: 0.9 },
+    image:        { provider_id: "openai",    model_id: "gpt-image-1-mini", temperature: 0.9 },
     overlay_copy: { provider_id: "google",    model_id: "gemini-2.5-flash", temperature: 0.7 },
   },
   equilibrado: {
@@ -74,7 +74,7 @@ export const PROFILE_CONFIGS: Record<Exclude<ProfileId, "personalizado">, Record
     identify:     { provider_id: "openai",    model_id: "gpt-4o", temperature: 0.3 },
     ads:          { provider_id: "anthropic", model_id: "claude-sonnet-4-20250514", temperature: 0.7 },
     prompts:      { provider_id: "anthropic", model_id: "claude-sonnet-4-20250514", temperature: 0.7 },
-    image:        { provider_id: "openai",    model_id: "dall-e-3", temperature: 0.9 },
+    image:        { provider_id: "openai",    model_id: "gpt-image-1.5", temperature: 0.9 },
     overlay_copy: { provider_id: "anthropic", model_id: "claude-sonnet-4-20250514", temperature: 0.7 },
   },
 };

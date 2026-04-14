@@ -3,11 +3,11 @@ import { estimateCost, getRequiredProviders } from "./helpers";
 import type { AIModel, AIFunction, FunctionConfig } from "./types";
 
 const makeConfig = (overrides?: Partial<Record<AIFunction, FunctionConfig>>): Record<AIFunction, FunctionConfig> => ({
-  identify:     { provider_id: "google",    model_id: "gemini-flash",  temperature: 0.3 },
-  ads:          { provider_id: "anthropic", model_id: "claude-haiku",  temperature: 0.7 },
-  prompts:      { provider_id: "google",    model_id: "gemini-flash",  temperature: 0.7 },
-  image:        { provider_id: "replicate", model_id: "flux-schnell",  temperature: 0.9 },
-  overlay_copy: { provider_id: "google",    model_id: "gemini-flash",  temperature: 0.7 },
+  identify:     { provider_id: "google",    model_id: "gemini-flash",     temperature: 0.3 },
+  ads:          { provider_id: "anthropic", model_id: "claude-haiku",     temperature: 0.7 },
+  prompts:      { provider_id: "google",    model_id: "gemini-flash",     temperature: 0.7 },
+  image:        { provider_id: "openai",    model_id: "gpt-image-1-mini", temperature: 0.9 },
+  overlay_copy: { provider_id: "google",    model_id: "gemini-flash",     temperature: 0.7 },
   ...overrides,
 });
 
@@ -35,7 +35,7 @@ describe("estimateCost", () => {
     const models = [
       makeModel("gemini-flash", { cost_per_1k_input: 0, cost_per_1k_output: 0 }),
       makeModel("claude-haiku", { provider_id: "anthropic", cost_per_1k_input: 0, cost_per_1k_output: 0 }),
-      makeModel("flux-schnell", { provider_id: "replicate", cost_per_image: 0 }),
+      makeModel("gpt-image-1-mini", { provider_id: "openai", cost_per_image: 0 }),
     ];
     expect(estimateCost(config, models)).toBeNull();
   });
@@ -45,7 +45,7 @@ describe("estimateCost", () => {
     const models = [
       makeModel("gemini-flash", { cost_per_1k_input: 0.0001, cost_per_1k_output: 0.0002 }),
       makeModel("claude-haiku", { provider_id: "anthropic", cost_per_1k_input: 0.0001, cost_per_1k_output: 0.0002 }),
-      makeModel("flux-schnell", { provider_id: "replicate", cost_per_image: 0.001 }),
+      makeModel("gpt-image-1-mini", { provider_id: "openai", cost_per_image: 0.001 }),
     ];
     const result = estimateCost(config, models);
     expect(result).not.toBeNull();
@@ -57,7 +57,7 @@ describe("estimateCost", () => {
     const models = [
       makeModel("gemini-flash", { cost_per_1k_input: 0.01, cost_per_1k_output: 0.03 }),
       makeModel("claude-haiku", { provider_id: "anthropic", cost_per_1k_input: 0.01, cost_per_1k_output: 0.03 }),
-      makeModel("flux-schnell", { provider_id: "replicate", cost_per_image: 0.05 }),
+      makeModel("gpt-image-1-mini", { provider_id: "openai", cost_per_image: 0.05 }),
     ];
     const result = estimateCost(config, models);
     expect(result).not.toBeNull();
@@ -70,7 +70,7 @@ describe("estimateCost", () => {
     const models = [
       makeModel("gemini-flash", { cost_per_1k_input: 0, cost_per_1k_output: 0 }),
       makeModel("claude-haiku", { provider_id: "anthropic", cost_per_1k_input: 0, cost_per_1k_output: 0 }),
-      makeModel("flux-schnell", { provider_id: "replicate", cost_per_image: 0.10, cost_per_1k_input: null, cost_per_1k_output: null }),
+      makeModel("gpt-image-1-mini", { provider_id: "openai", cost_per_image: 0.10, cost_per_1k_input: null, cost_per_1k_output: null }),
     ];
     const result = estimateCost(config, models);
     expect(result).toBe("~$0.70");
@@ -84,7 +84,7 @@ describe("getRequiredProviders", () => {
     expect(providers).toHaveLength(3);
     expect(providers).toContain("google");
     expect(providers).toContain("anthropic");
-    expect(providers).toContain("replicate");
+    expect(providers).toContain("openai");
   });
 
   it("returns single provider when all same", () => {

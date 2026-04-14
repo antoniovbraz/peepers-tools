@@ -3,11 +3,21 @@ import { PromptCard } from "@/context/CreateListingContext";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { Copy, Check, Upload, ThumbsUp, RefreshCw, MessageSquare, Sparkles, Loader2, X, Layers } from "lucide-react";
+import { Copy, Check, Upload, ThumbsUp, RefreshCw, MessageSquare, Sparkles, Loader2, X, Layers, ChevronDown } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
 import OverlayEditor from "./overlay-editor/OverlayEditor";
+
+const IMAGE_ROLE_LABELS: Record<number, string> = {
+  1: "Capa — Foto Principal",
+  2: "Benefícios",
+  3: "Características",
+  4: "Close-up / Detalhe",
+  5: "Lifestyle / Uso",
+  6: "Portabilidade / Escala",
+  7: "Conteúdo da Caixa",
+};
 
 interface PromptCardItemProps {
   prompt: PromptCard;
@@ -40,6 +50,7 @@ export default function PromptCardItem({
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedbackText, setFeedbackText] = useState("");
   const [overlayOpen, setOverlayOpen] = useState(false);
+  const [showPrompt, setShowPrompt] = useState(false);
   const uploadRef = useRef<HTMLInputElement | null>(null);
   const blobUrlRef = useRef<string | null>(null);
 
@@ -136,7 +147,9 @@ export default function PromptCardItem({
     >
       <div className="p-4 space-y-3">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-bold text-muted-foreground">PROMPT #{i + 1}</span>
+          <span className="text-xs font-bold text-muted-foreground">
+            {IMAGE_ROLE_LABELS[i + 1] || `IMAGEM #${i + 1}`}
+          </span>
           {p.approved && (
             <Badge className="bg-success text-success-foreground text-xs gap-1">
               <Check className="w-3 h-3" /> Aprovada
@@ -144,12 +157,36 @@ export default function PromptCardItem({
           )}
         </div>
 
-        <p className="text-sm text-foreground leading-relaxed">{p.prompt}</p>
+        <p className="text-sm text-foreground leading-relaxed">
+          {p.summary_ptbr || p.prompt}
+        </p>
 
-        <Button variant="outline" size="sm" className="gap-2 text-xs w-full" onClick={copyPrompt}>
-          {copiedId ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-          {copiedId ? "Copiado!" : "Copiar prompt"}
-        </Button>
+        {p.summary_ptbr && (
+          <button
+            onClick={() => setShowPrompt(!showPrompt)}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <ChevronDown className={`w-3 h-3 transition-transform ${showPrompt ? "rotate-180" : ""}`} />
+            {showPrompt ? "Ocultar prompt técnico" : "Ver prompt técnico"}
+          </button>
+        )}
+
+        {showPrompt && (
+          <div className="space-y-2">
+            <p className="text-xs text-muted-foreground leading-relaxed bg-muted/50 rounded-md p-2">{p.prompt}</p>
+            <Button variant="outline" size="sm" className="gap-2 text-xs w-full" onClick={copyPrompt}>
+              {copiedId ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+              {copiedId ? "Copiado!" : "Copiar prompt"}
+            </Button>
+          </div>
+        )}
+
+        {!p.summary_ptbr && (
+          <Button variant="outline" size="sm" className="gap-2 text-xs w-full" onClick={copyPrompt}>
+            {copiedId ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
+            {copiedId ? "Copiado!" : "Copiar prompt"}
+          </Button>
+        )}
 
         {p.imageUrl ? (
           <div className="space-y-2">

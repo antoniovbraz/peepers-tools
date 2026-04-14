@@ -105,43 +105,15 @@ Each of the 7 images has a specific role. The prompt for each must be a CLEAN im
 - Clean surface, soft overhead lighting
 - Organized layout with product centered
 
-CRITICAL: The AI that will generate images will ALSO receive real reference photos of the product. Every prompt must assume reference photos are available and instruct strict fidelity to them.
+CRITICAL: The AI that will generate images will ALSO receive real reference photos of the product. Fidelity and realism rules will be injected at image generation time — do NOT repeat them in the prompts.
 
-EVERY prompt MUST contain these 3 MANDATORY BLOCKS in this exact order:
-
-BLOCK 1 — FIDELITY (mandatory in ALL 7 prompts)
-Every prompt must START with:
-
-"Using the EXACT product from the reference photos.
-
-FIDELITY RULES:
-- Preserve exact shape, proportions, dimensions, and structure
-- Do not change: materials, colors, textures, button placement, ports, logos, branding, text, labels
-- Maintain all physical characteristics exactly as shown in the reference
-- Do not add, remove, or modify any product feature"
-
-BLOCK 2 — REALISM (mandatory in ALL 7 prompts)
-Every prompt must include:
-
-"REALISM RULES:
-- Make the product look like a real photographed object, NOT a 3D render or CGI
-- Use realistic reflections based on actual material (metal, plastic, glass, fabric, leather, etc.)
-- Accurate shadows with natural light falloff
-- Subtle micro imperfections for photorealism (minor surface variations, realistic edge quality)
-- AVOID: plastic look, over-smoothing, fake edges, CGI sheen, unrealistic specular highlights"
-
-BLOCK 3 — SCENE DIRECTION (specific per image type)
-Each prompt must have detailed, specific scene direction with ALL of these sub-sections:
+Each prompt must focus on SCENE DIRECTION with ALL of these sub-sections:
 - Camera: angle, lens equivalent, perspective, distance
 - Lighting: must be CONSISTENT with the visualDNA lighting
 - Background: must be CONSISTENT with the visualDNA background
 - Composition: product position, negative space, framing
 
-FINAL LINE (mandatory in ALL 7 prompts)
-Every prompt must END with:
-"Output: ultra high resolution, professional product photography, e-commerce ready, no text overlays, no watermarks, no arrows, no graphics, no typography. Clean product image only. Ensure the product looks identical to the reference image and not reinterpreted."
-
-Each prompt should be 150-250 words, highly detailed and specific. Do NOT use vague instructions.`;
+Each prompt should be 80-150 words of pure scene direction. Do NOT include fidelity rules, realism rules, or output format instructions — those are handled separately. Do NOT use vague instructions.`;
 
     const response = await callAI({
       userId,
@@ -149,7 +121,7 @@ Each prompt should be 150-250 words, highly detailed and specific. Do NOT use va
       requestId: log.requestId,
       messages: [
         { role: "system", content: systemPrompt },
-        { role: "user", content: `Crie o Visual DNA e 7 prompts de imagem para este produto:\n\n${productInfo}` },
+        { role: "user", content: `Crie o Visual DNA e 7 prompts de imagem para este produto. Para cada prompt, inclua também um resumo curto em português brasileiro (summary_ptbr) descrevendo a cena para o vendedor:\n\n${productInfo}` },
       ],
       tools: [
         {
@@ -174,8 +146,15 @@ Each prompt should be 150-250 words, highly detailed and specific. Do NOT use va
                 },
                 prompts: {
                   type: "array",
-                  items: { type: "string" },
-                  description: "Lista de 7 prompts em inglês, cada um com os 3 blocos obrigatórios",
+                  items: {
+                    type: "object",
+                    properties: {
+                      prompt: { type: "string", description: "Image prompt in English with scene direction" },
+                      summary_ptbr: { type: "string", description: "Resumo curto em português brasileiro da cena (1-2 frases, ~30 palavras)" },
+                    },
+                    required: ["prompt", "summary_ptbr"],
+                  },
+                  description: "Lista de 7 prompts de imagem, cada um com prompt EN e resumo PT-BR",
                 },
               },
               required: ["visualDNA", "prompts"],

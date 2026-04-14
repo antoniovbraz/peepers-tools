@@ -3,9 +3,7 @@
  * Used by generate-prompts to produce compliant AI image prompts.
  */
 
-export const IMAGE_RULES = `
-## REGRAS DE IMAGENS POR MARKETPLACE
-
+const IMAGE_RULES_ML = `
 ### Mercado Livre — Imagens
 **Regras obrigatórias:**
 - Foto principal (capa): fundo BRANCO PURO (RGB 255,255,255) — obrigatório
@@ -27,7 +25,9 @@ export const IMAGE_RULES = `
 - Escala com objeto de referência (mão humana, wallet para tamanho)
 - Antes/depois quando aplicável
 - Diagrama de compatibilidade com logos de dispositivos
+`;
 
+const IMAGE_RULES_SHOPEE = `
 ### Shopee — Imagens
 **Regras:**
 - Foto principal: fundo branco recomendado, mas pode ter elementos visuais simples
@@ -40,7 +40,9 @@ export const IMAGE_RULES = `
 - Adicione um badge de desconto ou "MAIS VENDIDO" na thumbnail
 - Use cor de fundo diferente do branco para se destacar nos feeds (ex: azul claro, gradiente suave)
 - Produto em contexto de uso real converte bem no feed
+`;
 
+const IMAGE_RULES_AMAZON = `
 ### Amazon Brasil — Imagens
 **Regras obrigatórias (mais rígidas):**
 - Foto principal: fundo BRANCO PURO obrigatório, sem exceção
@@ -57,7 +59,9 @@ export const IMAGE_RULES = `
 4. Infográfico de especificações (imagem 2-7 pode ter texto)
 5. Conteúdo da embalagem
 6. Comparativo de tamanhos / variações
+`;
 
+const IMAGE_RULES_MAGALU = `
 ### Magazine Luiza — Imagens
 **Regras:**
 - Foto principal: fundo branco recomendado
@@ -66,9 +70,9 @@ export const IMAGE_RULES = `
 - Máximo: 6 imagens por SKU
 
 **Dica Magalu:** Fotos de infográfico com especificações destacadas (imagens 2-6) ajudam compradores que não leem a descrição. Magalu tem público mais diverso — imagem com callouts de specs simples converte bem.
+`;
 
----
-
+const IMAGE_QUALITY_GUIDELINES = `
 ## DIRETRIZES DE QUALIDADE PARA AI IMAGE GENERATION
 
 ### Para gerar prompts de imagem de produto:
@@ -92,3 +96,33 @@ export const IMAGE_RULES = `
 | Brinquedos | Bright, colorful, child context, safe & fun vibe |
 | Beleza | Soft light, pastel tones, luxury feel |
 `;
+
+type ImageMarketplace = "mercadoLivre" | "shopee" | "amazon" | "magalu" | "all";
+
+const MARKETPLACE_IMAGE_RULES: Record<string, string> = {
+  mercadoLivre: IMAGE_RULES_ML,
+  shopee: IMAGE_RULES_SHOPEE,
+  amazon: IMAGE_RULES_AMAZON,
+  magalu: IMAGE_RULES_MAGALU,
+};
+
+/**
+ * Get image rules filtered by marketplace.
+ * Includes quality guidelines always, marketplace rules only for the active marketplace.
+ */
+export function getImageRules(marketplace: ImageMarketplace = "all"): string {
+  const sections = ["## REGRAS DE IMAGENS POR MARKETPLACE\n"];
+
+  if (marketplace === "all") {
+    sections.push(IMAGE_RULES_ML, IMAGE_RULES_SHOPEE, IMAGE_RULES_AMAZON, IMAGE_RULES_MAGALU);
+  } else {
+    const rules = MARKETPLACE_IMAGE_RULES[marketplace];
+    if (rules) sections.push(rules);
+  }
+
+  sections.push(IMAGE_QUALITY_GUIDELINES);
+  return sections.join("\n");
+}
+
+/** @deprecated Use getImageRules(marketplace) instead for filtered rules */
+export const IMAGE_RULES = getImageRules("all");

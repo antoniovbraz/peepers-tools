@@ -8,7 +8,7 @@ import { MERCADO_LIVRE_RULES, SHOPEE_RULES, AMAZON_BR_RULES, MAGALU_RULES } from
 import { COPYWRITING_FRAMEWORK } from "./copywriting.ts";
 import { getCategoryGuide, normalizeCategory, type KnowledgeCategory } from "./category-guides.ts";
 import { SEO_STRATEGY } from "./seo-strategy.ts";
-import { IMAGE_RULES } from "./image-rules.ts";
+import { IMAGE_RULES, getImageRules } from "./image-rules.ts";
 import { OVERLAY_COPY_RULES } from "./overlay-copy.ts";
 
 export type { KnowledgeCategory };
@@ -80,8 +80,8 @@ export function buildKnowledge(options: BuildKnowledgeOptions): string {
   }
 
   if (functionName === "prompts") {
-    // Core: image rules per marketplace
-    sections.push(IMAGE_RULES);
+    // Core: image rules filtered by active marketplace
+    sections.push(getImageRules(marketplace));
     if (normalizedCategory) {
       sections.push(getCategoryGuide(normalizedCategory));
     }

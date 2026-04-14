@@ -328,9 +328,11 @@ const MODEL_API_NAMES: Record<string, Record<string, string>> = {
     "gemini-2.5-flash-image": "gemini-2.5-flash-image",
   },
   openai: {
-    "gpt-4o":      "gpt-4o",
-    "gpt-4o-mini": "gpt-4o-mini",
-    "dall-e-3":    "dall-e-3",
+    "gpt-4o":            "gpt-4o",
+    "gpt-4o-mini":       "gpt-4o-mini",
+    "gpt-image-1.5":     "gpt-image-1.5",
+    "gpt-image-1":       "gpt-image-1",
+    "gpt-image-1-mini":  "gpt-image-1-mini",
   },
   anthropic: {
     "claude-sonnet-4-20250514": "claude-sonnet-4-20250514",
@@ -338,7 +340,6 @@ const MODEL_API_NAMES: Record<string, Record<string, string>> = {
   },
   replicate: {
     "flux-1.1-pro": "black-forest-labs/flux-1.1-pro",
-    "flux-schnell": "black-forest-labs/flux-schnell",
   },
 };
 
@@ -609,27 +610,49 @@ async function callAnthropic(apiKey: string, params: {
 
 /**
  * Call Replicate API for image generation (async polling).
+ * Supports image references for Flux 1.1 Pro via the `image` input parameter.
  * Returns OpenAI-compatible response with images array.
  */
 async function callReplicate(apiKey: string, params: {
   model: string;
   messages: any[];
 }): Promise<Response> {
-  // Extract prompt from last user message
+  // Extract prompt and image references from last user message
   const lastUserMsg = [...params.messages].reverse().find((m: any) => m.role === "user");
   let prompt = "";
+  let imageRef: string | undefined;
+
   if (lastUserMsg) {
     if (typeof lastUserMsg.content === "string") {
       prompt = lastUserMsg.content;
     } else if (Array.isArray(lastUserMsg.content)) {
-      prompt = lastUserMsg.content
-        .filter((p: any) => p.type === "text")
-        .map((p: any) => p.text)
-        .join("\n");
+      for (const part of lastUserMsg.content) {
+        if (part.type === "text") {
+          prompt += (prompt ? "\n" : "") + part.text;
+        } else if (part.type === "image_url" && !imageRef) {
+          const url = part.image_url?.url || part.image_url;
+          // Replicate accepts URLs directly; skip data URIs (too large for JSON body)
+          if (typeof url === "string" && url.startsWith("https://")) {
+            imageRef = url;
+          }
+        }
+      }
     }
   }
 
   const replicateModel = resolveModelName("replicate", params.model);
+
+  const input: Record<string, unknown> = {
+    prompt,
+    aspect_ratio: "1:1",
+    output_format: "png",
+  };
+
+  // Send first reference image for Flux 1.1 Pro (image-to-image with strength)
+  if (imageRef) {
+    input.image = imageRef;
+    input.prompt_strength = 0.75;
+  }
 
   // Create prediction
   const createRes = await fetchWithRetry("https://api.replicate.com/v1/predictions", {
@@ -640,11 +663,7 @@ async function callReplicate(apiKey: string, params: {
     },
     body: JSON.stringify({
       model: replicateModel,
-      input: {
-        prompt,
-        aspect_ratio: "1:1",
-        output_format: "png",
-      },
+      input,
     }),
   }, { maxRetries: 1, timeoutMs: 15_000 });
 
@@ -739,8 +758,8 @@ export async function callAI(params: {
 
       case "openai":
         if (modalities?.includes("image")) {
-          // For OpenAI image gen, use DALL-E (different API)
-          response = await callOpenAIDallE(apiKey, messages, config.modelId);
+          // For OpenAI image gen, use GPT Image API with reference support
+          response = await callOpenAIGPTImage(apiKey, messages, config.modelId);
         } else {
           response = await callOpenAI(apiKey, {
             model: config.modelId,
@@ -799,24 +818,110 @@ export async function callAI(params: {
 }
 
 /**
- * OpenAI DALL-E image generation via the images API.
+ * OpenAI GPT Image generation (gpt-image-1.5, gpt-image-1, gpt-image-1-mini).
+ * Uses /v1/images/edits when reference images are available (with input_fidelity=high),
+ * falls back to /v1/images/generations when no references.
  * Returns OpenAI-compatible response with images array.
  */
-async function callOpenAIDallE(apiKey: string, messages: any[], model: string): Promise<Response> {
-  // Extract prompt from last user message
+async function callOpenAIGPTImage(apiKey: string, messages: any[], model: string): Promise<Response> {
+  // Extract prompt and image references from messages
   const lastUserMsg = [...messages].reverse().find((m: any) => m.role === "user");
   let prompt = "";
+  const imageUrls: string[] = [];
+
   if (lastUserMsg) {
     if (typeof lastUserMsg.content === "string") {
       prompt = lastUserMsg.content;
     } else if (Array.isArray(lastUserMsg.content)) {
-      prompt = lastUserMsg.content
-        .filter((p: any) => p.type === "text")
-        .map((p: any) => p.text)
-        .join("\n");
+      for (const part of lastUserMsg.content) {
+        if (part.type === "text") {
+          prompt += (prompt ? "\n" : "") + part.text;
+        } else if (part.type === "image_url") {
+          const url = part.image_url?.url || part.image_url;
+          if (typeof url === "string") imageUrls.push(url);
+        }
+      }
     }
   }
 
+  const resolvedModel = resolveModelName("openai", model);
+
+  // If we have reference images, use the edits endpoint for image-to-image
+  if (imageUrls.length > 0) {
+    // Fetch reference images and build FormData
+    const formData = new FormData();
+    formData.append("model", resolvedModel);
+    formData.append("prompt", prompt.slice(0, 32_000));
+    formData.append("size", "1024x1024");
+    formData.append("quality", "medium");
+    formData.append("input_fidelity", "high");
+
+    // Fetch and attach up to 5 reference images
+    for (let idx = 0; idx < Math.min(imageUrls.length, 5); idx++) {
+      const imgUrl = imageUrls[idx];
+      let blob: Blob;
+
+      if (imgUrl.startsWith("data:")) {
+        // Convert data URI to blob
+        const match = imgUrl.match(/^data:(image\/[^;]+);base64,(.+)$/);
+        if (!match) continue;
+        const binaryStr = atob(match[2]);
+        const bytes = new Uint8Array(binaryStr.length);
+        for (let j = 0; j < binaryStr.length; j++) bytes[j] = binaryStr.charCodeAt(j);
+        blob = new Blob([bytes], { type: match[1] });
+      } else if (imgUrl.startsWith("https://")) {
+        try {
+          const imgRes = await fetch(imgUrl, { signal: AbortSignal.timeout(15_000) });
+          if (!imgRes.ok) continue;
+          blob = await imgRes.blob();
+        } catch {
+          continue;
+        }
+      } else {
+        continue;
+      }
+
+      // Determine file extension from MIME type
+      const ext = blob.type.includes("png") ? "png" : blob.type.includes("webp") ? "webp" : "jpg";
+      formData.append("image[]", blob, `ref_${idx}.${ext}`);
+    }
+
+    const response = await fetchWithRetry("https://api.openai.com/v1/images/edits", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: formData,
+    }, { timeoutMs: 120_000, maxRetries: 0 });
+
+    if (!response.ok) return response;
+
+    const data = await response.json();
+    const b64 = data.data?.[0]?.b64_json;
+    const outputUrl = data.data?.[0]?.url;
+
+    const imageResult = b64
+      ? `data:image/png;base64,${b64}`
+      : outputUrl || null;
+
+    if (!imageResult) {
+      return new Response(JSON.stringify({ error: "No image generated" }), {
+        status: 502,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+
+    return new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: "",
+          images: [{ image_url: { url: imageResult } }],
+        },
+      }],
+    }), { status: 200, headers: { "Content-Type": "application/json" } });
+  }
+
+  // No reference images — use generations endpoint
   const response = await fetchWithRetry("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: {
@@ -824,13 +929,14 @@ async function callOpenAIDallE(apiKey: string, messages: any[], model: string): 
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: resolveModelName("openai", model),
-      prompt: prompt.slice(0, 4000),
+      model: resolvedModel,
+      prompt: prompt.slice(0, 32_000),
       n: 1,
       size: "1024x1024",
+      quality: "medium",
       response_format: "b64_json",
     }),
-  });
+  }, { timeoutMs: 120_000, maxRetries: 0 });
 
   if (!response.ok) return response;
 

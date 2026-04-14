@@ -5,6 +5,7 @@ import type { OverlayElement } from "@/components/create/overlay-editor/types";
 export interface PromptCard {
   id: number;
   prompt: string;
+  summary_ptbr?: string;
   imageUrl?: string;
   approved: boolean;
   feedback?: string;

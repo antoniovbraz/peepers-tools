@@ -41,9 +41,11 @@ export default function StepPrompts() {
         body: {
           productName: data.identification.name,
           category: data.identification.category,
+          suggested_category: data.identification.suggested_category,
           characteristics: data.identification.characteristics,
           extras: data.identification.extras,
           adTitle: data.ads.mercadoLivre.title,
+          marketplace: data.marketplace,
         },
       });
       if (error) throw error;
@@ -54,9 +56,10 @@ export default function StepPrompts() {
       }
 
       const promptsList = result?.prompts || [];
-      const all7 = promptsList.slice(0, MAX_PROMPTS).map((text: string, i: number) => ({
+      const all7 = promptsList.slice(0, MAX_PROMPTS).map((item: string | { prompt: string; summary_ptbr?: string }, i: number) => ({
         id: i + 1,
-        prompt: text,
+        prompt: typeof item === "string" ? item : item.prompt,
+        summary_ptbr: typeof item === "string" ? undefined : item.summary_ptbr,
         approved: false,
         imageUrl: undefined,
         feedback: undefined,
