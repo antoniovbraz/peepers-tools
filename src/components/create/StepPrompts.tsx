@@ -172,7 +172,7 @@ export default function StepPrompts() {
         <div className="w-48 h-1.5 rounded-full bg-muted overflow-hidden">
           <div className="h-full bg-primary rounded-full animate-[pulse_2s_ease-in-out_infinite]" style={{ width: "40%" }} />
         </div>
-        <p className="text-xs text-muted-foreground">Estimativa: ~10 segundos</p>
+        <p className="text-xs text-muted-foreground">Estimativa: ~40 segundos</p>
 
         {/* Skeleton preview of prompt cards */}
         <div className="w-full max-w-lg space-y-3 mt-4">

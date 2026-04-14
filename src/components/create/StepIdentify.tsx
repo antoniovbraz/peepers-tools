@@ -103,7 +103,7 @@ export default function StepIdentify() {
         <div className="w-48 h-1.5 rounded-full bg-muted overflow-hidden">
           <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: "60%" }} />
         </div>
-        <p className="text-xs text-muted-foreground">Isso pode levar alguns segundos...</p>
+        <p className="text-xs text-muted-foreground">Estimativa: ~15 segundos</p>
       </div>
     );
   }

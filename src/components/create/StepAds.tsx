@@ -79,7 +79,7 @@ export default function StepAds() {
         <div className="w-48 h-1.5 rounded-full bg-muted overflow-hidden">
           <div className="h-full bg-primary rounded-full animate-[pulse_2s_ease-in-out_infinite]" style={{ width: "50%" }} />
         </div>
-        <p className="text-xs text-muted-foreground">Estimativa: ~8 segundos</p>
+        <p className="text-xs text-muted-foreground">Estimativa: ~30 segundos</p>
 
         {/* Skeleton preview of expected result */}
         <div className="w-full max-w-md space-y-3 mt-4">
