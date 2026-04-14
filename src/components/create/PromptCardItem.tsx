@@ -257,6 +257,17 @@ export default function PromptCardItem({
 
         {feedbackOpen && (
           <div className="space-y-2 pt-2 border-t">
+            <div className="flex flex-wrap gap-1.5">
+              {["Fundo muito escuro", "Produto cortado", "Cores diferentes", "Ângulo errado", "Muito artificial", "Falta detalhe"].map(chip => (
+                <button
+                  key={chip}
+                  onClick={() => setFeedbackText(prev => prev ? `${prev}; ${chip}` : chip)}
+                  className="text-xs px-2 py-0.5 rounded-full border border-border bg-muted hover:bg-accent transition-colors"
+                >
+                  {chip}
+                </button>
+              ))}
+            </div>
             <Textarea
               value={feedbackText}
               onChange={e => setFeedbackText(e.target.value)}

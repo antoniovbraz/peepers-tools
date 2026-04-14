@@ -1,5 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { PROVIDER_CAPABILITIES } from "./prompt-rules.ts";
 
 const CORS_ALLOW_HEADERS =
   "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version";
@@ -736,6 +737,20 @@ export async function callAI(params: {
   // 2. Get decrypted API key for the provider
   const apiKey = await getUserAIKey(userId, config.providerId);
 
+  // 3. Cap image refs to provider maximum before routing
+  const caps = PROVIDER_CAPABILITIES[config.providerId] ?? PROVIDER_CAPABILITIES["google"];
+  const cappedMessages = messages.map((msg: any) => {
+    if (!Array.isArray(msg.content)) return msg;
+    const imageItems = msg.content.filter((p: any) => p.type === "image_url");
+    if (imageItems.length <= caps.maxRefs) return msg;
+    let imgCount = 0;
+    const filtered = msg.content.filter((p: any) => {
+      if (p.type !== "image_url") return true;
+      return ++imgCount <= caps.maxRefs;
+    });
+    return { ...msg, content: filtered };
+  });
+
   const start = Date.now();
   let status = "success";
   let errorMessage: string | undefined;
@@ -748,7 +763,7 @@ export async function callAI(params: {
         response = await callGoogleAI({
           apiKey,
           model: config.modelId,
-          messages,
+          messages: cappedMessages,
           temperature: config.temperature,
           tools,
           tool_choice,
@@ -759,11 +774,11 @@ export async function callAI(params: {
       case "openai":
         if (modalities?.includes("image")) {
           // For OpenAI image gen, use GPT Image API with reference support
-          response = await callOpenAIGPTImage(apiKey, messages, config.modelId);
+          response = await callOpenAIGPTImage(apiKey, cappedMessages, config.modelId);
         } else {
           response = await callOpenAI(apiKey, {
             model: config.modelId,
-            messages,
+            messages: cappedMessages,
             temperature: config.temperature,
             tools,
             tool_choice,
@@ -774,7 +789,7 @@ export async function callAI(params: {
       case "anthropic":
         response = await callAnthropic(apiKey, {
           model: config.modelId,
-          messages,
+          messages: cappedMessages,
           temperature: config.temperature,
           tools,
           tool_choice,
@@ -784,7 +799,7 @@ export async function callAI(params: {
       case "replicate":
         response = await callReplicate(apiKey, {
           model: config.modelId,
-          messages,
+          messages: cappedMessages,
         });
         break;
 
@@ -795,6 +810,34 @@ export async function callAI(params: {
     if (!response.ok) {
       status = "error";
       errorMessage = `HTTP ${response.status}`;
+    }
+
+    // ── Auto-fallback for image generation ──────────────────────────────
+    // If primary provider fails with 5xx or 429, try openai/gpt-image-1-mini
+    // as a budget fallback (supports refs, lowest cost). Requires user to have
+    // an OpenAI API key stored. Silently skipped if no key or fallback fails.
+    if (!response.ok && modalities?.includes("image") && config.providerId !== "openai") {
+      if (response.status >= 500 || response.status === 429) {
+        try {
+          const fallbackKey = await getUserAIKey(userId, "openai");
+          const openaiCaps = PROVIDER_CAPABILITIES["openai"];
+          const fallbackMessages = cappedMessages.map((msg: any) => {
+            if (!Array.isArray(msg.content)) return msg;
+            if (msg.content.filter((p: any) => p.type === "image_url").length <= openaiCaps.maxRefs) return msg;
+            let imgCount = 0;
+            return { ...msg, content: msg.content.filter((p: any) => p.type !== "image_url" || ++imgCount <= openaiCaps.maxRefs) };
+          });
+          const fallbackResponse = await callOpenAIGPTImage(fallbackKey, fallbackMessages, "gpt-image-1-mini");
+          if (fallbackResponse.ok) {
+            console.log(`[callAI] Image fallback: ${config.providerId}/${config.modelId} → openai/gpt-image-1-mini`);
+            status = "success";
+            errorMessage = undefined;
+            return fallbackResponse;
+          }
+        } catch (_fallbackErr) {
+          // No OpenAI key stored or fallback also failed — return original response
+        }
+      }
     }
 
     return response;

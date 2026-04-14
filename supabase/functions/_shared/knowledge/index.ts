@@ -9,6 +9,8 @@ import { COPYWRITING_FRAMEWORK } from "./copywriting.ts";
 import { getCategoryGuide, normalizeCategory, type KnowledgeCategory } from "./category-guides.ts";
 import { SEO_STRATEGY } from "./seo-strategy.ts";
 import { IMAGE_RULES, getImageRules } from "./image-rules.ts";
+import { IMAGE_ROLES_KNOWLEDGE } from "./image-roles.ts";
+import { getCategoryImageGuide } from "./category-image.ts";
 import { OVERLAY_COPY_RULES } from "./overlay-copy.ts";
 
 export type { KnowledgeCategory };
@@ -80,10 +82,11 @@ export function buildKnowledge(options: BuildKnowledgeOptions): string {
   }
 
   if (functionName === "prompts") {
-    // Core: image rules filtered by active marketplace
+    // Core: marketplace image rules + visual roles + category photo guidance
     sections.push(getImageRules(marketplace));
+    sections.push(IMAGE_ROLES_KNOWLEDGE);
     if (normalizedCategory) {
-      sections.push(getCategoryGuide(normalizedCategory));
+      sections.push(getCategoryImageGuide(normalizedCategory));
     }
   }
 

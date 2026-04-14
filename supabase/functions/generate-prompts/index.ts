@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, sanitizeArrayForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger, callAI, parseToolCallResult, checkRateLimit } from "../_shared/helpers.ts";
 import { buildKnowledge } from "../_shared/knowledge/index.ts";
+import { PROMPT_RULES_VERSION } from "../_shared/prompt-rules.ts";
+import { IMAGE_ROLES_VERSION } from "../_shared/knowledge/image-roles.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -13,7 +15,7 @@ serve(async (req) => {
     const rateLimited = await checkRateLimit(userId, "generate-prompts", cors);
     if (rateLimited) return rateLimited;
     const log = createRequestLogger("generate-prompts", userId);
-    log.info("start");
+    log.info("start", { promptRulesVersion: PROMPT_RULES_VERSION, imageRolesVersion: IMAGE_ROLES_VERSION });
 
     const { productName, category, suggested_category, characteristics, extras, adTitle, marketplace } = await req.json();
     if (!productName || typeof productName !== "string" || productName.length > 500) {
@@ -64,56 +66,8 @@ The visualDNA must include:
 - accentColor: a suggested accent color for overlays that complements the product (e.g. "warm gold #D4A853")
 - headlineColor: a suggested headline text color (e.g. "dark navy #1A2332")
 
-═══════════════════════════════════════
-IMAGE ROLES
-═══════════════════════════════════════
-
-Each of the 7 images has a specific role. The prompt for each must be a CLEAN image prompt (NO text overlays, NO typography, NO arrows or graphics — those will be added programmatically later).
-
-#1 — COVER (Hero / Marketplace main image)
-- Clean white background, product centered, no text, no effects
-- 3/4 angle, slightly elevated, 85mm lens compression
-- Soft studio key light, rim light for separation
-
-#2 — BENEFITS (will receive text overlay later)
-- Product prominently displayed with generous negative space on the LEFT side for text placement
-- Same lighting and background as campaign DNA
-- Leave ~40% of frame as clean space for headline + bullets overlay
-
-#3 — FEATURES (will receive icons overlay later)
-- Product at slight angle showing key feature areas
-- Even lighting revealing all details
-- Generous margins around product for icon placement
-
-#4 — CLOSE-UP DETAIL
-- Macro/close-up of the most interesting product detail
-- Directional cross-lighting to reveal texture
-- Shallow depth of field, tight crop
-
-#5 — LIFESTYLE / USAGE CONTEXT
-- Product in realistic usage environment
-- Natural/ambient lighting, contextual props
-- Rule of thirds, product as focal point
-
-#6 — PORTABILITY / SCALE
-- Product next to familiar reference object (hand, coin, phone)
-- Clean background, even lighting
-- Both objects clearly visible for size comparison
-
-#7 — IN-BOX / WHAT'S INCLUDED
-- Flat lay or 45° angle showing all included items
-- Clean surface, soft overhead lighting
-- Organized layout with product centered
-
-CRITICAL: The AI that will generate images will ALSO receive real reference photos of the product. Fidelity and realism rules will be injected at image generation time — do NOT repeat them in the prompts.
-
-Each prompt must focus on SCENE DIRECTION with ALL of these sub-sections:
-- Camera: angle, lens equivalent, perspective, distance
-- Lighting: must be CONSISTENT with the visualDNA lighting
-- Background: must be CONSISTENT with the visualDNA background
-- Composition: product position, negative space, framing
-
-Each prompt should be 80-150 words of pure scene direction. Do NOT include fidelity rules, realism rules, or output format instructions — those are handled separately. Do NOT use vague instructions.`;
+The 7 IMAGE ROLES, their scene requirements, and category-specific photography direction are defined
+in the KNOWLEDGE BASE injected above. Follow them exactly — one prompt per role, in order.`;
 
     const response = await callAI({
       userId,

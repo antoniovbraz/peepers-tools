@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { getCorsHeaders, authenticate, errorResponse, handleAIError, sanitizeForLLM, LLM_SAFETY_INSTRUCTION, createRequestLogger, callAI, checkRateLimit } from "../_shared/helpers.ts";
+import { buildRefPrefix, PROMPT_RULES_VERSION } from "../_shared/prompt-rules.ts";
 
 serve(async (req) => {
   const cors = getCorsHeaders(req);
@@ -13,7 +14,7 @@ serve(async (req) => {
     const rateLimited = await checkRateLimit(userId, "generate-image", cors);
     if (rateLimited) return rateLimited;
     const log = createRequestLogger("generate-image", userId);
-    log.info("start");
+    log.info("start", { promptRulesVersion: PROMPT_RULES_VERSION });
 
     const { prompt, referencePhotos, feedback } = await req.json();
     if (!prompt || typeof prompt !== "string" || prompt.length > 5000) {
@@ -41,24 +42,7 @@ serve(async (req) => {
     if (photos.length > 0) {
       contentParts.push({
         type: "text",
-        text: `${LLM_SAFETY_INSTRUCTION}\n\nHere are reference photos of the ACTUAL product.
-
-FIDELITY RULES (MANDATORY — NEVER VIOLATE):
-- Use the EXACT product from these reference photos
-- Do not change: shape, proportions, dimensions, materials, colors, textures, button placement, ports, layout, logos, branding, text, labels
-- Preserve ALL physical characteristics exactly as shown
-- Do not add, remove, or modify any product feature
-- Match the exact surface finish (matte, glossy, brushed, etc.)
-
-REALISM RULES (MANDATORY):
-- This must look like a REAL photograph, NOT a 3D render or CGI
-- Realistic reflections based on actual material (metal, plastic, glass, fabric, leather)
-- Accurate shadows with natural light falloff
-- Subtle micro imperfections for photorealism (minor surface variations, realistic edge quality)
-- AVOID: plastic/CGI look, over-smoothing, fake edges, unrealistic specular highlights, artificial sheen
-
-Generate the image following the style direction in the prompt below.
-Ensure the product looks IDENTICAL to the reference and NOT reinterpreted.`,
+        text: `${LLM_SAFETY_INSTRUCTION}\n\nHere are reference photos of the ACTUAL product.\n\n${buildRefPrefix()}`,
       });
       for (const photoUrl of photos) {
         contentParts.push({
