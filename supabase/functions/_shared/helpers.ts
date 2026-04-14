@@ -926,7 +926,7 @@ export async function callAI(params: {
 
 /**
  * OpenAI GPT Image generation (gpt-image-1.5, gpt-image-1, gpt-image-1-mini).
- * Uses /v1/images/edits when reference images are available (with input_fidelity=high),
+ * Uses /v1/images/edits when reference images are available (with input_fidelity=high for non-mini models),
  * falls back to /v1/images/generations when no references.
  * Returns OpenAI-compatible response with images array.
  */
@@ -961,7 +961,10 @@ async function callOpenAIGPTImage(apiKey: string, messages: any[], model: string
     formData.append("prompt", prompt.slice(0, 32_000));
     formData.append("size", "1024x1024");
     formData.append("quality", "medium");
-    formData.append("input_fidelity", "high");
+    // input_fidelity is only supported on gpt-image-1 and gpt-image-1.5, not mini
+    if (resolvedModel !== "gpt-image-1-mini") {
+      formData.append("input_fidelity", "high");
+    }
 
     // Fetch and attach up to 5 reference images
     for (let idx = 0; idx < Math.min(imageUrls.length, 5); idx++) {
