@@ -151,8 +151,17 @@ export function handleAIError(
     return errorResponse("Chave de API inválida ou sem permissão. Verifique sua chave em Configurações.", 403, corsHeaders, "AI_AUTH_ERROR");
   }
   if (status === 400) {
-    console.error("AI bad request:", body.slice(0, 500));
-    return errorResponse("Requisição inválida ao provedor de IA. Tente novamente.", 400, corsHeaders, "AI_BAD_REQUEST");
+    console.error("AI bad request:", body.slice(0, 1000));
+    // Extract meaningful error detail from provider response
+    let detail = "";
+    try {
+      const parsed = JSON.parse(body);
+      detail = parsed?.error?.message || parsed?.error?.status || "";
+    } catch { /* body wasn't JSON */ }
+    const msg = detail
+      ? `Erro do provedor de IA: ${detail.slice(0, 200)}`
+      : "Requisição inválida ao provedor de IA. Tente novamente.";
+    return errorResponse(msg, 400, corsHeaders, "AI_BAD_REQUEST");
   }
   if (status === 503 || status === 529) {
     return errorResponse("Provedor de IA temporariamente indisponível. Tente novamente.", 503, corsHeaders, "AI_UNAVAILABLE");
@@ -892,7 +901,13 @@ export async function callGoogleAI(params: {
   });
 
   if (!response.ok) {
-    return response;
+    // Read and log the actual Google error before returning
+    const errorBody = await response.text();
+    console.error(`Google AI error (${response.status}):`, errorBody.slice(0, 1000));
+    return new Response(errorBody, {
+      status: response.status,
+      headers: { "Content-Type": response.headers.get("Content-Type") || "application/json" },
+    });
   }
 
   const data = await response.json();
@@ -909,30 +924,48 @@ export async function callGoogleAI(params: {
  * - Converts `type: ["string", "null"]` → `type: "string", nullable: true`
  * - Removes `additionalProperties` (unsupported by Gemini)
  */
+// Keys that hold nested Schema objects and must be recursed into
+const SCHEMA_RECURSE_KEYS = new Set(["properties", "items", "anyOf"]);
+// Keys not supported by Gemini Schema that must be stripped
+const SCHEMA_STRIP_KEYS = new Set(["additionalProperties", "$schema", "$id", "$ref", "$defs", "definitions"]);
+
 function sanitizeSchemaForGemini(schema: any): any {
   if (!schema || typeof schema !== "object") return schema;
   if (Array.isArray(schema)) return schema.map(sanitizeSchemaForGemini);
 
   const result: any = {};
   for (const [key, value] of Object.entries(schema)) {
-    if (key === "additionalProperties") continue;
+    if (SCHEMA_STRIP_KEYS.has(key)) continue;
     if (key === "type" && Array.isArray(value)) {
       const types = (value as string[]).filter((t) => t !== "null");
       result.type = types.length === 1 ? types[0] : types;
       if ((value as string[]).includes("null")) result.nullable = true;
-    } else if (key === "properties" && typeof value === "object") {
+    } else if (key === "properties" && typeof value === "object" && !Array.isArray(value)) {
       const props: any = {};
       for (const [pk, pv] of Object.entries(value as Record<string, any>)) {
         props[pk] = sanitizeSchemaForGemini(pv);
       }
       result[key] = props;
-    } else if (key === "items" && typeof value === "object") {
-      result[key] = sanitizeSchemaForGemini(value);
+    } else if (SCHEMA_RECURSE_KEYS.has(key)) {
+      result[key] = Array.isArray(value)
+        ? value.map(sanitizeSchemaForGemini)
+        : sanitizeSchemaForGemini(value);
     } else {
       result[key] = value;
     }
   }
   return result;
+}
+
+/** Convert ArrayBuffer to base64 without hitting V8's argument spread limit */
+function arrayBufferToBase64(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  const CHUNK = 32_768; // safe well under V8's ~65k arg limit
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += CHUNK) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + CHUNK));
+  }
+  return btoa(binary);
 }
 
 /** Fetch a single image URL and return inlineData part, or null on failure */
@@ -943,7 +976,7 @@ async function fetchImageAsPart(url: string): Promise<{ inlineData: { mimeType: 
       const contentType = imgRes.headers.get("content-type") || "image/jpeg";
       const mimeType = contentType.split(";")[0].trim();
       const arrayBuf = await imgRes.arrayBuffer();
-      const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuf)));
+      const base64 = arrayBufferToBase64(arrayBuf);
       return { inlineData: { mimeType, data: base64 } };
     }
     console.warn(`Failed to fetch image (${imgRes.status}): ${url.slice(0, 120)}`);
