@@ -509,7 +509,10 @@ async function callAnthropic(apiKey: string, params: {
   }
 
   const body: Record<string, unknown> = {
-    model: params.model,
+    model: ({
+      "claude-haiku-3.5": "claude-3-5-haiku-20241022",
+      "claude-sonnet-4-20250514": "claude-sonnet-4-20250514",
+    } as Record<string, string>)[params.model] || params.model,
     max_tokens: 4096,
     temperature: params.temperature,
     messages,
