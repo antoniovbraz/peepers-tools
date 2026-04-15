@@ -7,6 +7,45 @@ import type { Provider, UserKey, AIModel, AIFunction, ProfileId, FunctionConfig 
 import { AI_FUNCTIONS, FUNCTION_LABELS, FUNCTION_REQUIREMENTS, PROFILE_CONFIGS, PROFILE_META } from "./types";
 import { estimateCost, getRequiredProviders } from "./helpers";
 
+/* ── Provider Status Pages ── */
+const PROVIDER_STATUS: Record<string, { pageUrl: string; apiUrl?: string }> = {
+  google:    { pageUrl: "https://status.cloud.google.com/" },
+  openai:    { pageUrl: "https://status.openai.com/",    apiUrl: "https://status.openai.com/api/v2/status.json" },
+  anthropic: { pageUrl: "https://status.anthropic.com/",  apiUrl: "https://status.anthropic.com/api/v2/status.json" },
+  replicate: { pageUrl: "https://status.replicate.com/",  apiUrl: "https://status.replicate.com/api/v2/status.json" },
+};
+
+function StatusIndicator({ providerId, statuses }: { providerId: string; statuses: Record<string, string> }) {
+  const cfg = PROVIDER_STATUS[providerId];
+  if (!cfg) return null;
+
+  const status = statuses[providerId];
+  const dotColor =
+    status === "none"      ? "bg-green-500" :
+    status === "minor"     ? "bg-yellow-500" :
+    status === "major" || status === "critical" ? "bg-red-500" :
+    null;
+  const label =
+    status === "none"      ? "Operacional" :
+    status === "minor"     ? "Degradado" :
+    status === "major"     ? "Instável" :
+    status === "critical"  ? "Fora do ar" :
+    "Status";
+
+  return (
+    <a
+      href={cfg.pageUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+    >
+      {dotColor && <span className={`w-2 h-2 rounded-full ${dotColor}`} />}
+      {label}
+      <ExternalLink className="w-3 h-3" />
+    </a>
+  );
+}
+
 export default function TabProviders() {
   const { session } = useAuth();
   const [providers, setProviders] = useState<Provider[]>([]);
@@ -24,6 +63,7 @@ export default function TabProviders() {
   const [customConfig, setCustomConfig] = useState<Record<AIFunction, FunctionConfig> | null>(null);
   const [savingProfile, setSavingProfile] = useState(false);
   const [expandedCustom, setExpandedCustom] = useState(false);
+  const [providerStatuses, setProviderStatuses] = useState<Record<string, string>>({});
 
   const loadData = useCallback(async () => {
     if (!session) return;
@@ -94,6 +134,16 @@ export default function TabProviders() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  useEffect(() => {
+    Object.entries(PROVIDER_STATUS).forEach(([id, cfg]) => {
+      if (!cfg.apiUrl) return;
+      fetch(cfg.apiUrl)
+        .then((r) => r.json())
+        .then((d) => setProviderStatuses((prev) => ({ ...prev, [id]: d.status?.indicator ?? "unknown" })))
+        .catch(() => setProviderStatuses((prev) => ({ ...prev, [id]: "unknown" })));
+    });
+  }, []);
 
   const handleValidateAndSave = async (providerId: string) => {
     const keyValue = (keyInputs[providerId] ?? "").trim();
@@ -314,17 +364,20 @@ export default function TabProviders() {
                   <Shield className="w-5 h-5 text-muted-foreground" />
                   <div>
                     <p className="font-medium">{provider.name}</p>
-                    {provider.docs_url && (
-                      <a
-                        href={provider.docs_url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
-                      >
-                        Obter chave de API
-                        <ExternalLink className="w-3 h-3" />
-                      </a>
-                    )}
+                    <div className="flex items-center gap-3">
+                      {provider.docs_url && (
+                        <a
+                          href={provider.docs_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                        >
+                          Obter chave de API
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                      <StatusIndicator providerId={provider.id} statuses={providerStatuses} />
+                    </div>
                   </div>
                 </div>
 
