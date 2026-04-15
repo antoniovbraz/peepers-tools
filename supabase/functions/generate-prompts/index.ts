@@ -39,11 +39,11 @@ serve(async (req) => {
       log.warn("characteristics clipped", { original: characteristics.length, clipped: 20 });
     }
 
-    // Validate reference photos (up to 3 for visual context)
+    // Validate reference photos (capped per-provider by callAI)
     const validatedPhotos: string[] = [];
     if (referencePhotos !== undefined && referencePhotos !== null) {
-      if (!Array.isArray(referencePhotos) || referencePhotos.length > 3) {
-        return errorResponse("Fotos de referência inválidas (max 3)", 400, cors, "VALIDATION_ERROR");
+      if (!Array.isArray(referencePhotos) || referencePhotos.length > 10) {
+        return errorResponse("Fotos de referência inválidas (max 10)", 400, cors, "VALIDATION_ERROR");
       }
       for (const url of referencePhotos) {
         if (typeof url !== "string" || (!url.startsWith("https://") && !url.startsWith("data:image/"))) {
