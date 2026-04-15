@@ -1,6 +1,28 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /**
+ * Try to extract the backend error message from a Supabase FunctionsHttpError.
+ * The Supabase client sets `error.context` to the raw Response object, which
+ * contains the actual JSON body with `{ error, error_code }`.
+ */
+async function extractErrorMessage(error: Error): Promise<Error> {
+  try {
+    const context = (error as unknown as { context?: Response }).context;
+    if (context && typeof context.json === "function") {
+      const body = await context.json();
+      if (body?.error && typeof body.error === "string") {
+        const enriched = new Error(body.error);
+        enriched.name = error.name;
+        return enriched;
+      }
+    }
+  } catch {
+    // Response body already consumed or not JSON — keep original error
+  }
+  return error;
+}
+
+/**
  * Invoke a Supabase edge function with automatic retry on transient errors.
  * Does NOT retry on 4xx client errors (validation, auth, rate limit).
  */
@@ -29,6 +51,11 @@ export async function invokeWithRetry<T = unknown>(
       (result.error as unknown as { status?: number })?.status ??
       (result.error as unknown as { context?: { status?: number } })?.context?.status;
     if (typeof status === "number" && status >= 400 && status < 500) break;
+  }
+
+  // Extract the real backend error message before returning
+  if (lastError) {
+    lastError = await extractErrorMessage(lastError);
   }
 
   return { data: null, error: lastError };

@@ -15,7 +15,16 @@ export function friendlyMessage(err: unknown): string {
   if (lower.includes("api_key_missing") || lower.includes("ai_auth_error") || lower.includes("chave de api inválida"))
     return "Chave de API inválida ou sem permissão. Verifique suas configurações.";
 
-  if (lower.includes("ai_unavailable") || lower.includes("provedor de ia temporariamente"))
+  if (lower.includes("ai_safety_block") || lower.includes("bloqueou o conteúdo por questões de segurança"))
+    return "A IA bloqueou o conteúdo por questões de segurança. Tente com outras fotos.";
+
+  if (lower.includes("ai_parse_error") || lower.includes("não gerou um resultado válido"))
+    return "O modelo de IA não conseguiu processar as fotos. Tente novamente.";
+
+  if (lower.includes("ai_provider_error") || lower.includes("erro do provedor"))
+    return "Erro no provedor de IA. Tente novamente em instantes.";
+
+  if (lower.includes("ai_unavailable") || lower.includes("provedor de ia") || lower.includes("indisponível"))
     return "Provedor de IA temporariamente indisponível. Tente novamente em instantes.";
 
   if (lower.includes("rate limit") || lower.includes("too many requests"))

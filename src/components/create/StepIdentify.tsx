@@ -4,9 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { ArrowRight, ArrowLeft, Check, Edit3, Brain, Plus, ChevronDown, Tag } from "lucide-react";
+import { ArrowRight, ArrowLeft, Check, Edit3, Brain, Plus, ChevronDown, Tag, AlertTriangle, RefreshCw } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
+import { friendlyMessage } from "@/hooks/useErrorHandler";
 import { invokeWithRetry } from "@/lib/retryFetch";
 import {
   Collapsible,
@@ -31,6 +32,7 @@ export default function StepIdentify() {
   const [skuMappingNote, setSkuMappingNote] = useState(data.identification.skuMappingNote ?? "");
   const [fichaOpen, setFichaOpen] = useState(false);
   const [identified, setIdentified] = useState(!!data.identification.name);
+  const [aiError, setAiError] = useState<string | null>(null);
   // Tracks the photo set that last triggered an auto-run, so re-uploading
   // a completely different product forces AI to re-identify.
   const autoRunPhotoKey = useRef<string | null>(null);
@@ -41,6 +43,7 @@ export default function StepIdentify() {
       return;
     }
     setLoading(true);
+    setAiError(null);
     try {
       // photoUrls are now public Storage URLs — pass them directly
       const { data: result, error } = await invokeWithRetry("identify-product", {
@@ -69,6 +72,7 @@ export default function StepIdentify() {
         skuMappingNote,
       });
     } catch (err) {
+      setAiError(friendlyMessage(err));
       handleError(err, "Erro na IA");
     } finally {
       setLoading(false);
@@ -104,6 +108,26 @@ export default function StepIdentify() {
           <div className="h-full bg-primary rounded-full animate-pulse" style={{ width: "60%" }} />
         </div>
         <p className="text-xs text-muted-foreground">Estimativa: ~15 segundos</p>
+      </div>
+    );
+  }
+
+  if (!identified && aiError) {
+    return (
+      <div className="px-4 py-10 flex flex-col items-center gap-4">
+        <div className="w-16 h-16 rounded-full bg-destructive/10 flex items-center justify-center">
+          <AlertTriangle className="w-8 h-8 text-destructive" />
+        </div>
+        <h2 className="font-display text-lg font-bold">Falha na identificação</h2>
+        <p className="text-sm text-muted-foreground text-center max-w-sm">{aiError}</p>
+        <div className="flex gap-3">
+          <Button variant="outline" onClick={goBack} className="gap-2">
+            <ArrowLeft className="w-4 h-4" /> Voltar
+          </Button>
+          <Button onClick={runAI} className="gap-2">
+            <RefreshCw className="w-4 h-4" /> Tentar novamente
+          </Button>
+        </div>
       </div>
     );
   }

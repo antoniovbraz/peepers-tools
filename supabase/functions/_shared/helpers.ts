@@ -298,16 +298,32 @@ export function parseToolCallResult(
 ): { result: Record<string, unknown> } | Response {
   const toolCall = (data as any).choices?.[0]?.message?.tool_calls?.[0];
   if (!toolCall) {
+    const meta = (data as any)._meta;
+    const finishReason = meta?.finishReason;
+    const blockReason = meta?.blockReason;
+    console.warn("parseToolCallResult: no tool_calls", JSON.stringify({ finishReason, blockReason, choices: (data as any).choices }));
+
+    if (blockReason || finishReason === "SAFETY") {
+      return errorResponse(
+        "A IA bloqueou o conteúdo por questões de segurança. Tente com outras fotos.",
+        502, corsHeaders, "AI_SAFETY_BLOCK",
+      );
+    }
+    if (finishReason === "RECITATION") {
+      return errorResponse(
+        "A IA não conseguiu processar este conteúdo. Tente novamente.",
+        502, corsHeaders, "AI_PARSE_ERROR",
+      );
+    }
     return errorResponse(
       "A IA não gerou um resultado válido. Tente novamente.",
-      502,
-      corsHeaders,
-      "AI_PARSE_ERROR",
+      502, corsHeaders, "AI_PARSE_ERROR",
     );
   }
   try {
     return { result: JSON.parse(toolCall.function.arguments) };
   } catch {
+    console.warn("parseToolCallResult: JSON parse failed", toolCall.function?.arguments?.slice?.(0, 200));
     return errorResponse("Resposta da IA inválida", 502, corsHeaders, "AI_PARSE_ERROR");
   }
 }
@@ -850,15 +866,16 @@ export async function callAI(params: {
 
     // ── Auto-fallback for Google text models ─────────────────────────────
     // If gemini-2.5-flash (or any other google text model) returns 503/429,
-    // silently retry once with gemini-1.5-flash (stable GA model).
+    // try a chain of fallback models before giving up.
     if (!response.ok && config.providerId === "google" && !modalities?.includes("image")) {
       if (response.status === 503 || response.status === 429) {
-        const GOOGLE_TEXT_FALLBACK = "gemini-1.5-flash";
-        if (config.modelId !== GOOGLE_TEXT_FALLBACK) {
+        const GOOGLE_TEXT_FALLBACKS = ["gemini-2.0-flash", "gemini-1.5-flash"];
+        for (const fallbackModel of GOOGLE_TEXT_FALLBACKS) {
+          if (config.modelId === fallbackModel) continue;
           try {
             const fallbackResponse = await callGoogleAI({
               apiKey,
-              model: GOOGLE_TEXT_FALLBACK,
+              model: fallbackModel,
               messages: cappedMessages,
               temperature: config.temperature,
               tools,
@@ -866,13 +883,13 @@ export async function callAI(params: {
               modalities,
             });
             if (fallbackResponse.ok) {
-              console.log(`[callAI] Google text fallback: ${config.modelId} → ${GOOGLE_TEXT_FALLBACK}`);
+              console.log(`[callAI] Google text fallback: ${config.modelId} → ${fallbackModel}`);
               status = "success";
               errorMessage = undefined;
               return fallbackResponse;
             }
           } catch (_fallbackErr) {
-            // fallback also failed — return original response
+            // this fallback failed — try next in chain
           }
         }
       }
@@ -1321,8 +1338,19 @@ async function convertMessages(messages: any[]): Promise<{
 /** Convert Gemini response to OpenAI-compatible format */
 function convertResponse(data: any, isImageGeneration = false): Record<string, unknown> {
   const candidate = data.candidates?.[0];
+
+  // Extract metadata for downstream diagnostics
+  const finishReason = candidate?.finishReason || null;
+  const blockReason = data.promptFeedback?.blockReason || null;
+  const _meta = { finishReason, blockReason };
+
   if (!candidate?.content?.parts) {
-    return { choices: [{ message: { content: "", tool_calls: [] } }] };
+    console.warn("convertResponse: empty candidate", JSON.stringify({
+      finishReason,
+      blockReason,
+      safetyRatings: candidate?.safetyRatings ?? data.promptFeedback?.safetyRatings ?? null,
+    }));
+    return { _meta, choices: [{ message: { content: "", tool_calls: [] } }] };
   }
 
   const parts = candidate.content.parts;
@@ -1331,6 +1359,7 @@ function convertResponse(data: any, isImageGeneration = false): Record<string, u
   const functionCall = parts.find((p: any) => p.functionCall);
   if (functionCall) {
     return {
+      _meta,
       choices: [{
         message: {
           content: null,
@@ -1363,6 +1392,7 @@ function convertResponse(data: any, isImageGeneration = false): Record<string, u
     }
 
     return {
+      _meta,
       choices: [{
         message: {
           content: textContent,
@@ -1379,6 +1409,7 @@ function convertResponse(data: any, isImageGeneration = false): Record<string, u
     .join("");
 
   return {
+    _meta,
     choices: [{
       message: {
         content: textContent,
