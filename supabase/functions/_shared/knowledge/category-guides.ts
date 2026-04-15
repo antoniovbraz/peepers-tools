@@ -232,17 +232,32 @@ compatível com [marca], 65W, 3A, bivolt, cabo nylon, hub USB, adaptador univers
 ## CATEGORIA: PAPELARIA E ESCRITÓRIO
 
 ### Atributos Obrigatórios
-- Quantidade por embalagem / pacote
-- Dimensões (para papel: A4, A5, etc.)
-- Gramatura (papel, cartão)
-- Material / composição
-- Compatibilidade (impressoras, sistemas)
+- Quantidade por embalagem / pacote (fundamental para calcular custo por unidade)
+- Dimensões (para papel: A4, A5, Carta; para pastas: cm)
+- Gramatura (papel, cartão — g/m²)
+- Material / composição (sulfite, couchê, kraft, plástico PP etc.)
+- Compatibilidade (impressoras laser/jato de tinta, tipo de arquivo)
+- Cor e acabamento (fosco, brilhoso, laminado)
 
 ### Ângulos de Venda
-1. Custo por unidade vs. compra avulsa
-2. Qualidade de impressão / escrita
-3. Compatibilidade garantida
-4. Embalagem econômica para uso contínuo
+1. **Custo por unidade**: Calcule e mostre (ex: "R$0,08 por folha — metade do preço de papelaria")
+2. **Qualidade de impressão / escrita**: Para papel, gramatura alta = impressão sem transparência
+3. **Compatibilidade garantida**: Para cartuchos e toners es — liste modelos de impressora
+4. **Embalagem econômica** para uso contínuo e corporativo
+5. **Produtividade**: Item que facilita o dia a dia do profissional ou estudante
+
+### Keywords de Alta Conversão
+- papel sulfite, resma a4, folha A4, papel para impressora, caderno universitário
+- caneta esferográfica, caneta gel, marca texto, post-it, bloco de notas
+- pasta arquivo, fichário, organizador, porta-retrato, moldura
+- cartucho, toner, compatível, original, impressora [marca]
+
+### Objeções
+- "Vai manchar/borrar?" → Gramatura alta, tinta/pigmento de qualidade
+- "Serve na minha impressora?" → Liste modelos de impressora explicitamente
+- "Vai durar quanto tempo?" → Quantidade total de unidades, estimativa de uso
+- "É compatível ou original?" → Seja claro sobre original vs. compatível e qualidade
+- "Qual a diferença de gramatura?" → Explique: 75g normal, 90g premium, 120g+ premium/foto
 `,
 
   brinquedos: `
@@ -278,63 +293,107 @@ compatível com [marca], 65W, 3A, bivolt, cabo nylon, hub USB, adaptador univers
 ## CATEGORIA: ESPORTES E FITNESS
 
 ### Atributos Obrigatórios
-- Tamanho / numeração
-- Material e composição
-- Peso (para equipamentos)
-- Carga máxima suportada (para equipamentos de peso/estrutura)
-- Certificações (se aplicável)
+- Tamanho / numeração (PP/P/M/G/GG ou numérico exato — fundamental para evitar troca)
+- Material e composição (100% poliéster, nylon, algodão, borracha EVA etc.)
+- Peso do produto (para equipamentos e pesos)
+- Carga máxima suportada (para halteres, bancadas, elásticos de resistência)
+- Dimensões dobrado e aberto (colchonetes, tapetes, redes etc.)
+- Nível de nível (iniciante / intermediário / profissional)
 
 ### Ângulos de Venda
-1. Performance e resultado esperado
-2. Conforto durante uso prolongado
-3. Custo vs. academia
-4. Durabilidade para uso intenso
+1. **Resultado prático concreto**: "Queima até X kcal em 30 min" — dados específicos
+2. **Conforto e ergonomia**: Tecido tecnológico, caimento, amortecimento — detalhe o benefício
+3. **Custo vs. academia**: "Economize até R$150/mês com treino em casa"
+4. **Durabilidade para uso intenso**: Costuras reforçadas, material resistente a suor e lavagens
+5. **Versatilidade**: "Serve para corrida, cross training e caminhada"
+
+### Keywords de Alta Conversão
+- kit halteres, elástico resistência, colchonete yoga, tapete pilates, corda pular
+- bermuda academia, legging feminina, camiseta dry fit, tênis corrida
+- bicicleta ergométrica, esteira, kettlebell, barra fixa, prancha abdominal
+- suplemento pré-treino, proteína whey, creatina, BCAA, coqueteleira
 
 ### Objeções
-- "Aguenta meu peso?" → Carga máxima explícita
-- "É de qualidade profissional?" → Materiais, uso sugerido
+- "Aguenta meu peso?" → Carga máxima explícita (ex: "suporta até 120kg")
+- "O tamanho vai servir?" → Tabela de medidas com cintura/quadril/ombro em cm
+- "É de qualidade profissional ou iniciante?" → Nível de uso e material
+- "Vai durar lavagens?" → Material antimicrobiano, resistência ao cloro, instruções de lavagem
+- "O colchonete tem espessura suficiente?" → Espessura em cm + indicação (yoga: 6mm, pilates: 15mm)
+- "O elástico vai arrebentar logo?" → Material (latex/látex natural), carga em kg, número de dobras
 `,
 
   automotivo: `
 ## CATEGORIA: AUTOMOTIVO
 
 ### Atributos Obrigatórios
-- Compatibilidade com modelos de veículo (marca/modelo/ano)
-- Material
-- Dimensões de instalação
-- Voltagem (12V / 24V)
-- Certificações (DENATRAN, INMETRO quando aplicável)
+- Compatibilidade com modelos de veículo: marca / modelo / ano (ESSENCIAL — primeiro campo que o comprador confere)
+- Material e acabamento (ABS, couro sintético, alumínio, borracha SBR)
+- Dimensões de instalação (largura, profundidade, diâmetro)
+- Tensão de operação (12V / 24V — carro / caminhão)
+- Certificações quando aplicáveis (DENATRAN para rastreadores, INMETRO para capacetes)
+- Inclui kit de instalação? Quais peças vêm na embalagem?
 
 ### Ângulos de Venda
-1. Compatibilidade garantida com o veículo do comprador
-2. Facilidade de instalação (plug & play vs. precisa de mecânico)
-3. Durabilidade (exposição a calor, vibração)
+1. **Compatibilidade garantida**: Liste explicitamente marcas/modelos/anos — é o argumento #1 para fechar
+2. **Instalação sem mecânico**: "Plug & play, sem furos — instale em 5 minutos" aumenta conversão
+3. **Durabilidade sob calor e vibração**: Interior de carro chega a 80°C — materiais que aguentam
+4. **Segurança e proteção**: Para câmeras de ré, alertas de ponto cego, airbags etc.
+5. **Valorização do veículo**: Acessórios de acabamento aumentam percepção de valor
+
+### Keywords de Alta Conversão
+- câmera de ré, suporte celular carro, carregador veicular, tapete automotivo
+- capa banco, protetor capo, localizador GPS veicular, película protetora
+- sensor estacionamento, alarme, central multimídia, som automotivo
+- compatível [Gol/Civic/HB20/Onix/Strada/Corolla/Tracker] [ano]
 
 ### Objeções
-- "Serve no meu carro?" → Liste makes/models/anos explicitamente
-- "É fácil instalar?" → Descreva o processo de instalação
+- "Serve no meu carro [modelo/ano]?" → Liste 10+ modelos populares explicitamente (Gol, Onix, Tracker, HB20, Creta, Strada, SW4)
+- "É fácil instalar?" → Descreva o processo passo a passo + tempo estimado
+- "Precisa de instalador/mecânico?" → Seja claro: plug & play ou instalação profissional
+- "O suporte vai cair com o calor?" → Material resistente a temperatura, teste de aderência
+- "Vai arranhar o painel?" → Base protetora de silicone, fixação sem adesivo permanente
+- "É original ou genérico?" → Mencione se é peça original da montadora ou acessório aftermarket
 `,
 
   saude: `
 ## CATEGORIA: SAÚDE E SUPLEMENTOS
 
 ### Atributos Obrigatórios
-- Composição / informação nutricional (para suplementos)
-- Registro ANVISA (obrigatório)
-- Quantidade / dosagem por embalagem
-- Modo de uso / posologia
-- Contraindicações principais
-- Data de validade (indicar lote/validade disponível)
+- Composição / tabela nutricional (para suplementos: proteínas, carboidratos, calorias por porção)
+- Registro ANVISA (obrigatório para cosméticos, suplementos e dispositivos médicos)
+- Quantidade total / porções por embalagem (calcule custo por dose!)
+- Modo de uso / posologia recomendada
+- Contraindicações principais (grávidas, lactantes, menores de 18 anos)
+- Sabor / forma (cápsulas, pó, comprimido, líquido)
 
-### Regras Críticas
-- NUNCA faça afirmações de cura, tratamento ou prevenção de doenças (ANVISA)
-- OBRIGATÓRIO: "Consulte um médico antes de usar" para produtos com restrições
-- Suplementos alimentares: seguir regulamentação RDC 243/2018
+### Regras Críticas — AVISO LEGAL
+- NUNCA faça afirmações de cura, tratamento, diagnóstico ou prevenção de doenças (proibido ANVISA/CFM)
+- NUNCA use palavras: "cura", "trata", "previne [doença]", "medicamento"
+- Use linguagem permitida: "contribui para", "auxilia na manutenção de", "apoia a função"
+- OBRIGATÓRIO em suplementos: "Este produto não substitui uma alimentação equilibrada."
+- Para dispositivos médicos: Certificado ANVISA + número de registro
 
 ### Ângulos de Venda
-1. Composição de qualidade / pureza
-2. Resultado esperado com disclaimer
-3. Custo por dose vs. concorrentes
+1. **Custo por dose**: Calcule e mostre (ex: "Apenas R$2,50 por dia de suplementação")
+2. **Qualidade e pureza**: Origem dos ingredientes, ausência de aditivos desnecessários
+3. **Resultado esperado com disclaimer** (ex: "associado a exercícios e dieta")
+4. **Praticidade**: Formato, facilidade de consumo, sabor (para suplementos)
+5. **Credibilidade**: Certificações, origem importada/nacional, marca reconhecida
+
+### Keywords de Alta Conversão
+- whey protein, proteína concentrada isolada, creatina monohidratada, BCAA aminoácido
+- termogênico, pré-treino, hipercalórico, albumina, colágeno hidrolisado
+- vitamina D3 K2, ômega 3, multivitamínico, complexo B, magnésio dimalato
+- aparelho pressão, oxímetro, termômetro digital, medidor glicose, nebulizador
+- melatonina, própolis, vitamina C, zinco, probiótico, fibra alimentar
+
+### Objeções
+- "Realmente funciona?" → Ingredientes ativos com mecanismo de ação explicado (sem claims proibidos)
+- "Tem algum efeito colateral?" → Contraindicações claras + "consulte um médico antes de usar"
+- "Serve para quem não malha?" → Deixe claro o público-alvo e casos de uso
+- "Qual a concentração por cápsula/dose?" → Lista todas as quantidades (mg/mcg) por porção
+- "É de boa qualidade?" → Certificações, origem, marca, registro ANVISA
+- "Quando vou sentir o resultado?" → Expectativa realista + disclaimer de resultados variáveis
 `,
 };
 

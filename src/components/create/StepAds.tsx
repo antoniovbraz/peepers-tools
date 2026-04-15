@@ -161,6 +161,7 @@ export default function StepAds() {
           <div className="space-y-2">
             <label htmlFor="ml-desc" className="text-xs font-semibold text-muted-foreground">Descrição</label>
             <Textarea id="ml-desc" value={ml.description} onChange={e => setMl({ ...ml, description: e.target.value })} rows={6} />
+            <p className="text-xs text-amber-600 dark:text-amber-500">Apenas texto puro — sem HTML, bullets (•) ou emojis</p>
           </div>
         </div>
       )}
@@ -217,7 +218,12 @@ export default function StepAds() {
           )}
           <div className="space-y-2">
             <label htmlFor="amazon-desc" className="text-xs font-semibold text-muted-foreground">Descrição</label>
-            <Textarea id="amazon-desc" value={amazon.description} onChange={e => setAmazon({ ...amazon, description: e.target.value })} rows={5} />
+            <Textarea id="amazon-desc" value={amazon.description} onChange={e => setAmazon({ ...amazon, description: e.target.value })} rows={5} maxLength={2000} />
+            <div className="flex justify-end">
+              <span className={`text-xs ${amazon.description.length > 2000 ? "text-destructive" : "text-muted-foreground"}`}>
+                {amazon.description.length}/2000
+              </span>
+            </div>
           </div>
         </div>
       )}

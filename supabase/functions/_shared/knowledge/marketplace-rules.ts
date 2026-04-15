@@ -11,26 +11,54 @@ export const MERCADO_LIVRE_RULES = `
   Exemplo: "Cabo USB-C 3A Carga Rápida 1m Nylon Trançado"
 - Formato COM MARCA (quando solicitado): [Produto] [Marca] [Especificação] [Diferencial]
   Exemplo: "Cabo USB-C Anker 3A Carga Rápida Nylon"
-- Use cada caractere: 60 chars é o teto, não o ideal — preencha com specs relevantes
-- Palavras proibidas no título: "melhor", "top", "ótimo", "barato", "promoção", "oferta"
+- Use cada caractere: 60 chars é o teto — preencha com specs relevantes
+- Palavras proibidas no título: "melhor", "top", "ótimo", "barato", "promoção", "oferta", "estoque"
 - Primeira palavra = termo mais buscado (ex: "Carregador", não "Fonte")
 - Capitalize apenas a primeira letra e nomes próprios
+- Sem pontuação ou símbolos especiais — separe termos com espaços
 
-### Descrição (HTML permitido)
-- Estrutura obrigatória:
-  1. Parágrafo de abertura (benefício principal, 2-3 frases)
-  2. Lista de especificações técnicas com marcadores (•)
-  3. Seção de compatibilidade (se aplicável)
-  4. Instruções de uso / observações importantes
-  5. Informações de garantia
+### Descrição — TEXTO PURO OBRIGATÓRIO (máx. 50.000 chars)
+⚠️ REGRA CRÍTICA: O Mercado Livre REJEITA qualquer formatação HTML, emojis e bullets (•).
+A API retorna erro "The description must be in plain text" para qualquer tag HTML ou emoji.
+Não use: <br>, <b>, <ul>, <li>, &amp;, bullets (•), emojis, asteriscos, negrito.
+
+FORMATO CORRETO — use APENAS:
+- Letras, números, espaços e pontuação comum (vírgulas, pontos, hifens, reticências)
+- MAIÚSCULAS para destacar nomes de seções e cabeçalhos
+- Hifens (-) para marcar itens de lista
+- Quebras de linha simples para separar parágrafos e seções
+
+ESTRUTURA OBRIGATÓRIA (copie e adapte):
+SOBRE O PRODUTO
+[2-3 frases com benefício principal e diferencial do produto]
+
+ESPECIFICAÇÕES TÉCNICAS
+- Potência: [X]W / [X]A
+- Comprimento: [X]m
+- Material: [material externo]
+- Conector: [tipo A] para [tipo B]
+- Padrão de carga: [PD/QC/etc.]
+- Tensão: [bivolt 100-240V]
+
+COMPATIBILIDADE
+[Lista de modelos separados por hifens ou vírgulas — inclua os top 10 no Brasil]
+
+PROTEÇÕES INTEGRADAS
+- Proteção contra sobrecarga
+- Proteção contra curto-circuito
+
+GARANTIA E NOTA FISCAL
+[Prazo de garantia + como acionar + informação sobre nota fiscal]
+
 - Extensão ideal: 300-600 palavras
-- Evite blocos de texto denso — use listas e subtítulos
 - Inclua termos de busca naturalmente no texto (não keyword stuffing)
+- A descrição indexa para buscas longas — inclua variações: USB-C, tipo-c, type-c
 
-### Ficha Técnica (campos indexados pelo algoritmo)
+### Ficha Técnica (principal vetor de indexação no ML)
 - Preencha TODOS os campos disponíveis para a categoria
 - Campos não preenchidos = produto não aparece em filtros de busca
 - Voltagem, potência, dimensões, peso, material: sempre em unidades padrão BR
+- A ficha técnica é mais importante que a descrição para ranqueamento
 
 ### Algoritmo de Ranking (por prioridade)
 1. Reputação do vendedor (termômetro verde)
@@ -43,9 +71,9 @@ export const MERCADO_LIVRE_RULES = `
 
 ### Tom e Estilo
 - Profissional, técnico, confiável
-- Comprador típico pesquisa antes de comprar — forneça dados, não elogios
+- Comprador pesquisa antes de comprar — forneça dados, não elogios
 - Evite superlativas sem prova ("o melhor do mercado")
-- Use garantia como argumento de fechamento
+- Use garantia e nota fiscal como argumentos de fechamento
 `;
 
 export const SHOPEE_RULES = `
@@ -59,12 +87,20 @@ export const SHOPEE_RULES = `
 - Separe blocos com "|" para facilitar leitura
 - Números e especificações aumentam CTR (3A, 65W, 1m, 2m)
 
-### Descrição
+### Descrição (máx. ~3.000 caracteres recomendado)
 - Tom casual, próximo, entusiasmado — diferente do ML formal
-- Use emojis com moderação: ✅ para benefícios, ⚡ para velocidade, 🎁 para brindes
-- Inclua FAQ informal ao final (Pergunta frequente: "Serve no meu celular?")
-- Hashtags no final da descrição aumentam visibilidade: #cargaRapida #caborobusto
-- Mencione compatibilidade de modelos específicos (iPhone 15, Samsung S24, etc.)
+- Emojis são permitidos e aumentam engajamento:
+  ✅ para benefícios, ⚡ para velocidade, 🎁 para brindes, 🔥 para destaques, 📦 para embalagem
+- Use bullets com emojis para listar benefícios (ex: "✅ Carga rápida 3A — do 0% ao 50% em 30min")
+- Inclua FAQ informal ao final:
+  "❓ Serve no meu celular? Sim! Compatível com [lista de modelos]."
+- Hashtags NO FINAL da descrição aumentam visibilidade em feeds temáticos:
+  Para cabos/carregadores: #cargaRapida #caboUSBC #fastcharge #acessoriosCelular #caboResistente
+  Para eletrônicos: #eletronicos #gadgets #tecnologia
+  Para moda: #moda #tendencia #modafeminina
+  Para casa/cozinha: #casaEcozinha #decoracao #organizacao
+  Para beleza: #beleza #skincare #cuidadoPessoal
+- Mencione compatibilidade de modelos específicos (iPhone 15, Samsung S24, Xiaomi 14...)
 
 ### Algoritmo de Ranking
 1. Taxa de clique (CTR) — thumbnail e título decidem isso
@@ -79,6 +115,7 @@ export const SHOPEE_RULES = `
 - Mostre entusiasmo pelo produto
 - Destaque custo-benefício explicitamente ("Pelo preço de 1 café, você leva qualidade premium")
 - Use prova social: "Mais de X unidades vendidas" quando disponível
+- Crie urgência leve: "Aproveite enquanto temos estoque!"
 `;
 
 export const AMAZON_BR_RULES = `
@@ -87,38 +124,41 @@ export const AMAZON_BR_RULES = `
 ### Título (máx. 200 caracteres)
 - Formato padrão (SEM MARCA): [Produto] - [Feature 1] - [Feature 2] - [Especificação técnica] - [Tamanho/Cor/Pack]
   Exemplo: "Cabo USB-C - Carga Rápida 3A - Nylon Trançado - 1 Metro - Compatível Android e iOS"
-- Amazon prefere títulos descritivos e completos
+- Amazon prefere títulos descritivos e completos — use os 200 chars disponíveis
 - Primeira palavra = categoria ou produto principal
 - Inclua atributos de variação no título quando relevante (Pack com 2, Preto/Branco)
+- Sem emojis ou símbolos especiais no título
 
-### Bullet Points (5 obrigatórios)
-- Cada bullet começa com BENEFÍCIO EM MAIÚSCULAS seguido de detalhe técnico
+### Bullet Points — 5 OBRIGATÓRIOS (máx. 200 caracteres cada)
+- Cada bullet começa com BENEFÍCIO EM MAIÚSCULAS seguido de ":" e detalhe técnico
 - Estrutura: "CARGA ULTRA-RÁPIDA: Tecnologia 3A entrega 0-50% em apenas 30 minutos..."
-- Bullet 1: Benefício mais importante / USP
-- Bullet 2: Compatibilidade / alcance de uso
-- Bullet 3: Qualidade / materiais / durabilidade
-- Bullet 4: Especificações técnicas detalhadas
-- Bullet 5: Garantia / suporte / o que está incluso
-- Máx. 200 chars por bullet
+- Bullet 1: Benefício mais importante / USP principal
+- Bullet 2: Compatibilidade / alcance de uso (modelos específicos)
+- Bullet 3: Qualidade / materiais / durabilidade / certificações
+- Bullet 4: Especificações técnicas detalhadas (W, A, dimensões, etc.)
+- Bullet 5: Garantia / suporte / conteúdo da embalagem / nota fiscal
+- Máx. 200 caracteres por bullet — seja conciso e direto
+- NÃO use emojis nos bullets para Amazon
 
-### Descrição (A+ Content quando disponível)
-- Para sellers sem A+: texto corrido 2000 chars máx.
-- Reitere benefícios com mais detalhes
-- Inclua casos de uso, compatibilidade expandida
+### Descrição (máx. 2.000 caracteres — texto corrido)
+- Para sellers sem A+ Content: texto corrido, sem formatação HTML
+- Reitere benefícios com mais detalhes do que nos bullets
+- Inclua casos de uso expandidos e compatibilidade detalhada
+- Tom informativo e técnico — sem superlativas sem prova
+- Não repita literalmente o que já está nos bullets
 
-### Backend Search Terms (250 chars, não visíveis)
-- Inclua termos que não couberam no título
+### Backend Search Terms (250 chars, invisíveis ao comprador)
+- Inclua APENAS termos que NÃO aparecem no título ou bullets
 - Variações ortográficas, sinônimos, termos em inglês usados por brasileiros
-- Não repita palavras do título — o algoritmo A9 já as considera
-
-### EAN/GTIN
-- Obrigatório para categorias regulamentadas
-- Aumenta chance de aparecer no "Comparar com similar"
+- Modelos específicos de dispositivos compatíveis
+- Não use vírgulas — separe apenas por espaço
+- Não repita palavras — o algoritmo A9 ignora e penaliza keyword stuffing
+- Exemplo para cabo USB-C: "android iphone macbook ipad charging type-c braided xiaomi motorola huawei s23 ultra"
 
 ### Tom e Estilo
-- Informativo, técnico, objetivo
+- Informativo, técnico, objetivo — sem emojis em NENHUM campo
 - Comprador Amazon pesquisa muito — seja completo, não prolixo
-- Garantia e suporte são argumentos fortes
+- Garantia, suporte e nota fiscal são argumentos fortes de fechamento
 `;
 
 export const MAGALU_RULES = `
@@ -127,30 +167,46 @@ export const MAGALU_RULES = `
 ### Título (máx. 150 caracteres)
 - Formato padrão (SEM MARCA): [Produto] [Especificação técnica] [Diferencial] [Material]
   Exemplo: "Cabo USB-C 3A Carga Rápida Nylon Trançado 1 Metro"
-- Magalu indexa título + ficha técnica para busca interna
+- Magalu indexa título + ficha técnica para busca interna E Google Shopping
 - Seja preciso — compradores Magalu são mais funcionais que aspiracionais
+- Inclua especificações técnicas que aparecem nos filtros de busca
 
-### Descrição
+### Descrição (máx. ~2.000-3.000 caracteres recomendado)
 - Foco em informação técnica e utilitária
-- Inclua tabela de especificações técnicas
-- Liste compatibilidade de modelos quando relevante
-- Use linguagem acessível — base de usuários diversa em termos de escolaridade
+- Linguagem acessível — base de usuários diversa em termos de escolaridade
+- Use esta estrutura de especificações:
 
-### Ficha Técnica (crítica para filtros)
-- Magalu usa ficha técnica para alimentar os filtros de busca
+ESPECIFICAÇÕES TÉCNICAS:
+- [Atributo]: [Valor]
+- [Atributo]: [Valor]
+
+COMPATIBILIDADE:
+[Modelos e dispositivos compatíveis]
+
+O QUE VEM NA EMBALAGEM:
+[Lista de itens inclusos]
+
+GARANTIA:
+[Prazo e condições]
+
+- Evite jargão técnico sem explicação
+- Destaque condições de parcelamento se relevante ("até 10x sem juros")
+
+### Ficha Técnica (MAIS IMPORTANTE QUE A DESCRIÇÃO para filtros)
+- Magalu usa ficha técnica para alimentar filtros de busca e Google Shopping
 - Campos incompletos = produto invisível em refinamentos de busca
-- Atributos de destaque (aparecem na listagem): Voltagem, Potência, Dimensões, Peso
+- Atributos de destaque visíveis na listagem: Voltagem, Potência, Dimensões, Peso
+- Preencha obrigatoriamente: Marca, Modelo, Voltagem, Potência, Material, Cor, Dimensões, Peso, Compatibilidade
 
 ### Algoritmo de Ranking
-1. Relevância ficha técnica para filtros de busca
-2. B2W Fulfillment (envio rápido = boost)
+1. Relevância da ficha técnica para filtros de busca
+2. Envio rápido (fulfillment Magalu = boost)
 3. Avaliações de clientes (nota média e volume)
 4. Preço em relação à categoria
-5. Completude do cadastro
+5. Completude do cadastro do produto
 
 ### Tom e Estilo
-- Equilibrado entre formal e acessível
-- Magalu é "Lu da Magalu" — tem personalidade simpática mas respeitosa
-- Destaque condições de parcelamento quando relevante
-- Garantia do fabricante é importante argumento
+- Equilibrado entre formal e acessível — "Lu da Magalu": simpática mas respeitosa
+- Garantia do fabricante é importante argumento de compra
+- Evite jargão técnico sem explicação para o público leigo
 `;

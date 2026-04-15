@@ -45,7 +45,9 @@ serve(async (req) => {
           role: "system",
           content: `${LLM_SAFETY_INSTRUCTION}\n\n${knowledge}\n\nVocê é um copywriter especialista em marketplaces brasileiros.
 Crie títulos e descrições otimizados para os marketplaces solicitados seguindo rigorosamente as regras da base de conhecimento acima.
-Responda APENAS em português brasileiro.`,
+Responda APENAS em português brasileiro.
+
+REGRA CRÍTICA MERCADO LIVRE: a descrição DEVE ser texto puro. Nunca use HTML, bullets (•), emojis ou negrito (**texto**) na descrição do Mercado Livre. Use MAIÚSCULAS para seções e hifens (-) para listas.`,
         },
         {
           role: "user",
@@ -65,7 +67,7 @@ Responda APENAS em português brasileiro.`,
                   type: "object",
                   properties: {
                     title: { type: "string", description: "Título até 60 caracteres" },
-                    description: { type: "string", description: "Descrição detalhada em HTML simples" },
+                    description: { type: "string", description: "TEXTO PURO OBRIGATÓRIO — sem HTML, sem bullets (•), sem emojis, sem negrito. Use MAIÚSCULAS para seções, hifens (-) para listas e \\n para quebras de linha. Exemplo: 'ESPECIFICAÇÕES\\n- Potência: 65W'" },
                   },
                   required: ["title", "description"],
                   additionalProperties: false,
