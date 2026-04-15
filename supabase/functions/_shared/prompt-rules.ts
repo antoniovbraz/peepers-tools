@@ -13,11 +13,14 @@ export const PROMPT_RULES_VERSION = "v1";
 // ─────────────────────────────────────────────────────────────────
 
 export const FIDELITY_RULES = `FIDELITY RULES (MANDATORY — NEVER VIOLATE):
-- Use the EXACT product from these reference photos
-- Do not change: shape, proportions, dimensions, materials, colors, textures, button placement, ports, layout, logos, branding, text, labels
-- Preserve ALL physical characteristics exactly as shown
-- Do not add, remove, or modify any product feature
-- Match the exact surface finish (matte, glossy, brushed, etc.)`;
+- Use the EXACT product from these reference photos — do NOT substitute with a different or generic product
+- Reproduce the EXACT color(s): do not lighten, darken, tint, or alter the hue in any way
+- Reproduce the EXACT shape and proportions: do not round, elongate, or reshape the product
+- Reproduce the EXACT surface finish: matte stays matte, glossy stays glossy, brushed metal stays brushed
+- Reproduce ALL physical details: button placement, ports, logos, branding, text, labels, connectors
+- Preserve ALL textures: fabric weave, rubber grip, leather grain, perforations, etching
+- Do not add, remove, or modify ANY product feature not visible in the reference photos
+- FORBIDDEN: replacing the product with a stock image, illustration, or similar-looking substitute`;
 
 export const REALISM_RULES = `REALISM RULES (MANDATORY):
 - This must look like a REAL photograph, NOT a 3D render or CGI

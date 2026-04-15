@@ -51,7 +51,7 @@ serve(async (req) => {
     const roleDesc = roleDescriptions[imageRole] || "Product image that needs marketing text";
 
     const previousContext = Array.isArray(previousCopies) && previousCopies.length > 0
-      ? `\n\nALREADY USED (do NOT repeat, paraphrase, or use similar angles):\n${(previousCopies as string[]).slice(0, 20).map((c) => `- ${sanitizeForLLM(String(c), 150)}`).join("\n")}`
+      ? `\n\nALREADY USED (do NOT repeat, paraphrase, or use similar angles):\n${(previousCopies as string[]).slice(0, 10).map((c) => `- ${sanitizeForLLM(String(c), 60).split(/\s+/).slice(0, 5).join(" ")}`).join("\n")}`
       : "";
 
     const targetInstruction = Array.isArray(targetElements) && targetElements.length > 0
@@ -115,6 +115,7 @@ Additional rules:
         },
       ],
       tool_choice: { type: "function", function: { name: "generate_copy" } },
+      maxOutputTokens: 300,
     });
 
     if (!response.ok) {

@@ -5,8 +5,8 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, ArrowLeft, RefreshCw, Loader2, Check } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
+import { invokeWithRetry } from "@/lib/retryFetch";
 import { Checkbox } from "@/components/ui/checkbox";
 
 export default function StepAds() {
@@ -24,16 +24,14 @@ export default function StepAds() {
   const generateAds = async () => {
     setLoading(true);
     try {
-      const { data: result, error } = await supabase.functions.invoke("generate-ads", {
-        body: {
-          productName: data.identification.name,
-          category: data.identification.category,
-          suggested_category: data.identification.suggested_category,
-          characteristics: data.identification.characteristics,
-          extras: data.identification.extras,
-          marketplace: "all",
-          includeBrand,
-        },
+      const { data: result, error } = await invokeWithRetry("generate-ads", {
+        productName: data.identification.name,
+        category: data.identification.category,
+        suggested_category: data.identification.suggested_category,
+        characteristics: data.identification.characteristics,
+        extras: data.identification.extras,
+        marketplace: "all",
+        includeBrand,
       });
       if (error) throw error;
       if (result?.error) throw new Error(result.error);

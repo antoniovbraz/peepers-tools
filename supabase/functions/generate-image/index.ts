@@ -21,8 +21,8 @@ serve(async (req) => {
       return errorResponse("Prompt inválido", 400, cors, "VALIDATION_ERROR");
     }
     if (referencePhotos !== undefined && referencePhotos !== null) {
-      if (!Array.isArray(referencePhotos) || referencePhotos.length > 3) {
-        return errorResponse("Fotos de referência inválidas (max 3)", 400, cors, "VALIDATION_ERROR");
+      if (!Array.isArray(referencePhotos) || referencePhotos.length > 10) {
+        return errorResponse("Fotos de referência inválidas (max 10)", 400, cors, "VALIDATION_ERROR");
       }
       for (const url of referencePhotos) {
         if (typeof url !== "string" || (!url.startsWith("https://") && !url.startsWith("data:image/"))) {
@@ -38,7 +38,7 @@ serve(async (req) => {
 
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const contentParts: any[] = [];
-    const photos = (referencePhotos || []).slice(0, 3);
+    const photos = (referencePhotos || []).slice(0, 10);
     if (photos.length > 0) {
       contentParts.push({
         type: "text",

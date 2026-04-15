@@ -72,7 +72,7 @@ const IMAGE_RULES_MAGALU = `
 **Dica Magalu:** Fotos de infográfico com especificações destacadas (imagens 2-6) ajudam compradores que não leem a descrição. Magalu tem público mais diverso — imagem com callouts de specs simples converte bem.
 `;
 
-const IMAGE_QUALITY_GUIDELINES = `
+const IMAGE_QUALITY_HEADER = `
 ## DIRETRIZES DE QUALIDADE PARA AI IMAGE GENERATION
 
 ### Para gerar prompts de imagem de produto:
@@ -86,16 +86,29 @@ const IMAGE_QUALITY_GUIDELINES = `
 - Modelo ou mão segurando o produto (aumenta escala e contexto de uso)
 - Cores neutras no background do lifestyle para não competir com o produto
 - Iluminação natural quando lifestyle, studio quando foco no produto
+`;
 
+const CATEGORY_STYLES: Record<string, string> = {
+  acessorios_celular: "| Acessórios celular | Clean tech, white/dark background, product hero |",
+  eletronicos:        "| Eletrônicos | Clean tech, white/dark background, product hero |",
+  moda:               "| Moda | Model wearing, lifestyle context, natural light |",
+  casa_cozinha:       "| Casa/Cozinha | Kitchen/home context, warm lighting, lifestyle |",
+  brinquedos:         "| Brinquedos | Bright, colorful, child context, safe & fun vibe |",
+  beleza:             "| Beleza | Soft light, pastel tones, luxury feel |",
+  papelaria:          "| Papelaria | Clean desk context, natural light, organized scene |",
+  esportes:           "| Esportes | Dynamic context, outdoor/gym, energetic lighting |",
+  automotivo:         "| Automotivo | Dark/dramatic studio, specular highlights, precision feel |",
+  saude:              "| Saúde | Clinical-clean white background, trust/purity tone |",
+};
+
+const CATEGORY_STYLES_ALL = `
 ### Estilos por categoria:
 | Categoria | Estilo recomendado |
 |---|---|
-| Acessórios celular | Clean tech, white/dark background, product hero |
-| Moda | Model wearing, lifestyle context, natural light |
-| Casa/Cozinha | Kitchen/home context, warm lighting, lifestyle |
-| Brinquedos | Bright, colorful, child context, safe & fun vibe |
-| Beleza | Soft light, pastel tones, luxury feel |
+${Object.values(CATEGORY_STYLES).join("\n")}
 `;
+
+const IMAGE_QUALITY_GUIDELINES = IMAGE_QUALITY_HEADER + CATEGORY_STYLES_ALL;
 
 type ImageMarketplace = "mercadoLivre" | "shopee" | "amazon" | "magalu" | "all";
 
@@ -107,10 +120,11 @@ const MARKETPLACE_IMAGE_RULES: Record<string, string> = {
 };
 
 /**
- * Get image rules filtered by marketplace.
- * Includes quality guidelines always, marketplace rules only for the active marketplace.
+ * Get image rules filtered by marketplace and optionally by category.
+ * Includes quality guidelines always, marketplace rules only for the active marketplace,
+ * and category-specific style only when category is provided.
  */
-export function getImageRules(marketplace: ImageMarketplace = "all"): string {
+export function getImageRules(marketplace: ImageMarketplace = "all", category?: string): string {
   const sections = ["## REGRAS DE IMAGENS POR MARKETPLACE\n"];
 
   if (marketplace === "all") {
@@ -120,7 +134,13 @@ export function getImageRules(marketplace: ImageMarketplace = "all"): string {
     if (rules) sections.push(rules);
   }
 
-  sections.push(IMAGE_QUALITY_GUIDELINES);
+  // Category-filtered quality guidelines (saves ~300-400 tokens vs full table)
+  if (category && CATEGORY_STYLES[category]) {
+    sections.push(IMAGE_QUALITY_HEADER + `\n### Estilo recomendado para esta categoria:\n| Categoria | Estilo |\n|---|---|\n${CATEGORY_STYLES[category]}\n`);
+  } else {
+    sections.push(IMAGE_QUALITY_GUIDELINES);
+  }
+
   return sections.join("\n");
 }
 

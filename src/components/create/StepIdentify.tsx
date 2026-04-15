@@ -5,9 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, ArrowLeft, Check, Edit3, Brain, Plus, ChevronDown, Tag } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
+import { invokeWithRetry } from "@/lib/retryFetch";
 import {
   Collapsible,
   CollapsibleContent,
@@ -43,8 +43,8 @@ export default function StepIdentify() {
     setLoading(true);
     try {
       // photoUrls are now public Storage URLs — pass them directly
-      const { data: result, error } = await supabase.functions.invoke("identify-product", {
-        body: { photoUrls: data.photoUrls.slice(0, 4) },
+      const { data: result, error } = await invokeWithRetry("identify-product", {
+        photoUrls: data.photoUrls.slice(0, 4),
       });
 
       if (error) throw error;

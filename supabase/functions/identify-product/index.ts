@@ -91,6 +91,7 @@ Para o campo suggested_category, escolha O MAIS ADEQUADO entre estas opções: $
         },
       ],
       tool_choice: { type: "function", function: { name: "identify_product" } },
+      maxOutputTokens: 500,
     });
 
     if (!response.ok) {

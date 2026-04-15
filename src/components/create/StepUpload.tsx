@@ -4,6 +4,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Camera, X, ArrowRight, Loader2, Upload } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "@/hooks/use-toast";
+import { ToastAction } from "@/components/ui/toast";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
 import { supabase } from "@/integrations/supabase/client";
 import { compressImage } from "@/lib/compressImage";
@@ -55,6 +56,34 @@ export default function StepUpload() {
       const allFiles = [...data.photos, ...compressed];
       const allUrls = [...data.photoUrls, ...newUrls];
       updatePhotos(allFiles, allUrls);
+
+      // Offer to save to device gallery (works on mobile browsers that support Web Share API with files)
+      // This is the only reliable cross-platform way to save files to the device gallery from a web app.
+      const isMobile = navigator.maxTouchPoints > 0;
+      if (isMobile && "share" in navigator && typeof navigator.share === "function") {
+        const canShare = "canShare" in navigator && (navigator as Navigator & { canShare: (data?: ShareData) => boolean }).canShare({ files: compressed });
+        if (canShare) {
+          const filesToShare = [...compressed]; // capture for closure
+          toast({
+            title: "Fotos enviadas!",
+            description: "Deseja salvar as fotos na galeria do dispositivo?",
+            action: (
+              <ToastAction
+                altText="Salvar na galeria"
+                onClick={async () => {
+                  try {
+                    await navigator.share({ files: filesToShare, title: "Fotos do produto" });
+                  } catch {
+                    // User dismissed the share sheet — no-op
+                  }
+                }}
+              >
+                Salvar na galeria
+              </ToastAction>
+            ),
+          });
+        }
+      }
     } catch (err) {
       handleError(err, "Erro no upload");
     } finally {

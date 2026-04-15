@@ -2,9 +2,7 @@
  * SEO strategy per marketplace. Injected when generating titles and descriptions.
  */
 
-export const SEO_STRATEGY = `
-## ESTRATÉGIA DE SEO POR MARKETPLACE
-
+const SEO_ML = `
 ### Mercado Livre SEO
 **Como o algoritmo indexa:**
 - Título: cada palavra vira keyword — coloque os termos mais buscados nos primeiros 40 chars
@@ -29,7 +27,9 @@ export const SEO_STRATEGY = `
 - "Tênis Corrida Masculino Amortecimento Gel N42" (45 chars)
 
 **Dica crítica de ficha técnica:** Preencher "Potência: 65W" cria indexação automática no filtro "Potência > 65W" — compradores que filtram por potência vêem seu produto.
+`;
 
+const SEO_SHOPEE = `
 ### Shopee SEO
 **Como o algoritmo indexa:**
 - Título: keyword repetition é PERMITIDA e RECOMENDADA (vs. ML que penaliza)
@@ -53,7 +53,9 @@ export const SEO_STRATEGY = `
 - Infantil/brinquedos: #brinquedos #infantil #criancas #presente #educativo
 - Esportes: #esportes #fitness #treino #academia #esportivo
 - Saúde: #saude #saudavel #bemestar #vitaminasEsuplementos
+`;
 
+const SEO_AMAZON = `
 ### Amazon BR SEO (Algoritmo A9)
 **Fatores de ranking — em ordem de peso:**
 1. Relevância: correspondência entre query do comprador e título/bullets/descrição
@@ -76,7 +78,9 @@ export const SEO_STRATEGY = `
 - Skincare: "moisturizer serum vitamin c hyaluronic acid anti-aging cream skin care natural organic vegan"
 
 **Regra de ouro A9:** Título e bullets já indexam suas palavras. Use backend terms para cobrir sinônimos, variações ortográficas e termos em inglês que os compradores digitam.
+`;
 
+const SEO_MAGALU = `
 ### Magalu SEO
 **Como o algoritmo indexa:**
 - Busca interna Luiza: título + ficha técnica (principal vetor de filtragem)
@@ -90,4 +94,24 @@ export const SEO_STRATEGY = `
 **Estrutura de título Magalu para Google Shopping (150 chars):**
 [Produto] [Marca opcional] [Especificação técnica] [Diferencial] [Material/Cor/Quantidade]
 `;
+
+type SeoMarketplace = "mercadoLivre" | "shopee" | "amazon" | "magalu" | "all";
+
+const SEO_HEADER = `## ESTRATÉGIA DE SEO POR MARKETPLACE\n`;
+
+/**
+ * Returns SEO strategy filtered to the specified marketplace.
+ * Use instead of SEO_STRATEGY when marketplace is known — saves ~300–600 tokens per call.
+ */
+export function getSEOStrategy(marketplace: SeoMarketplace = "all"): string {
+  const sections: string[] = [SEO_HEADER];
+  if (marketplace === "all" || marketplace === "mercadoLivre") sections.push(SEO_ML);
+  if (marketplace === "all" || marketplace === "shopee") sections.push(SEO_SHOPEE);
+  if (marketplace === "all" || marketplace === "amazon") sections.push(SEO_AMAZON);
+  if (marketplace === "all" || marketplace === "magalu") sections.push(SEO_MAGALU);
+  return sections.join("\n");
+}
+
+/** @deprecated Use getSEOStrategy(marketplace) for filtered output */
+export const SEO_STRATEGY = getSEOStrategy("all");
 

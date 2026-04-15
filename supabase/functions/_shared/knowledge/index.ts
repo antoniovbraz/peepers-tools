@@ -7,7 +7,7 @@
 import { MERCADO_LIVRE_RULES, SHOPEE_RULES, AMAZON_BR_RULES, MAGALU_RULES } from "./marketplace-rules.ts";
 import { COPYWRITING_FRAMEWORK } from "./copywriting.ts";
 import { getCategoryGuide, normalizeCategory, type KnowledgeCategory } from "./category-guides.ts";
-import { SEO_STRATEGY } from "./seo-strategy.ts";
+import { getSEOStrategy } from "./seo-strategy.ts";
 import { IMAGE_RULES, getImageRules } from "./image-rules.ts";
 import { IMAGE_ROLES_KNOWLEDGE } from "./image-roles.ts";
 import { getCategoryImageGuide } from "./category-image.ts";
@@ -70,7 +70,7 @@ export function buildKnowledge(options: BuildKnowledgeOptions): string {
     if (normalizedCategory) {
       sections.push(getCategoryGuide(normalizedCategory));
     }
-    sections.push(SEO_STRATEGY);
+    sections.push(getSEOStrategy(marketplace));
   }
 
   if (functionName === "overlay_copy") {
@@ -83,7 +83,7 @@ export function buildKnowledge(options: BuildKnowledgeOptions): string {
 
   if (functionName === "prompts") {
     // Core: marketplace image rules + visual roles + category photo guidance
-    sections.push(getImageRules(marketplace));
+    sections.push(getImageRules(marketplace, normalizedCategory));
     sections.push(IMAGE_ROLES_KNOWLEDGE);
     if (normalizedCategory) {
       sections.push(getCategoryImageGuide(normalizedCategory));

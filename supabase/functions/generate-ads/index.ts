@@ -113,6 +113,7 @@ REGRA CRÍTICA MERCADO LIVRE: a descrição DEVE ser texto puro. Nunca use HTML,
         },
       ],
       tool_choice: { type: "function", function: { name: "generate_ads" } },
+      maxOutputTokens: 2000,
     });
 
     if (!response.ok) {

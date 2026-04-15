@@ -3,9 +3,9 @@ import { useCreateListing, PromptCard } from "@/context/CreateListingContext";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { ArrowRight, ArrowLeft, RefreshCw, ClipboardList, Loader2, ThumbsUp, Sparkles, XCircle, Plus } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
+import { invokeWithRetry } from "@/lib/retryFetch";
 import PromptCardItem from "./PromptCardItem";
 
 const MAX_PROMPTS = 7;
@@ -37,16 +37,15 @@ export default function StepPrompts() {
   const generatePrompts = async () => {
     setLoading(true);
     try {
-      const { data: result, error } = await supabase.functions.invoke("generate-prompts", {
-        body: {
-          productName: data.identification.name,
-          category: data.identification.category,
-          suggested_category: data.identification.suggested_category,
-          characteristics: data.identification.characteristics,
-          extras: data.identification.extras,
-          adTitle: data.ads.mercadoLivre.title,
-          marketplace: data.marketplace,
-        },
+      const { data: result, error } = await invokeWithRetry("generate-prompts", {
+        productName: data.identification.name,
+        category: data.identification.category,
+        suggested_category: data.identification.suggested_category,
+        characteristics: data.identification.characteristics,
+        extras: data.identification.extras,
+        adTitle: data.ads.mercadoLivre.title,
+        marketplace: data.marketplace,
+        referencePhotos: data.photoUrls,
       });
       if (error) throw error;
       if (result?.error) throw new Error(result.error);
@@ -126,7 +125,7 @@ export default function StepPrompts() {
     setBatchProgress(0);
 
     const pending = prompts.filter(p => !p.imageUrl && !p.approved);
-    const referencePhotos = data.photoUrls.slice(0, 3);
+    const referencePhotos = data.photoUrls;
 
     for (let idx = 0; idx < pending.length; idx++) {
       if (cancelRef.current) break;
@@ -134,12 +133,13 @@ export default function StepPrompts() {
       setBatchProgress(idx + 1);
 
       try {
-        const { data: result, error } = await supabase.functions.invoke("generate-image", {
-          body: { prompt: p.prompt, referencePhotos, feedback: p.feedback },
+        const { data: result, error } = await invokeWithRetry("generate-image", {
+          prompt: p.prompt, referencePhotos, feedback: p.feedback,
         });
         if (error) throw error;
         if (result?.error) throw new Error(result.error);
         if (result?.imageUrl) {
+          // Persist immediately — survives page refresh
           updatePrompt(p.id, { imageUrl: result.imageUrl });
         }
       } catch (err) {

@@ -762,8 +762,9 @@ export async function callAI(params: {
   tool_choice?: any;
   modalities?: string[];
   requestId?: string;
+  maxOutputTokens?: number;
 }): Promise<Response> {
-  const { userId, functionName, messages, tools, tool_choice, modalities, requestId } = params;
+  const { userId, functionName, messages, tools, tool_choice, modalities, requestId, maxOutputTokens } = params;
 
   // 1. Get user's provider/model config (or defaults)
   const config = await getUserAIConfig(userId, functionName);
@@ -802,6 +803,7 @@ export async function callAI(params: {
           tools,
           tool_choice,
           modalities,
+          maxOutputTokens,
         });
         break;
 
@@ -1090,8 +1092,9 @@ export async function callGoogleAI(params: {
   tools?: any[];
   tool_choice?: any;
   modalities?: string[];
+  maxOutputTokens?: number;
 }): Promise<Response> {
-  const { apiKey, model, messages, temperature = 0.7, tools, tool_choice, modalities } = params;
+  const { apiKey, model, messages, temperature = 0.7, tools, tool_choice, modalities, maxOutputTokens } = params;
 
   const isImageGeneration = modalities?.includes("image");
 
@@ -1103,6 +1106,7 @@ export async function callGoogleAI(params: {
     contents,
     generationConfig: {
       temperature,
+      ...(maxOutputTokens ? { maxOutputTokens } : {}),
     },
   };
 
