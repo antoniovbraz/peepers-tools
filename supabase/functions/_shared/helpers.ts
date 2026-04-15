@@ -868,7 +868,7 @@ export async function callAI(params: {
     // If gemini-2.5-flash (or any other google text model) returns 503/429,
     // try a chain of fallback models before giving up.
     if (!response.ok && config.providerId === "google" && !modalities?.includes("image")) {
-      if (response.status === 503 || response.status === 429) {
+      if (response.status === 503) {
         const GOOGLE_TEXT_FALLBACKS = ["gemini-2.0-flash", "gemini-1.5-flash"];
         for (const fallbackModel of GOOGLE_TEXT_FALLBACKS) {
           if (config.modelId === fallbackModel) continue;
@@ -1164,7 +1164,7 @@ export async function callGoogleAI(params: {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
-  }, { timeoutMs: 120_000, maxRetries: 2, initialDelayMs: 1000 });
+  }, { timeoutMs: 120_000, maxRetries: 1, initialDelayMs: 1000 });
 
   if (!response.ok) {
     // Read and log the actual Google error before returning
