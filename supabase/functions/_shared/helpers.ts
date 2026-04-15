@@ -1179,7 +1179,23 @@ export async function callGoogleAI(params: {
   const data = await response.json();
 
   // Convert Gemini response → OpenAI-compatible format
-  return new Response(JSON.stringify(convertResponse(data, isImageGeneration)), {
+  const converted = convertResponse(data, isImageGeneration);
+
+  // If tools were expected but no function call in response (empty/filtered candidate),
+  // return 503 so callAI's fallback chain can retry with a different model.
+  if (tools && tools.length > 0 && !isImageGeneration) {
+    const hasToolCall = (converted as any).choices?.[0]?.message?.tool_calls?.[0];
+    if (!hasToolCall) {
+      const meta = (converted as any)._meta;
+      console.warn(`[callGoogleAI] Model ${model} returned 200 but no function call (finishReason: ${meta?.finishReason ?? "unknown"}) — signaling 503 for fallback`);
+      return new Response(JSON.stringify(converted), {
+        status: 503,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+  }
+
+  return new Response(JSON.stringify(converted), {
     status: 200,
     headers: { "Content-Type": "application/json" },
   });
